@@ -68,13 +68,56 @@ class TempDockWidget(QDockWidget):
                 if d != self and d.isFloating() and not d.isHidden():
                     d.hide()
 
+class DataDockModel(QAbstractTableModel):
+    headings = ['Laps', 'Time', 'R', 'A', '1', 'Delta', 'Time offset', 'Dist offset']
+    def __init__(self, data_view):
+        super().__init__()
+        self.data_view = data_view
+        self.laps = []
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.headings[section]
+        return None
+
+    def set_data(self, laps):
+        old_len = len(self.laps)
+        self.laps = laps
+        self.layoutChanged.emit()
+
+    def rowCount(self, index): return len(self.laps)
+    def columnCount(self, index): return 8
+
+    def data(self, index, role):
+        if role == Qt.DisplayRole:
+            lapref, best_lap = self.laps[index.row()]
+            col = index.column()
+            if col == 0: return str(lapref.lap.num)
+            if col == 1: return '%d:%06.3f' % (lapref.lap.duration() // 60000,
+                                               lapref.lap.duration() % 60000 / 1000)
+            if col == 2: return '\u2b24' if lapref.same_log_and_lap(self.data_view.ref_lap) else '\u25cb'
+            if col == 3: return '\u24ff' if lapref.same_log_and_lap(self.data_view.alt_lap) else '\u25cb'
+            if col == 4: return ([chr(0x278b + idx)
+                                  for idx, lap in enumerate(self.data_view.extra_laps)
+                                  if lap.same_log_and_lap(lapref)] +
+                                 ['\u25cb'])[0]
+            if col == 5: return '%d:%06.3f' % ((lapref.lap.duration() - best_lap) // 60000,
+                                               (lapref.lap.duration() - best_lap) % 60000 / 1000)
+            return None
+        if role == Qt.TextAlignmentRole:
+            col = index.column()
+            if col >= 2 and col <= 4: return Qt.AlignHCenter | Qt.AlignVCenter
+            return Qt.AlignLeft | Qt.AlignVCenter
+        return None
+
 class DataDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
         super().__init__('Data', mainwindow, toolbar, True)
 
-        self.table = QTableWidget(1, 8)
-        self.table.setHorizontalHeaderLabels(['Laps', 'Time', 'R', 'A', '1', 'Delta',
-                                              'Time offset', 'Dist offset'])
+        self.model = DataDockModel(mainwindow.data_view)
+        self.table = QTableView()
+        self.table.setModel(self.model)
+        self.table.setSelectionMode(self.table.SingleSelection)
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setShowGrid(False)
         self.table.horizontalHeader().setHighlightSections(False)
@@ -86,56 +129,40 @@ class DataDockWidget(TempDockWidget):
         self.table.verticalHeader().setMinimumSectionSize(5)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.table.setEditTriggers(self.table.NoEditTriggers)
-        self.table.cellClicked.connect(self.clickCell)
+        self.table.pressed.connect(self.clickCell)
         self.setWidget(self.table)
-        self.laps = []
 
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()
 
-    def clickCell(self, row, col):
+    def clickCell(self, index):
+        row = index.row()
+        col = index.column()
+        lapref = self.model.laps[row][0]
         if col <= 2:
-            self.mainwindow.data_view.ref_lap = self.laps[row]
+            self.mainwindow.data_view.ref_lap = lapref
             self.mainwindow.data_view.zoom_window = (state.TimeDistRef(0, 0),
                                                      state.TimeDistRef(0, 0))
         elif col == 3:
-            if self.mainwindow.data_view.alt_lap == self.laps[row]:
+            if self.mainwindow.data_view.alt_lap == lapref:
                 self.mainwindow.data_view.alt_lap = None
             else:
-                self.mainwindow.data_view.alt_lap = self.laps[row]
+                self.mainwindow.data_view.alt_lap = lapref
         elif col == 4:
-            if self.laps[row] in self.mainwindow.data_view.extra_laps:
-                self.mainwindow.data_view.extra_laps.remove(self.laps[row])
+            if lapref in self.mainwindow.data_view.extra_laps: # XXX need to ignore offset
+                self.mainwindow.data_view.extra_laps.remove(lapref)
             elif len(self.mainwindow.data_view.extra_laps) < 7: # some sane upper bound
-                self.mainwindow.data_view.extra_laps.append(self.laps[row])
+                self.mainwindow.data_view.extra_laps.append(lapref)
         self.mainwindow.data_view.values_change.emit()
         self.mainwindow.data_view.data_change.emit()
 
     def recompute(self):
-        self.table.setRowCount(sum(len(logfile.log.get_laps())
-                                   for logfile in self.mainwindow.data_view.log_files))
-        self.laps = []
-        for logref in self.mainwindow.data_view.log_files:
-            logfile = logref.log
-            best_lap = min(logfile.get_laps(), key=lambda x: x.duration()).duration()
-            for lap in logfile.get_laps():
-                lapref = state.LapRef(logref, lap, state.TimeDistRef(0, 0))
-                dst = len(self.laps)
-                self.table.setItem(dst, 0, QTableWidgetItem(str(lap.num)))
-                self.table.setItem(dst, 1, QTableWidgetItem('%d:%06.3f' % (lap.duration() // 60000, lap.duration() % 60000 / 1000)))
-                self.table.setItem(dst, 2, QTableWidgetItem(
-                    '\u2b24' if lapref.same_log_and_lap(self.mainwindow.data_view.ref_lap) else '\u25cb'))
-                self.table.setItem(dst, 3, QTableWidgetItem(
-                    '\u24ff' if lapref.same_log_and_lap(self.mainwindow.data_view.alt_lap) else '\u25cb'))
-                self.table.setItem(dst, 4, QTableWidgetItem(
-                    ([chr(0x278b + idx)
-                      for idx, lap in enumerate(self.mainwindow.data_view.extra_laps)
-                      if lap.same_log_and_lap(lapref)] +
-                     ['\u25cb'])[0]))
-                self.table.setItem(dst, 5, QTableWidgetItem('%d:%06.3f' % ((lap.duration() - best_lap) // 60000, (lap.duration() - best_lap) % 60000 / 1000)))
-                for c in range(2, 5):
-                    self.table.item(dst, c).setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
-                self.laps.append(lapref)
+        logs = [(logref, min(logref.log.get_laps(), key=lambda x: x.duration()).duration())
+                for logref in self.mainwindow.data_view.log_files]
+        laps = [(state.LapRef(logref, lap, state.TimeDistRef(0., 0.)), best_lap)
+                for logref, best_lap in logs
+                for lap in logref.log.get_laps()]
+        self.model.set_data(laps)
 
 class TextMatcher:
     def __init__(self, txt):
