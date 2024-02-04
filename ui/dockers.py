@@ -26,6 +26,60 @@ from . import map
 from . import state
 from . import widgets
 
+class FastTableModel(QAbstractTableModel):
+    def __init__(self):
+        super().__init__()
+        self.heading = []
+        self.row_count = 0
+        self.col_count = 0
+
+    def set_data(self, heading, nrows):
+        self.heading = heading
+        self.row_count = nrows
+        self.col_count = len(heading)
+        self.layoutChanged.emit()
+
+    def headerData(self, section, orientation, role):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.heading[section]
+        return None
+
+    # Called too often, make them fast
+    def rowCount(self, index): return self.row_count
+    def columnCount(self, index): return self.col_count
+
+    def data(self, index, role): return None
+
+    # end user must override
+    def present(self, index):
+        return None
+
+
+class FastItemDelegate(QAbstractItemDelegate):
+    def __init__(self, model, margin):
+        super().__init__()
+        self.model = model
+        self.margin = margin
+        self.metrics = None # only one fontmetrics - not worried about section names exceeding width
+
+    def paint(self, painter, opt, index):
+        (fg, bg, font, align), txt = self.model.present(index)
+        if bg and not (opt.state & QStyle.State_Selected):
+            painter.fillRect(opt.rect, bg)
+        if txt:
+            painter.setPen(fg)
+            painter.setFont(font)
+            rect = opt.rect.adjusted(self.margin, 0, -self.margin, 0)
+            painter.drawText(rect, align,
+                             self.metrics.elidedText(txt, Qt.ElideRight, rect.width()))
+
+    def sizeHint(self):
+        return QSize(1, 1) # who cares
+
+    def set_metrics(self, metrics):
+        self.metrics = metrics
+
+
 class TempDockWidget(QDockWidget):
     def __init__(self, title, mainwindow, toolbar, prefer_float):
         super().__init__(title)
@@ -321,7 +375,7 @@ class ValuesTableFuncTime(ValuesTableFunc):
         return '%+.f:%06.3f' % (math.copysign(math.trunc(ms / 60000), ms),
                                abs(ms) % 60000 / 1000)
 
-class ValuesTableModel(QAbstractTableModel):
+class ValuesTableModel(FastTableModel):
     def __init__(self, data_view):
         super().__init__()
         self.data_view = data_view
@@ -333,36 +387,19 @@ class ValuesTableModel(QAbstractTableModel):
                               None, Qt.AlignTop | Qt.AlignRight]
         self.delta_style   = [QtGui.QPen(QtGui.QColor(192, 192, 192)), QtGui.QColor(48, 48, 48),
                               None, Qt.AlignTop | Qt.AlignRight]
-        self.heading = ['', '', '']
         self.rows = []
-        self.row_count = 0
         self.laps = []
-        self.col_count = 3
         self.delta_idx = None
 
     def set_data(self, heading, rows, laps, delta_idx):
-        self.heading = heading
         self.rows = rows
-        self.row_count = len(rows)
         self.laps = laps
-        self.col_count = len(laps) + 3
         self.delta_idx = delta_idx
         self.update_cursor()
-        self.layoutChanged.emit()
+        super().set_data(heading, len(rows))
 
     def update_cursor(self):
         self.laps = [(l, float(self.data_view.cursor2outTime(l))) for l, old_time in self.laps]
-
-    def headerData(self, section, orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
-            return self.heading[section]
-        return None
-
-    # Called too often, make them fast
-    def rowCount(self, index): return self.row_count
-    def columnCount(self, index): return self.col_count
-
-    def data(self, index, role): return None
 
     def present(self, index):
         handler = self.rows[index.row()]
@@ -374,26 +411,6 @@ class ValuesTableModel(QAbstractTableModel):
             self.laps[col],
             None if self.delta_idx is None else self.laps[self.delta_idx])
 
-class ValuesItemDelegate(QAbstractItemDelegate):
-    def __init__(self, model, margin):
-        super().__init__()
-        self.model = model
-        self.margin = margin
-        self.metrics = None # only one fontmetrics - not worried about section names exceeding width
-
-    def paint(self, painter, opt, index):
-        (fg, bg, font, align), txt = self.model.present(index)
-        if bg and not (opt.state & QStyle.State_Selected):
-            painter.fillRect(opt.rect, bg)
-        if txt:
-            painter.setPen(fg)
-            painter.setFont(font)
-            rect = opt.rect.adjusted(self.margin, 0, -self.margin, 0)
-            painter.drawText(rect, align,
-                             self.metrics.elidedText(txt, Qt.ElideRight, rect.width()))
-
-    def sizeHint(self):
-        return QSize(1, 1) # who cares
 
 class ValuesDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
@@ -406,7 +423,7 @@ class ValuesDockWidget(TempDockWidget):
         self.margin = 2
 
         self.model = ValuesTableModel(mainwindow.data_view)
-        self.deleg = ValuesItemDelegate(self.model, self.margin)
+        self.deleg = FastItemDelegate(self.model, self.margin)
         self.table = QTableView()
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
@@ -488,7 +505,7 @@ class ValuesDockWidget(TempDockWidget):
         self.model.channel_style[2] = font
         self.model.value_style[2] = font
         self.model.delta_style[2] = font
-        self.deleg.metrics = self.font_metrics
+        self.deleg.set_metrics(self.font_metrics)
 
         dv = self.mainwindow.data_view
 
