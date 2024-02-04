@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from cx_Freeze import setup, Executable
+from version import version
 
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
@@ -10,7 +11,7 @@ build_exe_options = {
 
 setup(
     name = 'Track Data Analysis',
-    version = '0.1.0',
+    version = version,
     description = 'Graphical tool to view data from race cars',
     options = {'build_exe': build_exe_options,
                'bdist_msi': {

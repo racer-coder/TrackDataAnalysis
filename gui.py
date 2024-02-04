@@ -34,6 +34,7 @@ import ui.layout
 import ui.state
 import ui.timedist
 import ui.widgets
+from version import version
 
 class TimeDistStatus(QLabel):
     def __init__(self, data_view):
@@ -170,8 +171,8 @@ class MainWindow(QMainWindow):
     def update_title(self):
         if self.workspace_fname:
             self.config['main']['workspace'] = self.workspace_fname
-            self.setWindowTitle("Track Data Analysis - " +
-                                os.path.splitext(os.path.basename(self.workspace_fname))[0])
+            self.setWindowTitle("Track Data Analysis %s - %s" % (
+                version, os.path.splitext(os.path.basename(self.workspace_fname))[0]))
         else:
             self.config.remove_option('main', 'workspace')
             self.setWindowTitle("Track Data Analysis")
