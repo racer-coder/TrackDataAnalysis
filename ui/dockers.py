@@ -155,8 +155,10 @@ class DataDockModel(QAbstractTableModel):
                                   for idx, lap in enumerate(self.data_view.extra_laps)
                                   if lap.same_log_and_lap(lapref)] +
                                  ['\u25cb'])[0]
-            if col == 5: return '%d:%06.3f' % ((lapref.lap.duration() - best_lap) // 60000,
-                                               (lapref.lap.duration() - best_lap) % 60000 / 1000)
+            if col == 5:
+                diff = lapref.lap.duration() - best_lap
+                return '%.f:%06.3f' % (math.copysign(math.trunc(diff / 60000), diff),
+                                       abs(diff) % 60000 / 1000)
             return None
         if role == Qt.TextAlignmentRole:
             col = index.column()
