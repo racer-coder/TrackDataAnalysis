@@ -139,22 +139,24 @@ class DataDockWidget(TempDockWidget):
         row = index.row()
         col = index.column()
         lapref = self.model.laps[row][0]
+        data_view = self.mainwindow.data_view
         if col <= 2:
-            self.mainwindow.data_view.ref_lap = lapref
-            self.mainwindow.data_view.zoom_window = (state.TimeDistRef(0, 0),
+            data_view.ref_lap = lapref
+            data_view.zoom_window = (state.TimeDistRef(0, 0),
                                                      state.TimeDistRef(0, 0))
         elif col == 3:
-            if self.mainwindow.data_view.alt_lap == lapref:
-                self.mainwindow.data_view.alt_lap = None
+            if data_view.alt_lap == lapref:
+                data_view.alt_lap = None
             else:
-                self.mainwindow.data_view.alt_lap = lapref
+                data_view.alt_lap = lapref
         elif col == 4:
-            if lapref in self.mainwindow.data_view.extra_laps: # XXX need to ignore offset
-                self.mainwindow.data_view.extra_laps.remove(lapref)
-            elif len(self.mainwindow.data_view.extra_laps) < 7: # some sane upper bound
-                self.mainwindow.data_view.extra_laps.append(lapref)
-        self.mainwindow.data_view.values_change.emit()
-        self.mainwindow.data_view.data_change.emit()
+            removed = [l for l in data_view.extra_laps if not l.same_log_and_lap(lapref)]
+            if len(removed) != len(data_view.extra_laps):
+                data_view.extra_laps = removed
+            elif len(data_view.extra_laps) < 8: # some sane upper bound
+                data_view.extra_laps.append(lapref)
+        data_view.values_change.emit()
+        data_view.data_change.emit()
 
     def recompute(self):
         logs = [(logref, min(logref.log.get_laps(), key=lambda x: x.duration()).duration())
