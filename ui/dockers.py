@@ -106,8 +106,9 @@ class DataDockModel(QAbstractTableModel):
             return None
         if role == Qt.TextAlignmentRole:
             col = index.column()
-            if col >= 2 and col <= 4: return Qt.AlignHCenter | Qt.AlignVCenter
-            return Qt.AlignLeft | Qt.AlignVCenter
+            # XXX Can't get QT to respect any vertical alignment here...
+            if col >= 2 and col <= 4: return Qt.AlignHCenter #| Qt.AlignVCenter
+            return Qt.AlignRight # | Qt.AlignVCenter
         return None
 
 class DataDockWidget(TempDockWidget):
@@ -158,9 +159,13 @@ class DataDockWidget(TempDockWidget):
         data_view.values_change.emit()
         data_view.data_change.emit()
 
+    def best_lap(self, logref):
+        laps = logref.log.get_laps()
+        return min(laps[1:-1] if len(laps) >= 3 else laps,
+                   key=lambda x: x.duration()).duration()
+
     def recompute(self):
-        logs = [(logref, min(logref.log.get_laps(), key=lambda x: x.duration()).duration())
-                for logref in self.mainwindow.data_view.log_files]
+        logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
         laps = [(state.LapRef(logref, lap, state.TimeDistRef(0., 0.)), best_lap)
                 for logref, best_lap in logs
                 for lap in logref.log.get_laps()]
