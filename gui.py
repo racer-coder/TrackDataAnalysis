@@ -260,6 +260,7 @@ class MainWindow(QMainWindow):
 
         progress = QProgressDialog('Processing file', 'Cancel', 0, 100, self)
         progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(1000)
         def update_progress(pos, total):
             progress.setMaximum(total)
             progress.setValue(pos)
@@ -270,8 +271,8 @@ class MainWindow(QMainWindow):
             obj = builder(file_name, update_progress)
         except KeyboardInterrupt:
             return # abort load
-
-        progress.deleteLater()
+        finally:
+            progress.deleteLater()
 
         self.data_view.log_files.append(
             ui.state.LogRef(data.distance.DistanceWrapper(obj)))
