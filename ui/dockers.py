@@ -143,8 +143,7 @@ class DataDockWidget(TempDockWidget):
         data_view = self.mainwindow.data_view
         if col <= 2:
             data_view.ref_lap = lapref
-            data_view.zoom_window = (state.TimeDistRef(0, 0),
-                                                     state.TimeDistRef(0, 0))
+            data_view.zoom_window = (state.TimeDistRef(0, 0), state.TimeDistRef(0, 0))
         elif col == 3:
             if data_view.alt_lap == lapref:
                 data_view.alt_lap = None
@@ -390,12 +389,8 @@ class ValuesItemDelegate(QAbstractItemDelegate):
             painter.setPen(fg)
             painter.setFont(font)
             rect = opt.rect.adjusted(self.margin, 0, -self.margin, 0)
-            while self.metrics.horizontalAdvance(txt) > rect.width():
-                if not txt.endswith('...'): txt = txt[:-1] + '...'
-                elif len(txt) > 3:          txt = txt[:-4] + '...'
-                elif txt:                   txt = txt[:-1]
-                else:                       break # I give up, negative underflow?
-            painter.drawText(rect, align, txt)
+            painter.drawText(rect, align,
+                             self.metrics.elidedText(txt, Qt.ElideRight, rect.width()))
 
     def sizeHint(self):
         return QSize(1, 1) # who cares
