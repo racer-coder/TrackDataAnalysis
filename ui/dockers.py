@@ -300,7 +300,7 @@ class ValuesTableChannel:
         v = self._calc(lap)
         if v is None:
             return (self.model.value_style, None)
-        if delta is None or delta == lap[0]:
+        if delta is None or delta == lap:
             return (self.model.value_style, self._format(v))
         b = self._calc(delta)
         return (self.model.delta_style, self._format_delta(v-b))
