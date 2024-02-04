@@ -78,6 +78,12 @@ Every data acquisition tool comes with their own software, so why make another t
 
 ## Installation (from binary)
 
+Right now only Windows x86_64 images are being built.  Head on over to
+[Releases](https://github.com/racer-coder/TrackDataAnalysis/releases)
+and install the most recent.  Once installed, there will be a start
+menu shortcut for "Track Data Analysis" (just press the windows key
+and start typing Track).
+
 ## Installation (from source)
 
 1. Make sure you have a proper version of Python.  PySide2 generally
@@ -88,7 +94,7 @@ Prefer to download it directly from
 [python.org](https://www.python.org/downloads/) rather than the
 Windows store.
 
-1. Install python requirements.
+2. Install python requirements.
 ```
 pip install -r requirements.txt
 ```
@@ -103,7 +109,7 @@ On Ubuntu (tested with 22.04), you can install the default system packages inste
 apt install python3-pyside2.qtwidgets python3-numpy python3-opengl
 ```
 
-1. Install video player library.
+3. Install video player library.
 
 This program uses [libmpv](https://mpv.io/installation/) to handle
 video.  Download the right binary and make the .so/.dll accessible
@@ -114,7 +120,7 @@ Alternatively, on Ubuntu 22.04+, you can install the defaulte system package ins
 apt install libmpv1
 ```
 
-1. Run!
+4. Run!
 ```
 python gui.py
 ```
