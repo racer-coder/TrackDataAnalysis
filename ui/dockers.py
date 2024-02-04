@@ -556,11 +556,11 @@ class ValuesDockWidget(TempDockWidget):
             self.table.setColumnWidth(
                 0, self.margin * 2 + self.font_metrics.horizontalAdvance('\u25bc'))
             self.table.setColumnWidth(
-                1, self.margin * 2 + max([self.font_metrics.horizontalAdvance(ch)
-                                          for ch in allch]))
+                1, self.margin * 2 + 1 + max([self.font_metrics.horizontalAdvance(ch)
+                                              for ch in allch + ['Session Time', 'Session Dist']]))
             for c in range(2, self.model.columnCount(None) - 1):
                 self.table.setColumnWidth(
-                    c, self.margin * 2 + self.font_metrics.horizontalAdvance('MMMMM.M'))
+                    c, self.margin * 2 + self.font_metrics.horizontalAdvance('+MMMM.MMM'))
             self.table.setColumnWidth(
                 self.model.columnCount(None) - 1,
                 self.margin * 2 + max([self.font_metrics.horizontalAdvance(r.units[1])
