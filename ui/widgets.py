@@ -26,7 +26,12 @@ def deviceScaleFactor(widget):
     return widget.devicePixelRatioF() * widget.logicalDpiX() / 96
 
 def deviceScale(widget, sz):
+    '''Scales to pixels'''
     return int(deviceScaleFactor(widget) * sz + 0.5)
+
+def devicePointScale(widget, sz):
+    '''Scales to points'''
+    return int(sz * widget.logicalDpiX() / 96 + 0.5)
 
 PaintHelper = namedtuple('PaintHelper', ['painter', 'rect', 'size', 'ratio', 'scale'])
 def makePaintHelper(widget, paintEvent):
@@ -269,7 +274,7 @@ class LapWidget(MouseHelperWidget):
 
     def sizeHint(self):
         fontMetrics = QtGui.QFontMetrics(self.getFont(False))
-        return QSize(200, 3 * fontMetrics.height() + 2)
+        return QSize(200, 3 * fontMetrics.height() / self.devicePixelRatioF() + 2)
 
     def paintEvent(self, e):
         ph = makePaintHelper(self, e)

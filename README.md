@@ -86,48 +86,76 @@ and start typing Track).
 
 ## Installation (from source)
 
-1. Make sure you have a proper version of Python.  PySide2 generally
-only has support for up to Python 3.10, though there are patches
-around to make it work with Python 3.11.  For simplicity, Python 3.10
-should probably be your default choice for Windows 8+, Linux, and Mac.
-Prefer to download it directly from
-[python.org](https://www.python.org/downloads/) rather than the
-Windows store.
+Track Data Analysis relies on the `PySide2` package in order to
+support the widest list of operating systems.  However it places some
+odd constraints on how you source certain packages.  Please follow the
+instructions below as closely as reasonable.
 
-2. Install python requirements.
+### Linux / Ubuntu
+
+Track Data Analysis is developed and tested on Ubuntu 22.04.  You can
+use the built in packages for most things except `glfw`, which you'll
+have to install via `pip3`.  Later versions of Ubuntu have switched to
+`python3.11` as the default, which is fine as long as the PySide2
+package is available.  If you're installing PySide2 via `pip3`, then
+you'll want to stick to `python3.10` or older.
+
+Ubuntu 22.04:
+```
+sudo apt install python3-pyside2.qtwidgets python3-numpy libmpv1
+pip3 install glfw # Ubuntu 23.04+ has apt package python3-pyglfw
+```
+
+You should then be able to run the program using either of the following:
+
+```
+./gui.py
+python3.10 gui.py
+```
+
+### Windows 8+
+
+You'll want to get Python 3.10 directly from
+[python.org](https://www.python.org/downloads/release/python-31011/).
+You should probably get the 'Windows installer (64-bit)'.  Do not use
+the version of python from the Microsoft app store; I haven't tried it
+but I have read enough that makes me think it won't work right.
+
+Assuming that Python is in your path, you can then install the
+Python package requirements with:
 ```
 pip install -r requirements.txt
 ```
-NOTE: On MacOSX, the PyPi version of PySide2 does not support Arm CPU.  Instead, use home brew.  Something like (NOT TESTED):
+
+You will need to manually install [libmpv](https://sourceforge.net/projects/mpv-player-windows/files/libmpv/);
+I typically put `libmpv-2.dll` under the `ui/` directory as that is
+added to the path automatically.
+
+You should then be able to run the program using:
+
+```
+python3 gui.py
+```
+
+### Mac Arm (and probably Intel?)
+
+Mac is a little tricky; PySide2 is not technically supported on Mac
+Arm machines, but it is available on [Homebrew](https://brew.sh/).
+However, they make it a little difficult, and it will only show up
+under Python3.10, so you need to make sure to specify that when
+running various commands.
+
 ```
 brew install pyside@2
 brew link pyside@2
+brew install mpv
+pip3.10 install glfw numpy
 ```
 
-On Ubuntu (tested with 22.04), you can mostly install the default system packages instead:
+Then you should be able to run the program with either:
 ```
-apt install python3-pyside2.qtwidgets python3-numpy
-pip3 install glfw
-```
-
-3. Install video player library.
-
-This program uses [libmpv](https://mpv.io/installation/) to handle
-video.  Download the right binary and make the .so/.dll accessible
-(drop it in the source directory?).
-
-Alternatively, on Ubuntu 22.04+, you can install the default system package instead:
-```
-apt install libmpv1
-```
-
-4. Run!
-```
-python gui.py
-```
-or maybe:
-```
-python3 gui.py
+./gui.py
+python3.10 ./gui.py
 ```
 
 ## Basic introduction

@@ -227,8 +227,9 @@ class OneVideo(QOpenGLWidget):
         self.updateCursor(None)
 
     def paintGL(self):
+        pixel_size = self.devicePixelRatioF() * self.size()
         self.ctx.render(flip_y=True,
-                        opengl_fbo={'w': self.width(), 'h': self.height(),
+                        opengl_fbo={'w': pixel_size.width(), 'h': pixel_size.height(),
                                     'fbo': self.defaultFramebufferObject()})
 
 

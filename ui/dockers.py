@@ -228,9 +228,9 @@ class DataDockWidget(TempDockWidget):
     def recompute(self):
         font_size = 12
         self.model.font = QtGui.QFont('Tahoma')
-        self.model.font.setPixelSize(widgets.deviceScale(self, font_size))
+        self.model.font.setPixelSize(widgets.devicePointScale(self, font_size))
         self.model.big_font = QtGui.QFont('Tahoma')
-        self.model.big_font.setPixelSize(widgets.deviceScale(self, font_size * 1))
+        self.model.big_font.setPixelSize(widgets.devicePointScale(self, font_size * 1))
         logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
         laps = [(lap, best_lap) for logref, best_lap in logs for lap in logref.laps]
         self.model.set_data(laps)
@@ -520,7 +520,7 @@ class ValuesDockWidget(TempDockWidget):
 
     def recompute(self):
         font = QtGui.QFont('Tahoma')
-        font.setPixelSize(widgets.deviceScale(self, 11.25))
+        font.setPixelSize(widgets.devicePointScale(self, 11.25))
         self.font_metrics = QtGui.QFontMetrics(font)
         section_font = QtGui.QFont(font)
         section_font.setBold(True)
