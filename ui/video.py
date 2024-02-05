@@ -4,7 +4,7 @@
 import ctypes
 import locale
 import math
-import os.path
+import os
 import platform
 
 from PySide2 import QtGui
@@ -19,6 +19,8 @@ from PySide2.QtWidgets import (
 #from PySide2.QtMultimedia import QMediaContent, QMediaPlayer
 #from PySide2.QtMultimediaWidgets import QVideoWidget
 
+# Might need to add current dir to path to find mpv dll/so
+os.environ['PATH'] = os.path.dirname(__file__) + os.pathsep + os.environ['PATH']
 from . import mpv
 from . import widgets
 from .timedist import roundUpHumanNumber, AxisGrid

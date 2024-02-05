@@ -6,7 +6,7 @@ from version import version
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
     "excludes": ["tkinter", "unittest"],
-    'include_files': ['libmpv-2.dll'],
+    'include_files': [('libmpv-2.dll', 'lib/ui/libmpv-2.dll')],
 }
 
 setup(
