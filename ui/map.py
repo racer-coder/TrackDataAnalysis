@@ -15,7 +15,6 @@ from PySide2.QtWidgets import (
 )
 
 import data.gps as gps
-from . import timedist
 from . import widgets
 
 worker = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix='maploader')
@@ -172,9 +171,7 @@ class MapWidget(QWidget):
 
         # track position
         msize = widgets.deviceScale(self, 4)
-        for color, lap in list(zip(timedist.lap_colors,
-                                   [dv.ref_lap, dv.alt_lap] + dv.extra_laps))[::-1]:
-            if not lap: continue
+        for color, lap in dv.get_laps()[::-1]:
             pen = QtGui.QPen(QtGui.QColor(0, 0, 0))
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)

@@ -15,6 +15,7 @@ from PySide2.QtWidgets import (
     QMenu,
 )
 
+from . import state
 from . import widgets
 from data.distance import ChannelData
 
@@ -29,18 +30,6 @@ channel_colors = (
     QtGui.QColor(186, 117, 255),
     QtGui.QColor(255, 106, 218),
     QtGui.QColor(244, 244, 0),
-    )
-
-lap_colors = (
-    QtGui.QColor(240, 0, 0),
-    QtGui.QColor(223, 223, 223),
-    QtGui.QColor(64, 255, 64),
-    QtGui.QColor(43, 255, 255),
-    QtGui.QColor(47, 151, 255),
-    QtGui.QColor(186, 117, 255),
-    QtGui.QColor(255, 106, 218),
-    QtGui.QColor(244, 244, 0),
-    QtGui.QColor(255, 160, 32),
     )
 
 def roundUpHumanNumber(num):
@@ -289,11 +278,8 @@ class TimeDist(widgets.MouseHelperWidget):
     def paintGraph(self, ph, y_offset, height, channels, graph_idx):
         if not self.x_axis: return
         # get laps
-        laps = ([(self.dataView.ref_lap, None),
-                 (self.dataView.alt_lap, lap_colors[1])] +
-                [(l, lap_colors[i+2])
-                 for i, l in enumerate(self.dataView.extra_laps)])
-        laps = [l for l in laps if l[0]] # Filter out potentially missing laps (like alt_lap)
+        laps = self.dataView.get_laps()
+        laps[0] = (self.dataView.ref_lap, None) # special color to mean use channel color
         # get data
         var = []
         if 'Time Slip' in channels:
@@ -379,7 +365,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                         12 + fontMetrics.height() * len(channels))),
                             QtGui.QColor(32, 32, 32, 160))
         # text for data
-        pen2 = QtGui.QPen(lap_colors[1])
+        pen2 = QtGui.QPen(state.lap_colors[1])
         pen2.setStyle(Qt.SolidLine)
         next_y = y_offset
         for (color, (ch, lap)), d in zip(
@@ -607,13 +593,12 @@ class TimeDist(widgets.MouseHelperWidget):
         if not self.dataView.mode_offset or not self.lapView or self.dataView.active_component != self:
             self.shift_axis = []
         else:
-            self.shift_axis = [self.dataView.ref_lap, self.dataView.alt_lap] + self.dataView.extra_laps
             self.shift_axis = [
                 (lap, AxisGrid(zero_offset + self.dataView.getTDValue(lap.offset),
                                zero_offset + self.dataView.getTDValue(lap.offset) + data_range,
                                est_spacing,
                                (ph.size.width() - self.graph_x) / data_range, self.graph_x))
-                for lap in self.shift_axis if lap]
+                for lap, color in self.dataView.get_laps()]
         y_div = ph.size.height() - 16 * ph.scale * (1 + len(self.shift_axis))
 
         # grey out area outside of the current lap

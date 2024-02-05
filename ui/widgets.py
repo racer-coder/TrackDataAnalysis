@@ -291,8 +291,7 @@ class LapWidget(MouseHelperWidget):
         ph.painter.drawRect(0, lapy, ph.size.width() - 1, ph.size.height() - 1 - lapy)
         if self.dataView.ref_lap:
             laps = []
-            for l in [self.dataView.ref_lap, self.dataView.alt_lap] + self.dataView.extra_laps:
-                if not l: continue
+            for l, c in self.dataView.get_laps():
                 dur = l.lap.duration()
                 txt = '[%d:%06.3f] Lap %d [%s]' % (dur // 60000, dur % 60000 / 1000, l.lap.num,
                                                    os.path.basename(l.log.log.get_filename()))

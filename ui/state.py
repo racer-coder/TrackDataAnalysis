@@ -6,7 +6,21 @@ import math
 import typing
 
 from PySide2.QtCore import Signal
+from PySide2 import QtGui
 from PySide2.QtWidgets import QWidget
+
+# belongs in a theme file, but ...
+lap_colors = (
+    QtGui.QColor(240, 0, 0),
+    QtGui.QColor(223, 223, 223),
+    QtGui.QColor(64, 255, 64),
+    QtGui.QColor(43, 255, 255),
+    QtGui.QColor(47, 151, 255),
+    QtGui.QColor(186, 117, 255),
+    QtGui.QColor(255, 106, 218),
+    QtGui.QColor(244, 244, 0),
+    QtGui.QColor(255, 160, 32),
+    )
 
 # Cursor time/dist: Offset time/dist for the reference lap
 # Offset time/dist: relative to start of zoom_window
@@ -47,7 +61,7 @@ class LapRef:
 class DataView:
     ref_lap: typing.Optional[LapRef]
     alt_lap: typing.Optional[LapRef]
-    extra_laps: typing.List[LapRef]
+    extra_laps: typing.List[typing.Tuple[LapRef, QtGui.QColor]]
     cursor_time: TimeDistRef
     zoom_window: typing.Tuple[TimeDistRef, TimeDistRef] # relative to start and end of lap, respectively
     mode_time: bool # Varies per worksheet
@@ -60,6 +74,12 @@ class DataView:
     cursor_change: Signal # (old_cursor) when cursor position changed.  Lightest weight update
     values_change: Signal # () lap selection, lap shift, zoom window, time/dist mode.  Redraw all components, maybe more
     data_change: Signal # () focus change, channel selection, load log file.  Anything that requires dock widgets to update.
+
+    def get_laps(self):
+        return [(l, c)
+                for l, c in [(self.ref_lap, lap_colors[0]),
+                             (self.alt_lap, lap_colors[1])] + self.extra_laps
+                if l]
 
     def outTime2Mode(self, lapref: LapRef, time):
         return time if self.mode_time else lapref.log.log.outTime2Dist(time)

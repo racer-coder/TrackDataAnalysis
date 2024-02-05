@@ -151,7 +151,7 @@ class DataDockModel(QAbstractTableModel):
             if col == 2: return '\u2776' if lapref.same_log_and_lap(self.data_view.ref_lap) else '\u2d54'
             if col == 3: return '\u2777' if lapref.same_log_and_lap(self.data_view.alt_lap) else '\u2d54'
             if col == 4: return ([chr(0x2778 + idx)
-                                  for idx, lap in enumerate(self.data_view.extra_laps)
+                                  for idx, (lap, color) in enumerate(self.data_view.extra_laps)
                                   if lap.same_log_and_lap(lapref)] +
                                  ['\u2d54'])[0]
             if col == 5: return state.format_time(lapref.lap.duration() - best_lap)
@@ -209,11 +209,15 @@ class DataDockWidget(TempDockWidget):
             else:
                 data_view.alt_lap = lapref
         elif col == 4:
-            removed = [l for l in data_view.extra_laps if not l.same_log_and_lap(lapref)]
+            removed = [(l, c) for l, c in data_view.extra_laps if l != lapref]
             if len(removed) != len(data_view.extra_laps):
                 data_view.extra_laps = removed
             elif len(data_view.extra_laps) < 8: # some sane upper bound
-                data_view.extra_laps.append(lapref)
+                used_colors = [c for l, c in data_view.extra_laps]
+                for color in state.lap_colors[2:]:
+                    if color not in used_colors:
+                        break
+                data_view.extra_laps.append((lapref, color))
         data_view.values_change.emit()
 
     def best_lap(self, logref):
@@ -528,8 +532,8 @@ class ValuesDockWidget(TempDockWidget):
 
         dv = self.mainwindow.data_view
 
-        laps = [('R', dv.ref_lap), ('A', dv.alt_lap)] + [(chr(ord('3') + idx), lap)
-                                                         for idx, lap in enumerate(dv.extra_laps)]
+        laps = [('R', dv.ref_lap), ('A', dv.alt_lap)] + [
+            (chr(ord('3') + idx), lap) for idx, (lap, color) in enumerate(dv.extra_laps)]
         laps = [l for l in laps if l[1]] # filter out any unset laps (ref_lap, alt_lap?)
 
         self.table.clearSpans()
