@@ -1,13 +1,21 @@
 #!/usr/bin/python3
 
 from cx_Freeze import setup, Executable
+import sys
 from version import version
 
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
     "excludes": ["tkinter", "unittest"],
-    'include_files': [('ui/libmpv-2.dll', 'lib/ui/libmpv-2.dll')],
 }
+
+if sys.platform == 'win32':
+    build_exe_options['include_files'] = [('ui/libmpv-2.dll', 'lib/ui/libmpv-2.dll')]
+
+if sys.platform == 'darwin':
+    build_exe_options['include_files'] = [('/opt/homebrew/lib/libmpv.dylib', 'lib/ui/libmpv.dylib')]
+
+
 
 setup(
     name = 'Track Data Analysis',
@@ -20,7 +28,7 @@ setup(
                },
                },
     executables = [Executable('gui.py',
-                              base='Win32GUI',
+                              base='Win32GUI' if sys.platform == 'win32' else None,
                               shortcut_name='Track Data Analysis',
                               shortcut_dir='StartMenuFolder',
                               )],
