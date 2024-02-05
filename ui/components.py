@@ -37,7 +37,7 @@ class ComponentManager(QWidget):
         self.addAction(act)
         self.setContextMenuPolicy(Qt.ActionsContextMenu)
 
-        self.clipboard_widget = None
+        self.component_clipboard = None
 
     def newTDGraph(self):
         ComponentBase(self, None, self.dataView,
