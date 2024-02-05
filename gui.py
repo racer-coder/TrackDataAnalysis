@@ -140,6 +140,7 @@ class MainWindow(QMainWindow):
         file_menu.addSeparator()
         file_menu.addAction('Exit').triggered.connect(self.close)
 
+        self.comp_menu.addAction('Hi') # dummy entry so Mac OSX will show the Component menu
         self.comp_menu.aboutToShow.connect(self.setup_component_menu)
 
         data_menu.addAction('Time/Distance').triggered.connect(self.toggle_time_dist)
