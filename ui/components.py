@@ -159,14 +159,16 @@ class ComponentBase(QWidget):
         self.data_view = data_view
         self.vLayout = QVBoxLayout(self)
         self.vLayout.setContentsMargins(4, 4, 4, 4)
-        self.setChildWidget(cWidget)
 
         self.m_infocus = False
         self.m_isEditing = True
         self.pressedGeometry = None
 
         self.parentResize(parent.resizeLambda())
+
+        self.setChildWidget(cWidget)
         self.setFocus()
+
 
     def save_state(self):
         return (False, self.fracGeometry.x(), self.fracGeometry.y(),
@@ -174,10 +176,6 @@ class ComponentBase(QWidget):
 
     def setChildWidget(self, cWidget):
         if cWidget:
-            self.childWidget = cWidget
-            self.childWidget.setMouseTracking(True)
-            self.vLayout.addWidget(cWidget)
-
             act = QAction('', cWidget)
             act.setSeparator(True)
             cWidget.addAction(act)
@@ -193,6 +191,10 @@ class ComponentBase(QWidget):
             act = QAction('Paste', cWidget)
             act.triggered.connect(self.parent().paste_component)
             cWidget.addAction(act)
+
+            self.childWidget = cWidget
+            self.childWidget.setMouseTracking(True)
+            self.vLayout.addWidget(cWidget)
 
     def parentResize(self, m):
         self.setGeometry(QRectF(m(self.fracGeometry.topLeft()),
