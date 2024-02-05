@@ -7,6 +7,7 @@ import math
 import os
 import platform
 
+import glfw
 from PySide2 import QtGui
 from PySide2.QtCore import QSize, Qt, Signal
 from PySide2.QtWidgets import (
@@ -16,8 +17,6 @@ from PySide2.QtWidgets import (
     QOpenGLWidget,
     QWidget,
 )
-#from PySide2.QtMultimedia import QMediaContent, QMediaPlayer
-#from PySide2.QtMultimediaWidgets import QVideoWidget
 
 # Might need to add current dir to path to find mpv dll/so
 os.environ['PATH'] = os.path.dirname(__file__) + os.pathsep + os.environ['PATH']
@@ -27,68 +26,26 @@ from .timedist import roundUpHumanNumber, AxisGrid
 
 
 class GetProcAddressGetter:
-    """This wrapper class is necessary because the required function pointers were only exposed from Qt 6.5 onwards
-    https://bugreports.qt.io/browse/PYSIDE-971"""
+    """This wrapper class is necessary because the required function
+    pointers were only exposed from Qt 6.5 onwards
+    https://bugreports.qt.io/browse/PYSIDE-971
+    """
 
     def __init__(self):
-        self._func = self._find_platform_wrapper()
-
-    def _find_platform_wrapper(self):
-        operating_system = platform.system()
-        if operating_system == 'Linux':
-            return self._init_linux()
-        elif operating_system == 'Windows':
-            return self._init_windows()
-        raise f'Platform {operating_system} not supported yet'
-
-    def _init_linux(self):
-        try:
-            from OpenGL import GLX
-            return self._glx_impl
-        except AttributeError:
-            pass
-        try:
-            from OpenGL import EGL
-            return self._egl_impl
-        except AttributeError:
-            pass
-        raise 'Cannot initialize OpenGL'
-
-    def _init_windows(self):
-        import glfw
-        from PySide2.QtGui import QOffscreenSurface, QOpenGLContext
-
-        self.surface = QOffscreenSurface()
+        self.surface = QtGui.QOffscreenSurface()
         self.surface.create()
 
         if not glfw.init():
             raise 'Cannot initialize OpenGL'
 
         glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
-        window = glfw.create_window(1, 1, "mpvQC-OpenGL", None, None)
+        window = glfw.create_window(1, 1, "tda-OpenGL", None, None)
 
         glfw.make_context_current(window)
-        QOpenGLContext.currentContext().makeCurrent(self.surface)
-        return self._windows_impl
+        QtGui.QOpenGLContext.currentContext().makeCurrent(self.surface)
 
     def wrap(self, _, name: bytes):
-        address = self._func(name)
-        return ctypes.cast(address, ctypes.c_void_p).value
-
-    @staticmethod
-    def _glx_impl(name: bytes):
-        from OpenGL import GLX
-        return GLX.glXGetProcAddress(name.decode("utf-8"))
-
-    @staticmethod
-    def _egl_impl(name: bytes):
-        from OpenGL import EGL
-        return EGL.eglGetProcAddress(name.decode("utf-8"))
-
-    @staticmethod
-    def _windows_impl(name: bytes):
-        import glfw
-        return glfw.get_proc_address(name.decode('utf8'))
+        return ctypes.cast(glfw.get_proc_address(name.decode('utf8')), ctypes.c_void_p).value
 
 
 #class Video(QVideoWidget):

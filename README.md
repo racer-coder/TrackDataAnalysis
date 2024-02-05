@@ -104,9 +104,10 @@ brew install pyside@2
 brew link pyside@2
 ```
 
-On Ubuntu (tested with 22.04), you can install the default system packages instead:
+On Ubuntu (tested with 22.04), you can mostly install the default system packages instead:
 ```
-apt install python3-pyside2.qtwidgets python3-numpy python3-opengl
+apt install python3-pyside2.qtwidgets python3-numpy
+pip3 install glfw
 ```
 
 3. Install video player library.
@@ -115,7 +116,7 @@ This program uses [libmpv](https://mpv.io/installation/) to handle
 video.  Download the right binary and make the .so/.dll accessible
 (drop it in the source directory?).
 
-Alternatively, on Ubuntu 22.04+, you can install the defaulte system package instead:
+Alternatively, on Ubuntu 22.04+, you can install the default system package instead:
 ```
 apt install libmpv1
 ```

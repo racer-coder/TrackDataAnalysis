@@ -1,6 +1,4 @@
 PySide2
 numpy
-PyOpenGL ; sys_platform == 'linux'
-glfw ; sys_platform == 'win32'
+glfw
 cx_freeze
-
