@@ -123,7 +123,7 @@ class TempDockWidget(QDockWidget):
                     d.hide()
 
 class DataDockModel(QAbstractTableModel):
-    headings = ['Laps', 'Time', 'R', 'A', '3', 'Delta', 'Time offset', 'Dist offset']
+    headings = ['Lap', 'Time', 'R', 'A', '3', 'Delta', 'Time off', 'Dist off']
     def __init__(self, data_view):
         super().__init__()
         self.data_view = data_view
@@ -183,15 +183,16 @@ class DataDockWidget(TempDockWidget):
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setMinimumSectionSize(10)
         self.table.setHorizontalScrollMode(self.table.ScrollPerPixel)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setMinimumSectionSize(5)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.setEditTriggers(self.table.NoEditTriggers)
         self.table.pressed.connect(self.clickCell)
         self.setWidget(self.table)
 
+        self.margin = 2
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()
 
@@ -233,6 +234,17 @@ class DataDockWidget(TempDockWidget):
                 for logref, best_lap in logs
                 for lap in logref.log.get_laps()]
         self.model.set_data(laps)
+        metrics = QtGui.QFontMetrics(self.model.font)
+        self.table.setColumnWidth(0, self.margin * 2 + metrics.horizontalAdvance('Lap 888'))
+        self.table.setColumnWidth(1, self.margin * 2 + metrics.horizontalAdvance('88:88.888'))
+        self.table.setColumnWidth(2, self.margin * 2 + metrics.horizontalAdvance('M'))
+        self.table.setColumnWidth(3, self.margin * 2 + metrics.horizontalAdvance('M'))
+        self.table.setColumnWidth(4, self.margin * 2 + metrics.horizontalAdvance('M'))
+        self.table.setColumnWidth(5, self.margin * 2 + metrics.horizontalAdvance('+88:88.888'))
+        self.table.setColumnWidth(6, self.margin * 2 + metrics.horizontalAdvance('88:88.888'))
+        self.table.setColumnWidth(7, self.margin * 2 + metrics.horizontalAdvance('+88888'))
+        for row in range(self.model.rowCount(None)):
+            self.table.setRowHeight(row, metrics.height())
 
 class TextMatcher:
     def __init__(self, txt):
