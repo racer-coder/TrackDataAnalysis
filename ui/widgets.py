@@ -256,9 +256,9 @@ class LapWidget(MouseHelperWidget):
                 self.dataView.values_change.emit()
                 break
 
-    def getFont(self):
+    def getFont(self, big):
         font = QtGui.QFont('Tahoma')
-        font.setPixelSize(deviceScale(self, 11.25))
+        font.setPixelSize(deviceScale(self, 11.25 * (1.25 if big else 1)))
         return font
 
     def updateCursor(self, old_cursor):
@@ -268,17 +268,17 @@ class LapWidget(MouseHelperWidget):
         return round(self.dataView.outTime2Mode(self.dataView.ref_lap, time) * self.scale)
 
     def sizeHint(self):
-        fontMetrics = QtGui.QFontMetrics(self.getFont())
+        fontMetrics = QtGui.QFontMetrics(self.getFont(False))
         return QSize(200, 3 * fontMetrics.height() + 2)
 
     def paintEvent(self, e):
         ph = makePaintHelper(self, e)
-        font = self.getFont()
-        ph.painter.setFont(font)
+        font = self.getFont(False)
+        bigfont = self.getFont(True)
         metrics = QtGui.QFontMetrics(font)
         fh = metrics.height()
+        icon_width = QtGui.QFontMetrics(bigfont).horizontalAdvance(chr(0x2776))
         pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
-        pen.setStyle(Qt.SolidLine)
         ph.painter.setPen(pen)
 
         ph.painter.fillRect(0, 0, ph.size.width(), ph.size.height(),
@@ -290,21 +290,24 @@ class LapWidget(MouseHelperWidget):
         lapy = 2 * fh
         ph.painter.drawRect(0, lapy, ph.size.width() - 1, ph.size.height() - 1 - lapy)
         if self.dataView.ref_lap:
-            laps = []
-            for l, c in self.dataView.get_laps():
-                dur = l.lap.duration()
-                txt = '[%d:%06.3f] Lap %d [%s]' % (dur // 60000, dur % 60000 / 1000, l.lap.num,
-                                                   os.path.basename(l.log.log.get_filename()))
-                laps.append(txt)
+            size = 0
             lapx = 4
-            for a, b in zip(laps[::2], laps[1::2] + ['']):
-                size = max(metrics.horizontalAdvance(a), metrics.horizontalAdvance(b))
-                ph.painter.drawText(lapx, 0, ph.size.width(), fh,
-                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine, a)
-                if b:
-                    ph.painter.drawText(lapx, fh, ph.size.width(), fh,
-                                        Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine, b)
-                lapx += size + metrics.horizontalAdvance('MMMMM')
+            for pos, (l, c) in enumerate(self.dataView.get_laps()):
+                y = (pos & 1) * fh
+                ph.painter.setFont(bigfont)
+                ph.painter.setPen(c)
+                ph.painter.drawText(lapx, y, ph.size.width(), fh,
+                                    Qt.AlignTop | Qt.AlignLeft, chr(0x2776 + pos)) # XXX
+
+                ph.painter.setFont(font)
+                ph.painter.setPen(pen)
+                txt = '[%s] Lap %d [%s]' % (state.format_time(l.lap.duration()), l.lap.num,
+                                            os.path.basename(l.log.log.get_filename()))
+                size = max(size, metrics.horizontalAdvance(txt))
+                ph.painter.drawText(lapx + icon_width, y, ph.size.width(), fh,
+                                    Qt.AlignTop | Qt.AlignLeft, txt)
+                if y:
+                    lapx += icon_width + size + metrics.horizontalAdvance('MMMMM')
 
             duration = self.dataView.outTime2Mode(self.dataView.ref_lap,
                                                   self.dataView.ref_lap.log.laps[-1].lap.end_time)
