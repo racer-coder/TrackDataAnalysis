@@ -148,11 +148,11 @@ class DataDockModel(QAbstractTableModel):
             col = index.column()
             if col == 0: return str(lapref.lap.num)
             if col == 1: return state.format_time(lapref.lap.duration())
-            if col == 2: return '\u2776' if lapref.same_log_and_lap(self.data_view.ref_lap) else '\u2d54'
-            if col == 3: return '\u2777' if lapref.same_log_and_lap(self.data_view.alt_lap) else '\u2d54'
+            if col == 2: return '\u2776' if lapref == self.data_view.ref_lap else '\u2d54'
+            if col == 3: return '\u2777' if lapref == self.data_view.alt_lap else '\u2d54'
             if col == 4: return ([chr(0x2778 + idx)
                                   for idx, (lap, color) in enumerate(self.data_view.extra_laps)
-                                  if lap.same_log_and_lap(lapref)] +
+                                  if lap == lapref] +
                                  ['\u2d54'])[0]
             if col == 5: return state.format_time(lapref.lap.duration() - best_lap)
             if col == 6: return state.format_time(lapref.offset.time) if lapref.offset.time else ''

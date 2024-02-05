@@ -31,21 +31,18 @@ class TimeDistRef:
     time: float # seconds
     dist: float # meters?
 
-@dataclass()
+@dataclass(eq=False)
 class LogRef:
     log: object # usually data.Distance
     video_file: typing.Optional[str] = None
     video_alignment: typing.Optional[int] = None
     laps: typing.List['LapRef'] = field(default_factory=list)
 
-@dataclass()
+@dataclass(eq=False)
 class LapRef:
     log: LogRef
     lap: object
     offset: TimeDistRef
-
-    def same_log_and_lap(self, other):
-        return other and self.log == other.log and self.lap == other.lap
 
     def lapDist2Time(self, dist):
         return self.log.log.outDist2Time(self.log.log.outTime2Dist(self.lap.start_time) + dist) - self.lap.start_time
@@ -57,7 +54,7 @@ class LapRef:
     def offDist2Time(self, dist):
         return self.lapDist2Time(dist + self.offset.dist) - self.offset.time
 
-@dataclass()
+@dataclass(eq=False)
 class DataView:
     ref_lap: typing.Optional[LapRef]
     alt_lap: typing.Optional[LapRef]
