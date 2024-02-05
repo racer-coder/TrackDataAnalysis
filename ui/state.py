@@ -57,7 +57,7 @@ class DataView:
 
     cursor_change: Signal # (old_cursor) when cursor position changed.  Lightest weight update
     values_change: Signal # () lap selection, lap shift, zoom window, time/dist mode.  Redraw all components, maybe more
-    data_change: Signal # () lap selection, focus change, channel selection, load log file.  Anything that requires dock widgets to update.
+    data_change: Signal # () focus change, channel selection, load log file.  Anything that requires dock widgets to update.
 
     def outTime2Mode(self, lapref: LapRef, time):
         return time if self.mode_time else lapref.log.log.outTime2Dist(time)

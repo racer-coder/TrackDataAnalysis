@@ -193,6 +193,7 @@ class DataDockWidget(TempDockWidget):
         self.setWidget(self.table)
 
         self.margin = 2
+        mainwindow.data_view.values_change.connect(self.recompute)
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()
 
@@ -216,7 +217,6 @@ class DataDockWidget(TempDockWidget):
             elif len(data_view.extra_laps) < 8: # some sane upper bound
                 data_view.extra_laps.append(lapref)
         data_view.values_change.emit()
-        data_view.data_change.emit()
 
     def best_lap(self, logref):
         laps = logref.log.get_laps()
@@ -465,6 +465,7 @@ class ValuesDockWidget(TempDockWidget):
         self.table.activated.connect(self.activate_cell)
 
         mainwindow.data_view.cursor_change.connect(self.update_cursor)
+        mainwindow.data_view.values_change.connect(self.recompute)
         mainwindow.data_view.data_change.connect(self.recompute)
 
         layout = QVBoxLayout()

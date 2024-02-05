@@ -254,7 +254,6 @@ class LapWidget(MouseHelperWidget):
                 self.dataView.ref_lap.lap = lap
                 self.dataView.zoom_window = (state.TimeDistRef(0, 0), state.TimeDistRef(0, 0))
                 self.dataView.values_change.emit()
-                self.dataView.data_change.emit()
                 break
 
     def getFont(self):
