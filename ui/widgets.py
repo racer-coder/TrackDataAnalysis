@@ -258,7 +258,7 @@ class LapWidget(MouseHelperWidget):
 
     def getFont(self, big):
         font = QtGui.QFont('Tahoma')
-        font.setPixelSize(deviceScale(self, 11.25 * (1.25 if big else 1)))
+        font.setPixelSize(deviceScale(self, 11.25))
         return font
 
     def updateCursor(self, old_cursor):
@@ -277,7 +277,7 @@ class LapWidget(MouseHelperWidget):
         bigfont = self.getFont(True)
         metrics = QtGui.QFontMetrics(font)
         fh = metrics.height()
-        icon_width = QtGui.QFontMetrics(bigfont).horizontalAdvance(chr(0x2776))
+        icon_width = QtGui.QFontMetrics(bigfont).horizontalAdvance(chr(0x278a))
         pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
         ph.painter.setPen(pen)
 
@@ -297,7 +297,7 @@ class LapWidget(MouseHelperWidget):
                 ph.painter.setFont(bigfont)
                 ph.painter.setPen(c)
                 ph.painter.drawText(lapx, y, ph.size.width(), fh,
-                                    Qt.AlignTop | Qt.AlignLeft, chr(0x2775 + idx))
+                                    Qt.AlignTop | Qt.AlignLeft, chr(0x2789 + idx))
 
                 ph.painter.setFont(font)
                 ph.painter.setPen(pen)

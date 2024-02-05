@@ -148,9 +148,9 @@ class DataDockModel(QAbstractTableModel):
             col = index.column()
             if col == 0: return str(lapref.lap.num)
             if col == 1: return state.format_time(lapref.lap.duration())
-            if col == 2: return '\u2776' if lapref == self.data_view.ref_lap else '\u2d54'
-            if col == 3: return '\u2777' if lapref == self.data_view.alt_lap else '\u2d54'
-            if col == 4: return ([chr(0x2778 + idx)
+            if col == 2: return '\u278a' if lapref == self.data_view.ref_lap else '\u2d54'
+            if col == 3: return '\u278b' if lapref == self.data_view.alt_lap else '\u2d54'
+            if col == 4: return ([chr(0x278c + idx)
                                   for idx, (lap, color) in enumerate(self.data_view.extra_laps)
                                   if lap == lapref] +
                                  ['\u2d54'])[0]
@@ -230,7 +230,7 @@ class DataDockWidget(TempDockWidget):
         self.model.font = QtGui.QFont('Tahoma')
         self.model.font.setPixelSize(widgets.deviceScale(self, font_size))
         self.model.big_font = QtGui.QFont('Tahoma')
-        self.model.big_font.setPixelSize(widgets.deviceScale(self, font_size * 1.25))
+        self.model.big_font.setPixelSize(widgets.deviceScale(self, font_size * 1))
         logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
         laps = [(lap, best_lap) for logref, best_lap in logs for lap in logref.laps]
         self.model.set_data(laps)
