@@ -2,6 +2,7 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 from dataclasses import dataclass, field
+import math
 import typing
 
 from PySide2.QtCore import Signal
@@ -133,3 +134,8 @@ class DataView:
         lap_range = self.getLapValue(self.ref_lap)
         return (lap_range[1] - lap_range[0]
                 + self.getTDValue(self.zoom_window[1]) - self.getTDValue(self.zoom_window[0]))
+
+# doesn't really belong here, but ....
+def format_time(time_ms, sign=''): # pass '+' into sign to get +/- instead of ''/-
+    return ('%' + sign + '.f:%06.3f') % (math.copysign(math.trunc(time_ms / 60000), time_ms),
+                                         abs(time_ms) % 60000 / 1000)

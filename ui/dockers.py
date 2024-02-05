@@ -147,18 +147,16 @@ class DataDockModel(QAbstractTableModel):
             lapref, best_lap = self.laps[index.row()]
             col = index.column()
             if col == 0: return str(lapref.lap.num)
-            if col == 1: return '%d:%06.3f' % (lapref.lap.duration() // 60000,
-                                               lapref.lap.duration() % 60000 / 1000)
+            if col == 1: return state.format_time(lapref.lap.duration())
             if col == 2: return '\u2776' if lapref.same_log_and_lap(self.data_view.ref_lap) else '\u2d54'
             if col == 3: return '\u2777' if lapref.same_log_and_lap(self.data_view.alt_lap) else '\u2d54'
             if col == 4: return ([chr(0x2778 + idx)
                                   for idx, lap in enumerate(self.data_view.extra_laps)
                                   if lap.same_log_and_lap(lapref)] +
                                  ['\u2d54'])[0]
-            if col == 5:
-                diff = lapref.lap.duration() - best_lap
-                return '%.f:%06.3f' % (math.copysign(math.trunc(diff / 60000), diff),
-                                       abs(diff) % 60000 / 1000)
+            if col == 5: return state.format_time(lapref.lap.duration() - best_lap)
+            if col == 6: return state.format_time(lapref.offset.time) if lapref.offset.time else ''
+            if col == 7: return '%.2f' % lapref.offset.dist if lapref.offset.dist else ''
             return None
         if role == Qt.TextAlignmentRole:
             col = index.column()
