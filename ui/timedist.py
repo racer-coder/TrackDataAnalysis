@@ -598,7 +598,7 @@ class TimeDist(widgets.MouseHelperWidget):
             else:
                 data_range = self.dataView.outTime2Mode(
                     self.dataView.ref_lap,
-                    self.dataView.ref_lap.log.log.get_laps()[-1].end_time)
+                    self.dataView.ref_lap.log.laps[-1].lap.end_time)
                 zero_offset = -self.dataView.getLapValue(self.dataView.ref_lap)[0] - self.dataView.getTDValue(self.dataView.ref_lap.offset)
             if data_range > 0: # maybe we have no distance data?
                 est_spacing = roundUpHumanNumber(data_range / ((ph.size.width() - self.graph_x) / ph.scale / 60))
@@ -639,17 +639,18 @@ class TimeDist(widgets.MouseHelperWidget):
         ph.painter.drawRect(self.graph_x, 0, ph.size.width() - self.graph_x - 1, graph_y - 2)
         # draw laps
         if self.x_axis:
-            for lap in self.dataView.ref_lap.log.log.get_laps():
+            for lap in self.dataView.ref_lap.log.laps:
                 start_x = self.x_axis.calc(
                     self.dataView.lapTime2Mode(
                         self.dataView.ref_lap,
-                        lap.start_time - self.dataView.ref_lap.lap.start_time))
+                        lap.lap.start_time - self.dataView.ref_lap.lap.start_time))
                 end_x = self.x_axis.calc(
-                    self.dataView.lapTime2Mode(self.dataView.ref_lap,
-                                               lap.end_time - self.dataView.ref_lap.lap.start_time))
+                    self.dataView.lapTime2Mode(
+                        self.dataView.ref_lap,
+                        lap.lap.end_time - self.dataView.ref_lap.lap.start_time))
                 ph.painter.drawText(start_x, 1, end_x - start_x, graph_y,
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
-                                    str(lap.num))
+                                    str(lap.lap.num))
 
         # paint each channel group graph
         self.cursor_values = []
@@ -677,16 +678,17 @@ class TimeDist(widgets.MouseHelperWidget):
         pen.setStyle(Qt.DashLine)
         ph.painter.setPen(pen)
         if self.x_axis:
-            for lap in self.dataView.ref_lap.log.log.get_laps():
+            for lap in self.dataView.ref_lap.log.laps:
                 x = self.x_axis.calc(
                     self.dataView.lapTime2Mode(
                         self.dataView.ref_lap,
-                        lap.start_time - self.dataView.ref_lap.lap.start_time))
+                        lap.lap.start_time - self.dataView.ref_lap.lap.start_time))
                 if x > self.graph_x:
                     ph.painter.drawLine(x, 0, x, y_div)
                 x = self.x_axis.calc(
-                    self.dataView.lapTime2Mode(self.dataView.ref_lap,
-                                               lap.end_time - self.dataView.ref_lap.lap.start_time))
+                    self.dataView.lapTime2Mode(
+                        self.dataView.ref_lap,
+                        lap.lap.end_time - self.dataView.ref_lap.lap.start_time))
                 if x > self.graph_x:
                     ph.painter.drawLine(x, 0, x, y_div)
 

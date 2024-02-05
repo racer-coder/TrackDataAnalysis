@@ -219,9 +219,9 @@ class DataDockWidget(TempDockWidget):
         data_view.values_change.emit()
 
     def best_lap(self, logref):
-        laps = logref.log.get_laps()
+        laps = logref.laps
         return min(laps[1:-1] if len(laps) >= 3 else laps,
-                   key=lambda x: x.duration()).duration()
+                   key=lambda x: x.lap.duration()).lap.duration()
 
     def recompute(self):
         font_size = 12
@@ -230,9 +230,7 @@ class DataDockWidget(TempDockWidget):
         self.model.big_font = QtGui.QFont('Tahoma')
         self.model.big_font.setPixelSize(widgets.deviceScale(self, font_size * 1.25))
         logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
-        laps = [(state.LapRef(logref, lap, state.TimeDistRef(0., 0.)), best_lap)
-                for logref, best_lap in logs
-                for lap in logref.log.get_laps()]
+        laps = [(lap, best_lap) for logref, best_lap in logs for lap in logref.laps]
         self.model.set_data(laps)
         metrics = QtGui.QFontMetrics(self.model.font)
         self.table.setColumnWidth(0, self.margin * 2 + metrics.horizontalAdvance('Lap 888'))

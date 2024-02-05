@@ -275,18 +275,18 @@ class MainWindow(QMainWindow):
         finally:
             progress.deleteLater()
 
-        self.data_view.log_files.append(
-            ui.state.LogRef(data.distance.DistanceWrapper(obj)))
-        laps = self.data_view.log_files[-1].log.get_laps()
+        logref = ui.state.LogRef(data.distance.DistanceWrapper(obj))
+        logref.laps = [ui.state.LapRef(logref, lap, ui.state.TimeDistRef(0., 0.))
+                       for lap in logref.log.get_laps()]
+        self.data_view.log_files.append(logref)
+
+        laps = logref.laps
         if not laps:
             best_lap = None
-        elif len(laps) < 3:
-            best_lap = laps[0]
         else:
-            best_lap = min(laps[1:-1], key=lambda x: x.end_time - x.start_time)
-        self.data_view.ref_lap = ui.state.LapRef(self.data_view.log_files[-1],
-                                                 best_lap,
-                                                 ui.state.TimeDistRef(0, 0))
+            best_lap = min(laps[1:-1] if len(laps) >= 3 else laps,
+                           key=lambda x: x.lap.duration())
+        self.data_view.ref_lap = best_lap
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
         self.config['main']['last_open_dir'] = os.path.dirname(file_name)

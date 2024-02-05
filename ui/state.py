@@ -1,7 +1,7 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import typing
 
 from PySide2.QtCore import Signal
@@ -21,6 +21,7 @@ class LogRef:
     log: object # usually data.Distance
     video_file: typing.Optional[str] = None
     video_alignment: typing.Optional[int] = None
+    laps: typing.List['LapRef'] = field(default_factory=list)
 
 @dataclass()
 class LapRef:

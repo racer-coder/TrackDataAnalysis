@@ -249,9 +249,9 @@ class LapWidget(MouseHelperWidget):
 
     def selectLap(self, abs_pos):
         tc = self.dataView.outMode2Time(self.dataView.ref_lap, abs_pos.x() / self.scale)
-        for lap in self.dataView.ref_lap.log.log.get_laps():
-            if tc >= lap.start_time and tc <= lap.end_time:
-                self.dataView.ref_lap.lap = lap
+        for lap in self.dataView.ref_lap.log.laps:
+            if tc >= lap.lap.start_time and tc <= lap.lap.end_time:
+                self.dataView.ref_lap = lap
                 self.dataView.zoom_window = (state.TimeDistRef(0, 0), state.TimeDistRef(0, 0))
                 self.dataView.values_change.emit()
                 break
@@ -308,7 +308,7 @@ class LapWidget(MouseHelperWidget):
                 lapx += size + metrics.horizontalAdvance('MMMMM')
 
             duration = self.dataView.outTime2Mode(self.dataView.ref_lap,
-                                                  self.dataView.ref_lap.log.log.get_laps()[-1].end_time)
+                                                  self.dataView.ref_lap.log.laps[-1].lap.end_time)
             if not duration: # bug out early if no real data
                 self.lookupCursor()
                 return
@@ -325,20 +325,20 @@ class LapWidget(MouseHelperWidget):
                       ph.size.height() - 2 - lapy),
                 QtGui.QColor(48, 48, 48))
             # draw laps and lap markers
-            for lap in self.dataView.ref_lap.log.log.get_laps():
-                start_x = self.timeCalc(lap.start_time)
-                end_x = self.timeCalc(lap.end_time)
+            for lap in self.dataView.ref_lap.log.laps:
+                start_x = self.timeCalc(lap.lap.start_time)
+                end_x = self.timeCalc(lap.lap.end_time)
                 ph.painter.drawText(start_x, 1 + lapy, end_x - start_x, ph.size.height() - lapy,
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
-                                    str(lap.num))
+                                    str(lap.lap.num))
             # draw lap boundaries
             pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
             pen.setStyle(Qt.DashLine)
             ph.painter.setPen(pen)
-            for lap in self.dataView.ref_lap.log.log.get_laps():
-                x = self.timeCalc(lap.start_time)
+            for lap in self.dataView.ref_lap.log.laps:
+                x = self.timeCalc(lap.lap.start_time)
                 ph.painter.drawLine(x, lapy, x, ph.size.height())
-                x = self.timeCalc(lap.end_time)
+                x = self.timeCalc(lap.lap.end_time)
                 ph.painter.drawLine(x, lapy, x, ph.size.height())
 
             # draw cursor
