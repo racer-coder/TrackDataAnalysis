@@ -204,7 +204,7 @@ class MainWindow(QMainWindow):
             self.data_view.mode_offset = flag
             self.data_view.active_component.update()
         else:
-            laps = [self.data_view.ref_lap, self.data_view.alt_lap] + self.data_view.extra_laps
+            laps = [lap for log in self.data_view.log_files for lap in log.laps]
             if any(lap.offset.time != 0 for lap in laps if lap):
                 ret = QMessageBox.warning(self, 'Warning', 'Turning off data offsets will discard '
                                           'the offsets, continue?',
@@ -216,7 +216,7 @@ class MainWindow(QMainWindow):
                     return
             # zero all offsets
             for lap in laps:
-                if lap: lap.offset = ui.state.TimeDistRef(0, 0)
+                lap.offset = ui.state.TimeDistRef(0, 0)
             self.data_view.mode_offset = flag
             self.data_view.values_change.emit()
 
