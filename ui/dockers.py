@@ -123,7 +123,7 @@ class TempDockWidget(QDockWidget):
                     d.hide()
 
 class DataDockModel(QAbstractTableModel):
-    headings = ['Laps', 'Time', 'R', 'A', '1', 'Delta', 'Time offset', 'Dist offset']
+    headings = ['Laps', 'Time', 'R', 'A', '3', 'Delta', 'Time offset', 'Dist offset']
     def __init__(self, data_view):
         super().__init__()
         self.data_view = data_view
@@ -149,12 +149,12 @@ class DataDockModel(QAbstractTableModel):
             if col == 0: return str(lapref.lap.num)
             if col == 1: return '%d:%06.3f' % (lapref.lap.duration() // 60000,
                                                lapref.lap.duration() % 60000 / 1000)
-            if col == 2: return '\u2b24' if lapref.same_log_and_lap(self.data_view.ref_lap) else '\u25cb'
-            if col == 3: return '\u24ff' if lapref.same_log_and_lap(self.data_view.alt_lap) else '\u25cb'
-            if col == 4: return ([chr(0x278b + idx)
+            if col == 2: return '\u2776' if lapref.same_log_and_lap(self.data_view.ref_lap) else '\u2d54'
+            if col == 3: return '\u2777' if lapref.same_log_and_lap(self.data_view.alt_lap) else '\u2d54'
+            if col == 4: return ([chr(0x2778 + idx)
                                   for idx, lap in enumerate(self.data_view.extra_laps)
                                   if lap.same_log_and_lap(lapref)] +
-                                 ['\u25cb'])[0]
+                                 ['\u2d54'])[0]
             if col == 5:
                 diff = lapref.lap.duration() - best_lap
                 return '%.f:%06.3f' % (math.copysign(math.trunc(diff / 60000), diff),
@@ -165,6 +165,9 @@ class DataDockModel(QAbstractTableModel):
             # XXX Can't get QT to respect any vertical alignment here...
             if col >= 2 and col <= 4: return Qt.AlignHCenter #| Qt.AlignVCenter
             return Qt.AlignRight # | Qt.AlignVCenter
+        if role == Qt.FontRole:
+            col = index.column()
+            return self.font if col < 2 or col > 4 else self.big_font
         return None
 
 class DataDockWidget(TempDockWidget):
@@ -220,6 +223,11 @@ class DataDockWidget(TempDockWidget):
                    key=lambda x: x.duration()).duration()
 
     def recompute(self):
+        font_size = 12
+        self.model.font = QtGui.QFont('Tahoma')
+        self.model.font.setPixelSize(widgets.deviceScale(self, font_size))
+        self.model.big_font = QtGui.QFont('Tahoma')
+        self.model.big_font.setPixelSize(widgets.deviceScale(self, font_size * 1.25))
         logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
         laps = [(state.LapRef(logref, lap, state.TimeDistRef(0., 0.)), best_lap)
                 for logref, best_lap in logs
@@ -511,7 +519,7 @@ class ValuesDockWidget(TempDockWidget):
 
         dv = self.mainwindow.data_view
 
-        laps = [('R', dv.ref_lap), ('A', dv.alt_lap)] + [(chr(ord('2') + idx), lap)
+        laps = [('R', dv.ref_lap), ('A', dv.alt_lap)] + [(chr(ord('3') + idx), lap)
                                                          for idx, lap in enumerate(dv.extra_laps)]
         laps = [l for l in laps if l[1]] # filter out any unset laps (ref_lap, alt_lap?)
 
