@@ -1,4 +1,11 @@
-PySide2
 numpy
 glfw
-cx_freeze
+# For Mac, install pyside@2 via homebrew
+PySide2 ; sys_platform != 'darwin'
+
+# Packager for Windows
+cx_freeze ; sys_platform == 'win32'
+
+# Packager for Mac, because I can't get cx_freeze to work properly...
+pyinstaller ; sys_platform == 'darwin'
+dmgbuild ; sys_platform == 'darwin'

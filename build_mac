@@ -6,5 +6,5 @@ mkdir -p dist
 rm -rf dist/*
 pyinstaller --collect-binaries glfw --windowed -y -n TrackDataAnalysis gui.py
 echo Building DMG
-dmgbuild -s dmg.py foo bar
+dmgbuild -s dmg.py foo bar # see dmg.py for actual settings
 

@@ -12,6 +12,7 @@ build_exe_options = {
 if sys.platform == 'win32':
     build_exe_options['include_files'] = [('ui/libmpv-2.dll', 'lib/ui/libmpv-2.dll')]
 
+# Currently, Mac doesn't work, but leaving this here just in case it does later.
 if sys.platform == 'darwin':
     build_exe_options['include_files'] = [('/opt/homebrew/lib/libmpv.dylib', 'lib/ui/libmpv.dylib')]
 
