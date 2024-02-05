@@ -60,11 +60,16 @@ class ComponentManager(QWidget):
                 ph.painter.fillRect(QRect(cx * sz, cy * sz, sz, sz),
                                     QtGui.QColor(bright, bright, bright))
 
-    def resizeMatrix(self):
-        return QtGui.QMatrix().scale(self.size().width(), self.size().height())
+    def resizeLambda(self):
+        return lambda p: QPointF(p.x() * self.size().width(),
+                                 p.y() * self.size().height())
+
+    def invertLambda(self):
+        return lambda p: QPointF(p.x() / self.size().width(),
+                                 p.y() / self.size().height())
 
     def resizeEvent(self, e):
-        m = self.resizeMatrix()
+        m = self.resizeLambda()
         for cb in self.findChildren(ComponentBase):
             cb.parentResize(m)
 
@@ -160,7 +165,7 @@ class ComponentBase(QWidget):
         self.m_isEditing = True
         self.pressedGeometry = None
 
-        self.parentResize(parent.resizeMatrix())
+        self.parentResize(parent.resizeLambda())
         self.setFocus()
 
     def save_state(self):
@@ -190,14 +195,14 @@ class ComponentBase(QWidget):
             cWidget.addAction(act)
 
     def parentResize(self, m):
-        self.setGeometry(QRectF(m.map(self.fracGeometry.topLeft()),
-                                m.map(self.fracGeometry.bottomRight())).toRect())
+        self.setGeometry(QRectF(m(self.fracGeometry.topLeft()),
+                                m(self.fracGeometry.bottomRight())).toRect())
 
     def saveGeometry(self):
-        m = self.parentWidget().resizeMatrix().inverted()[0]
+        m = self.parentWidget().invertLambda()
         geof = QRectF(self.geometry())
-        self.fracGeometry = QRectF(m.map(geof.topLeft()),
-                                   m.map(geof.bottomRight()))
+        self.fracGeometry = QRectF(m(geof.topLeft()),
+                                   m(geof.bottomRight()))
 
     def focusInEvent(self, a0: QtGui.QFocusEvent):
         self.data_view.active_component = self.childWidget
@@ -317,10 +322,9 @@ class ComponentBase(QWidget):
                 newGeo.setRight(min(max(e.globalPos().x() + self.pressedGeometry.right(),
                                         newGeo.left() + minSize.width()),
                                     self.parentWidget().width()))
-            m = QtGui.QMatrix().scale(1 / self.parentWidget().width(),
-                                      1 / self.parentWidget().height())
-            self.fracGeometry = QRectF(m.map(QPointF(newGeo.topLeft())),
-                                       m.map(QPointF(newGeo.bottomRight())))
+            m = self.parentWidget().invertLambda()
+            self.fracGeometry = QRectF(m(QPointF(newGeo.topLeft())),
+                                       m(QPointF(newGeo.bottomRight())))
             self.setGeometry(newGeo)
         self.saveGeometry()
         e.accept()
