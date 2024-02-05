@@ -171,7 +171,7 @@ class MapWidget(QWidget):
 
         # track position
         msize = widgets.deviceScale(self, 4)
-        for color, lap in dv.get_laps()[::-1]:
+        for lap, color, idx in dv.get_laps()[::-1]:
             pen = QtGui.QPen(QtGui.QColor(0, 0, 0))
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)

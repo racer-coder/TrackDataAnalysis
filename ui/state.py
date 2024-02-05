@@ -73,9 +73,10 @@ class DataView:
     data_change: Signal # () focus change, channel selection, load log file.  Anything that requires dock widgets to update.
 
     def get_laps(self):
-        return [(l, c)
-                for l, c in [(self.ref_lap, lap_colors[0]),
-                             (self.alt_lap, lap_colors[1])] + self.extra_laps
+        return [(l, c, idx + 3)
+                for idx, (l, c) in ([(-2, (self.ref_lap, lap_colors[0])),
+                                     (-1, (self.alt_lap, lap_colors[1]))]
+                                    + list(enumerate(self.extra_laps)))
                 if l]
 
     def outTime2Mode(self, lapref: LapRef, time):

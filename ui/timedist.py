@@ -255,7 +255,7 @@ class TimeDist(widgets.MouseHelperWidget):
     def calc_time_slip(self, laps, var):
         target_window = self.dataView.lapTime2Mode(self.dataView.ref_lap,
                                                    self.dataView.ref_lap.lap.duration())
-        for lapref, color in laps:
+        for lapref, color, _ in laps:
             start_idx = max(0,
                             bisect.bisect_left(lapref.log.log.dist_map_time,
                                                self.dataView.offMode2outTime(lapref, 0)) - 1)
@@ -279,7 +279,7 @@ class TimeDist(widgets.MouseHelperWidget):
         if not self.x_axis: return
         # get laps
         laps = self.dataView.get_laps()
-        laps[0] = (self.dataView.ref_lap, None) # special color to mean use channel color
+        laps[0] = (self.dataView.ref_lap, None, 0) # special color to mean use channel color
         # get data
         var = []
         if 'Time Slip' in channels:
@@ -322,7 +322,7 @@ class TimeDist(widgets.MouseHelperWidget):
         if graph_idx == self.current_channel[0]:
             draw_channels = ([d for d in draw_channels if d[1] != self.current_channel[1]] +
                              [d for d in draw_channels if d[1] == self.current_channel[1]])
-        for lidx, (lap, color) in list(enumerate(laps if self.lapView else laps[:1]))[::-1]:
+        for lidx, (lap, color, _) in list(enumerate(laps if self.lapView else laps[:1]))[::-1]:
             for idx, ch in draw_channels:
                 d = lap.log.log.get_channel_data(ch) if ch != 'Time Slip' else var[lidx]
                 if not len(d.values): continue
@@ -371,7 +371,7 @@ class TimeDist(widgets.MouseHelperWidget):
         for (color, (ch, lap)), d in zip(
                 (list(zip(channel_colors,
                           [(ch, self.dataView.ref_lap) for ch in channels if ch != 'Time Slip'])) +
-                 [(c, ('Time Slip', l)) for l, c in laps]),
+                 [(c, ('Time Slip', l)) for l, c, _ in laps]),
                 data + var):
             if color is None: continue
 
@@ -598,7 +598,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                zero_offset + self.dataView.getTDValue(lap.offset) + data_range,
                                est_spacing,
                                (ph.size.width() - self.graph_x) / data_range, self.graph_x))
-                for lap, color in self.dataView.get_laps()]
+                for lap, color, idx in self.dataView.get_laps()]
         y_div = ph.size.height() - 16 * ph.scale * (1 + len(self.shift_axis))
 
         # grey out area outside of the current lap

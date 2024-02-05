@@ -292,12 +292,12 @@ class LapWidget(MouseHelperWidget):
         if self.dataView.ref_lap:
             size = 0
             lapx = 4
-            for pos, (l, c) in enumerate(self.dataView.get_laps()):
+            for pos, (l, c, idx) in enumerate(self.dataView.get_laps()):
                 y = (pos & 1) * fh
                 ph.painter.setFont(bigfont)
                 ph.painter.setPen(c)
                 ph.painter.drawText(lapx, y, ph.size.width(), fh,
-                                    Qt.AlignTop | Qt.AlignLeft, chr(0x2776 + pos)) # XXX
+                                    Qt.AlignTop | Qt.AlignLeft, chr(0x2775 + idx))
 
                 ph.painter.setFont(font)
                 ph.painter.setPen(pen)
