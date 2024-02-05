@@ -1,6 +1,8 @@
 # input file to dmgbuild
 
-filename = 'dist/TrackDataAnalysis-0.1.2.dev.dmg'
+exec(open('version.py').read())
+
+filename = 'dist/TrackDataAnalysis-%s.dmg' % version
 volume_name = 'TrackDataAnalysis'
 files = [('dist/TrackDataAnalysis.app', 'TrackDataAnalysis.app')]
 format = 'ULFO'
