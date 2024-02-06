@@ -1,19 +1,19 @@
-UNITS:
-. map various unit names to more consistent convention
-. time/dist detect whether should use meter vs feet depending on speed units?
-
-
 MVP:
 * FILE FORMATS
-. aim / motec - metadata? display somehow
 . megalogviewer - file reader
-. calc correction factor per lap across log files?
 
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
 . lat/long g force calculation from GPS? or internal accelerometers? or both?
 . detection of braking/cornering based on exceeding threshold for a duration of time?
 
-
+DATABASE
+. ability to set directory for scanning
+. store somehow (sqlite?)
+. quick/easy search - rework file open dialog
+. aim / motec - metadata? display somehow
+. show metadata in data dock as separators
+. display some metadata in top lab widget
+. calc correction factor per lap across log files?
 
 Later Milestones:
 
@@ -31,6 +31,7 @@ Later Milestones:
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
 . cython or mypyc for aim_xrk?
+. time/dist detect whether should use meter vs feet depending on speed units?
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
 . time/dist - in paintGraph, label channels even if no x_axis
