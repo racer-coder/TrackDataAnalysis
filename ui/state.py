@@ -47,11 +47,10 @@ class LapRef:
     offset: TimeDistRef
 
     def lapDist2Time(self, dist):
-        return self.log.log.outDist2Time(self.log.log.outTime2Dist(self.start.time) + dist) - self.start.time
+        return self.log.log.outDist2Time(self.start.dist + dist) - self.start.time
 
     def lapTime2Dist(self, time):
-        p = self.log.log.outTime2Dist([self.start.time + time, self.start.time])
-        return p[0] - p[1]
+        return self.log.log.outTime2Dist(self.start.time + time) - self.start.dist
 
     def offDist2Time(self, dist):
         return self.lapDist2Time(dist + self.offset.dist) - self.offset.time
@@ -102,17 +101,20 @@ class DataView:
     def offMode2outDist(self, lapref: LapRef, val):
         return self.outMode2Dist(lapref, self.offMode2outMode(lapref, val))
 
+    def offMode2outTime(self, lapref: LapRef, val):
+        return self.outMode2Time(lapref, self.offMode2outMode(lapref, val))
+
     def offMode2outMode(self, lapref: LapRef, val):
-        return val + self.outTime2Mode(lapref, lapref.start.time + lapref.offset.time)
+        return self.getTDValue(lapref.start) + self.getTDValue(lapref.offset) + val
 
     def offMode2outTime(self, lapref: LapRef, val):
         return self.outMode2Time(lapref, self.offMode2outMode(lapref, val))
 
     def offMode2Dist(self, lapref: LapRef, val):
-        return self.outMode2Dist(lapref, self.offMode2outMode(lapref, val)) - lapref.log.log.outTime2Dist(lapref.start.time + lapref.offset.time)
+        return self.offMode2outDist(lapref, val) - lapref.start.dist - lapref.offset.dist
 
     def offMode2Time(self, lapref: LapRef, val):
-        return self.outMode2Time(lapref, self.offMode2outMode(lapref, val)) - lapref.start.time - lapref.offset.time
+        return self.offMode2outTime(lapref, val) - lapref.start.time - lapref.offset.time
 
     def outTime2offTime(self, lapref: LapRef, time):
         return time - lapref.start.time - lapref.offset.time
@@ -150,8 +152,7 @@ class DataView:
         return tdref.time if self.mode_time else tdref.dist
 
     def getLapValue(self, lapref: LapRef):
-        p = self.outTime2Mode(lapref, [lapref.start.time, lapref.end.time])
-        return (p[0], p[1])
+        return (self.getTDValue(lapref.start), self.getTDValue(lapref.end))
 
     def windowSize2Mode(self):
         lap_range = self.getLapValue(self.ref_lap)

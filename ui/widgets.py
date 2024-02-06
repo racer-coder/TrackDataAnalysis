@@ -229,7 +229,7 @@ class LapWidget(MouseHelperWidget):
 
     def leftDrag(self, rel_pos, abs_pos, saved_state):
         self.dataView.zoom_window = (
-            self.dataView.makeTD(abs_pos.x() / self.scale - self.dataView.outTime2Mode(self.dataView.ref_lap, self.dataView.ref_lap.start.time),
+            self.dataView.makeTD(abs_pos.x() / self.scale - self.dataView.getTDValue(self.dataView.ref_lap.start),
                                  False),
             self.dataView.zoom_window[1])
         self.dataView.values_change.emit()
@@ -268,6 +268,9 @@ class LapWidget(MouseHelperWidget):
 
     def updateCursor(self, old_cursor):
         self.update()
+
+    def modeCalc(self, mode):
+        return round(self.dataView.getTDValue(mode) * self.scale)
 
     def timeCalc(self, time):
         return round(self.dataView.outTime2Mode(self.dataView.ref_lap, time) * self.scale)
@@ -323,18 +326,18 @@ class LapWidget(MouseHelperWidget):
             # draw grey zone
             ph.painter.fillRect(
                 QRect(1, 1 + lapy,
-                      self.timeCalc(self.dataView.ref_lap.start.time) - 1,
+                      self.modeCalc(self.dataView.ref_lap.start) - 1,
                       ph.size.height() - 2 - lapy),
                 QtGui.QColor(48, 48, 48))
             ph.painter.fillRect(
-                QRect(self.timeCalc(self.dataView.ref_lap.end.time), 1 + lapy,
-                      ph.size.width() - 1 - self.timeCalc(self.dataView.ref_lap.end.time),
+                QRect(self.modeCalc(self.dataView.ref_lap.end), 1 + lapy,
+                      ph.size.width() - 1 - self.modeCalc(self.dataView.ref_lap.end),
                       ph.size.height() - 2 - lapy),
                 QtGui.QColor(48, 48, 48))
             # draw laps and lap markers
             for lap in self.dataView.ref_lap.log.laps:
-                start_x = self.timeCalc(lap.start.time)
-                end_x = self.timeCalc(lap.end.time)
+                start_x = self.modeCalc(lap.start)
+                end_x = self.modeCalc(lap.end)
                 ph.painter.drawText(start_x, 1 + lapy, end_x - start_x, ph.size.height() - lapy,
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
                                     str(lap.num))
@@ -343,9 +346,9 @@ class LapWidget(MouseHelperWidget):
             pen.setStyle(Qt.DashLine)
             ph.painter.setPen(pen)
             for lap in self.dataView.ref_lap.log.laps:
-                x = self.timeCalc(lap.start.time)
+                x = self.modeCalc(lap.start)
                 ph.painter.drawLine(x, lapy, x, ph.size.height())
-                x = self.timeCalc(lap.end.time)
+                x = self.modeCalc(lap.end)
                 ph.painter.drawLine(x, lapy, x, ph.size.height())
 
             # draw cursor
