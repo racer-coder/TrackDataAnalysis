@@ -277,8 +277,15 @@ class MainWindow(QMainWindow):
             progress.deleteLater()
 
         logref = ui.state.LogRef(data.distance.DistanceWrapper(obj))
-        logref.laps = [ui.state.LapRef(logref, lap, ui.state.TimeDistRef(0., 0.))
-                       for lap in logref.log.get_laps()]
+        logref.laps = [
+            ui.state.LapRef(logref,
+                            lap.num,
+                            ui.state.TimeDistRef(lap.start_time,
+                                                 logref.log.outTime2Dist(lap.start_time)),
+                            ui.state.TimeDistRef(lap.end_time,
+                                                 logref.log.outTime2Dist(lap.end_time)),
+                            ui.state.TimeDistRef(0., 0.))
+            for lap in logref.log.get_laps()]
         self.data_view.log_files.append(logref)
 
         laps = logref.laps
@@ -286,7 +293,7 @@ class MainWindow(QMainWindow):
             best_lap = None
         else:
             best_lap = min(laps[1:-1] if len(laps) >= 3 else laps,
-                           key=lambda x: x.lap.duration())
+                           key=lambda x: x.duration())
         self.data_view.ref_lap = best_lap
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()

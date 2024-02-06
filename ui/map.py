@@ -76,9 +76,9 @@ class MapWidget(QWidget):
             return
 
         zoom_start = bisect.bisect_left(
-            gps_lat.timecodes, lap.lap.start_time + lap.offset.time + dv.zoom_window[0].time)
+            gps_lat.timecodes, lap.start.time + lap.offset.time + dv.zoom_window[0].time)
         zoom_end = bisect.bisect_left(
-            gps_lat.timecodes, lap.lap.end_time + lap.offset.time + dv.zoom_window[1].time)
+            gps_lat.timecodes, lap.end.time + lap.offset.time + dv.zoom_window[1].time)
         zoom_lat = gps_lat.values[max(0, zoom_start-1) : zoom_end]
         zoom_long = gps_long.values[max(0, zoom_start-1) : zoom_end]
         zoom_alt = gps_alt.values[max(0, zoom_start-1) : zoom_end] if len(gps_alt.values) else np.array(0.)
@@ -141,8 +141,8 @@ class MapWidget(QWidget):
                         ph.painter.drawPixmap(tgt_rect, pm, pm.rect())
 
         # get gps data for the lap
-        start_idx = bisect.bisect_left(gps_lat.timecodes, lap.lap.start_time)
-        end_idx = bisect.bisect_right(gps_lat.timecodes, lap.lap.end_time)
+        start_idx = bisect.bisect_left(gps_lat.timecodes, lap.start.time)
+        end_idx = bisect.bisect_right(gps_lat.timecodes, lap.end.time)
         # we assume timecodes in long match lat
         lap_y = memoryview((gps_lat.values[start_idx:end_idx] - lat_base) * lat_scale)
         lap_x = memoryview((gps_long.values[start_idx:end_idx] - long_base) * long_scale)

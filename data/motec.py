@@ -35,9 +35,6 @@ class Lap:
     start_time: int
     end_time: int
 
-    def duration(self):
-        return self.end_time - self.start_time
-
 def _dec_u16(s, offs):
     return s[offs:offs+4].cast('H')[0]
 

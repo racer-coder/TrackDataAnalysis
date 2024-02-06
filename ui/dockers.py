@@ -146,15 +146,15 @@ class DataDockModel(QAbstractTableModel):
         if role == Qt.DisplayRole:
             lapref, best_lap = self.laps[index.row()]
             col = index.column()
-            if col == 0: return str(lapref.lap.num)
-            if col == 1: return state.format_time(lapref.lap.duration())
+            if col == 0: return str(lapref.num)
+            if col == 1: return state.format_time(lapref.duration())
             if col == 2: return '\u278a' if lapref == self.data_view.ref_lap else '\u2d54'
             if col == 3: return '\u278b' if lapref == self.data_view.alt_lap else '\u2d54'
             if col == 4: return ([chr(0x278c + idx)
                                   for idx, (lap, color) in enumerate(self.data_view.extra_laps)
                                   if lap == lapref] +
                                  ['\u2d54'])[0]
-            if col == 5: return state.format_time(lapref.lap.duration() - best_lap)
+            if col == 5: return state.format_time(lapref.duration() - best_lap)
             if col == 6: return state.format_time(lapref.offset.time) if lapref.offset.time else ''
             if col == 7: return '%.2f' % lapref.offset.dist if lapref.offset.dist else ''
             return None
@@ -223,7 +223,7 @@ class DataDockWidget(TempDockWidget):
     def best_lap(self, logref):
         laps = logref.laps
         return min(laps[1:-1] if len(laps) >= 3 else laps,
-                   key=lambda x: x.lap.duration()).lap.duration()
+                   key=lambda x: x.duration()).duration()
 
     def recompute(self):
         font_size = 12

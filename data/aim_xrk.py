@@ -68,9 +68,6 @@ class Lap:
     start_time: int
     end_time: int
 
-    def duration(self):
-        return self.end_time - self.start_time
-
 @dataclass(**dc_slots)
 class Message:
     token: bytes

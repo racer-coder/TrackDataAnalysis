@@ -229,7 +229,7 @@ class LapWidget(MouseHelperWidget):
 
     def leftDrag(self, rel_pos, abs_pos, saved_state):
         self.dataView.zoom_window = (
-            self.dataView.makeTD(abs_pos.x() / self.scale - self.dataView.outTime2Mode(self.dataView.ref_lap, self.dataView.ref_lap.lap.start_time),
+            self.dataView.makeTD(abs_pos.x() / self.scale - self.dataView.outTime2Mode(self.dataView.ref_lap, self.dataView.ref_lap.start.time),
                                  False),
             self.dataView.zoom_window[1])
         self.dataView.values_change.emit()
@@ -237,7 +237,7 @@ class LapWidget(MouseHelperWidget):
     def rightDrag(self, rel_pos, abs_pos, saved_state):
         self.dataView.zoom_window = (
             self.dataView.zoom_window[0],
-            self.dataView.makeTD(abs_pos.x() / self.scale - self.dataView.outTime2Mode(self.dataView.ref_lap, self.dataView.ref_lap.lap.end_time),
+            self.dataView.makeTD(abs_pos.x() / self.scale - self.dataView.outTime2Mode(self.dataView.ref_lap, self.dataView.ref_lap.end.time),
                                  True))
         self.dataView.values_change.emit()
 
@@ -255,7 +255,7 @@ class LapWidget(MouseHelperWidget):
     def selectLap(self, abs_pos):
         tc = self.dataView.outMode2Time(self.dataView.ref_lap, abs_pos.x() / self.scale)
         for lap in self.dataView.ref_lap.log.laps:
-            if tc >= lap.lap.start_time and tc <= lap.lap.end_time:
+            if tc >= lap.start.time and tc <= lap.end.time:
                 self.dataView.ref_lap = lap
                 self.dataView.zoom_window = (state.TimeDistRef(0, 0), state.TimeDistRef(0, 0))
                 self.dataView.values_change.emit()
@@ -306,7 +306,7 @@ class LapWidget(MouseHelperWidget):
 
                 ph.painter.setFont(font)
                 ph.painter.setPen(pen)
-                txt = '[%s] Lap %d [%s]' % (state.format_time(l.lap.duration()), l.lap.num,
+                txt = '[%s] Lap %d [%s]' % (state.format_time(l.duration()), l.num,
                                             os.path.basename(l.log.log.get_filename()))
                 size = max(size, metrics.horizontalAdvance(txt))
                 ph.painter.drawText(lapx + icon_width, y, ph.size.width(), fh,
@@ -315,7 +315,7 @@ class LapWidget(MouseHelperWidget):
                     lapx += icon_width + size + metrics.horizontalAdvance('MMMMM')
 
             duration = self.dataView.outTime2Mode(self.dataView.ref_lap,
-                                                  self.dataView.ref_lap.log.laps[-1].lap.end_time)
+                                                  self.dataView.ref_lap.log.laps[-1].end.time)
             if not duration: # bug out early if no real data
                 self.lookupCursor()
                 return
@@ -323,45 +323,45 @@ class LapWidget(MouseHelperWidget):
             # draw grey zone
             ph.painter.fillRect(
                 QRect(1, 1 + lapy,
-                      self.timeCalc(self.dataView.ref_lap.lap.start_time) - 1,
+                      self.timeCalc(self.dataView.ref_lap.start.time) - 1,
                       ph.size.height() - 2 - lapy),
                 QtGui.QColor(48, 48, 48))
             ph.painter.fillRect(
-                QRect(self.timeCalc(self.dataView.ref_lap.lap.end_time), 1 + lapy,
-                      ph.size.width() - 1 - self.timeCalc(self.dataView.ref_lap.lap.end_time),
+                QRect(self.timeCalc(self.dataView.ref_lap.end.time), 1 + lapy,
+                      ph.size.width() - 1 - self.timeCalc(self.dataView.ref_lap.end.time),
                       ph.size.height() - 2 - lapy),
                 QtGui.QColor(48, 48, 48))
             # draw laps and lap markers
             for lap in self.dataView.ref_lap.log.laps:
-                start_x = self.timeCalc(lap.lap.start_time)
-                end_x = self.timeCalc(lap.lap.end_time)
+                start_x = self.timeCalc(lap.start.time)
+                end_x = self.timeCalc(lap.end.time)
                 ph.painter.drawText(start_x, 1 + lapy, end_x - start_x, ph.size.height() - lapy,
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
-                                    str(lap.lap.num))
+                                    str(lap.num))
             # draw lap boundaries
             pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
             pen.setStyle(Qt.DashLine)
             ph.painter.setPen(pen)
             for lap in self.dataView.ref_lap.log.laps:
-                x = self.timeCalc(lap.lap.start_time)
+                x = self.timeCalc(lap.start.time)
                 ph.painter.drawLine(x, lapy, x, ph.size.height())
-                x = self.timeCalc(lap.lap.end_time)
+                x = self.timeCalc(lap.end.time)
                 ph.painter.drawLine(x, lapy, x, ph.size.height())
 
             # draw cursor
             pen = QtGui.QPen(QtGui.QColor(255, 255, 0))
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)
-            x = self.timeCalc(self.dataView.ref_lap.lap.start_time + self.dataView.cursor_time.time)
+            x = self.timeCalc(self.dataView.ref_lap.start.time + self.dataView.cursor_time.time)
             ph.painter.drawLine(x, 1 + lapy, x, ph.size.height() - 2)
 
             # draw zoom window
             pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)
-            x1 = self.timeCalc(self.dataView.ref_lap.lap.start_time + self.dataView.zoom_window[0].time)
+            x1 = self.timeCalc(self.dataView.ref_lap.start.time + self.dataView.zoom_window[0].time)
             self.leftClick.geometry.setRect(x1 - 3, lapy, 7, ph.size.height() - lapy)
-            x2 = self.timeCalc(self.dataView.ref_lap.lap.end_time + self.dataView.zoom_window[1].time)
+            x2 = self.timeCalc(self.dataView.ref_lap.end.time + self.dataView.zoom_window[1].time)
             self.rightClick.geometry.setRect(x2 - 3, lapy, 7, ph.size.height() - lapy)
             ph.painter.drawRect(x1, 1 + lapy, x2 - x1, ph.size.height() - 2 - lapy)
 

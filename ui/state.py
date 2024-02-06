@@ -41,18 +41,23 @@ class LogRef:
 @dataclass(eq=False)
 class LapRef:
     log: LogRef
-    lap: object
+    num: int
+    start: TimeDistRef
+    end: TimeDistRef
     offset: TimeDistRef
 
     def lapDist2Time(self, dist):
-        return self.log.log.outDist2Time(self.log.log.outTime2Dist(self.lap.start_time) + dist) - self.lap.start_time
+        return self.log.log.outDist2Time(self.log.log.outTime2Dist(self.start.time) + dist) - self.start.time
 
     def lapTime2Dist(self, time):
-        p = self.log.log.outTime2Dist([self.lap.start_time + time, self.lap.start_time])
+        p = self.log.log.outTime2Dist([self.start.time + time, self.start.time])
         return p[0] - p[1]
 
     def offDist2Time(self, dist):
         return self.lapDist2Time(dist + self.offset.dist) - self.offset.time
+
+    def duration(self):
+        return self.end.time - self.start.time
 
 @dataclass(eq=False)
 class DataView:
@@ -92,25 +97,25 @@ class DataView:
         return time if self.mode_time else lapref.lapTime2Dist(time)
 
     def offTime2outMode(self, lapref: LapRef, time):
-        return self.outTime2Mode(lapref, lapref.lap.start_time + lapref.offset.time + time)
+        return self.outTime2Mode(lapref, lapref.start.time + lapref.offset.time + time)
 
     def offMode2outDist(self, lapref: LapRef, val):
         return self.outMode2Dist(lapref, self.offMode2outMode(lapref, val))
 
     def offMode2outMode(self, lapref: LapRef, val):
-        return val + self.outTime2Mode(lapref, lapref.lap.start_time + lapref.offset.time)
+        return val + self.outTime2Mode(lapref, lapref.start.time + lapref.offset.time)
 
     def offMode2outTime(self, lapref: LapRef, val):
         return self.outMode2Time(lapref, self.offMode2outMode(lapref, val))
 
     def offMode2Dist(self, lapref: LapRef, val):
-        return self.outMode2Dist(lapref, self.offMode2outMode(lapref, val)) - lapref.log.log.outTime2Dist(lapref.lap.start_time + lapref.offset.time)
+        return self.outMode2Dist(lapref, self.offMode2outMode(lapref, val)) - lapref.log.log.outTime2Dist(lapref.start.time + lapref.offset.time)
 
     def offMode2Time(self, lapref: LapRef, val):
-        return self.outMode2Time(lapref, self.offMode2outMode(lapref, val)) - lapref.lap.start_time - lapref.offset.time
+        return self.outMode2Time(lapref, self.offMode2outMode(lapref, val)) - lapref.start.time - lapref.offset.time
 
     def outTime2offTime(self, lapref: LapRef, time):
-        return time - lapref.lap.start_time - lapref.offset.time
+        return time - lapref.start.time - lapref.offset.time
 
     def cursor2offDist(self, lapref: LapRef):
         return self.offMode2Dist(lapref, self.getTDValue(self.cursor_time))
@@ -131,7 +136,7 @@ class DataView:
     def makeTD(self, val, rel_end):
         lapref = self.ref_lap
         if rel_end:
-            lapdur = lapref.lap.duration()
+            lapdur = lapref.duration()
             basetd = TimeDistRef(lapdur, lapref.lapTime2Dist(lapdur))
             valtd = self.makeTD(val + self.getTDValue(basetd), False)
             return TimeDistRef(valtd.time - basetd.time, valtd.dist - basetd.dist)
@@ -145,7 +150,7 @@ class DataView:
         return tdref.time if self.mode_time else tdref.dist
 
     def getLapValue(self, lapref: LapRef):
-        p = self.outTime2Mode(lapref, [lapref.lap.start_time, lapref.lap.end_time])
+        p = self.outTime2Mode(lapref, [lapref.start.time, lapref.end.time])
         return (p[0], p[1])
 
     def windowSize2Mode(self):

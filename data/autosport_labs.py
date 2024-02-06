@@ -25,9 +25,6 @@ class Lap:
     start_time: int
     end_time: int
 
-    def duration(self):
-        return self.end_time - self.start_time
-
 def _decode_channel_hdr(ch):
     fields = list(csv.reader([ch[0]], delimiter='|'))[0]
     dec_places = 0
