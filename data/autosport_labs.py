@@ -79,7 +79,7 @@ class AutosportLabs:
         dividers = np.concatenate((np.array([0.]),
                                    dividers,
                                    np.array([max(np.max(ch.timecodes) for ch in channels)])))
-        self.laps = [Lap(idx, int(start), int(end))
+        self.laps = [Lap(int(idx + ch.values[0]), int(start), int(end))
                      for idx, (start, end) in enumerate(zip(dividers[:-1], dividers[1:]))]
 
     def get_laps(self):
