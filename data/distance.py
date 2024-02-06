@@ -42,19 +42,26 @@ class DistanceWrapper:
         self.data = data
         self.channel_cache = {}
 
+        # in case we fail out
+        self.dist_map_time = np.array([0.]).data
+        self.dist_map_dist = self.dist_map_time
+
         if not self.data.get_laps() or not data.get_speed_channel():
-            self.dist_map_time = np.array([0.]).data
-            self.dist_map_dist = self.dist_map_time
             return
 
         distdata = data.get_channel_data(data.get_speed_channel())
+        converted = unitconv.convert(distdata[1],
+                                     data.get_channel_units(data.get_speed_channel()),
+                                     'm/s')
+        if len(converted) == 0:
+            return
 
         # VALIDATED: AiM GPS Speed is just linear interpolation of raw
         # ECEF velocity between datapoints, modulo floating point
         # accuracy (they seem to use 32-bit floats).
         tc = np.arange(0, self.data.get_laps()[-1].end_time,
                        10, dtype=np.float64) # np.interp requires float64 arrays for performance
-        gs = np.interp(tc, distdata[0], distdata[1])
+        gs = np.interp(tc, distdata[0], converted)
 
         # adjust distances of each lap to match the median, if within a certain percentage
         dividers = [(l.start_time + 5) // 10 for l in self.data.get_laps()]
@@ -83,18 +90,30 @@ class DistanceWrapper:
     def get_channels(self):
         return self.data.get_channels()
 
-    def get_channel_data(self, *names):
+    def get_channel_data(self, *names, unit=None):
         for name in names:
-            if name not in self.channel_cache:
-                data = self.data.get_channel_data(name)
-                if data is None: continue
-                self.channel_cache[name] = ChannelData(data[0],
-                                                       self.outTime2Dist(data[0]),
-                                                       data[1],
-                                                       self.data.get_channel_units(name),
-                                                       self.data.get_channel_dec_points(name))
-            if len(self.channel_cache[name].values):
-                return self.channel_cache[name]
+            key = (name, unit)
+            if key not in self.channel_cache:
+                if unit:
+                    base = self.get_channel_data(name)
+                    if not len(base.values): continue
+                    converted = unitconv.convert(base.values, base.units, unit)
+                    if converted is None: continue
+                    self.channel_cache[key] = ChannelData(base.timecodes,
+                                                          base.distances,
+                                                          converted,
+                                                          unit,
+                                                          base.dec_pts) # XXX what to do here?
+                else:
+                    data = self.data.get_channel_data(name)
+                    if data is None: continue
+                    self.channel_cache[key] = ChannelData(data[0],
+                                                          self.outTime2Dist(data[0]),
+                                                          data[1],
+                                                          self.data.get_channel_units(name),
+                                                          self.data.get_channel_dec_points(name))
+            if len(self.channel_cache[key].values):
+                return self.channel_cache[key]
         return ChannelData([], [], [], '', 0)
 
 

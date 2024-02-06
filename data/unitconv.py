@@ -8,6 +8,8 @@
 from dataclasses import dataclass, field
 import math
 
+import numpy as np
+
 
 @dataclass
 class Unit:
@@ -33,7 +35,7 @@ properties = [
     UnitProperty('Velocity',
                  [Unit('meter/sec', 'm/s'),
                   Unit('kilometer/hour', 'km/h', 3.6, aliases=['kph']),
-                  Unit('mile/hour', 'mph', 5280 * 12 * .0254 / 3600, aliases=['mile/h'])]),
+                  Unit('mile/hour', 'mph', 100/2.54/12/5280*3600, aliases=['mile/h'])]),
     UnitProperty('Time',
                  [Unit('second', 's'),
                   Unit('millisecond', 'ms', 1000)]),
@@ -67,7 +69,7 @@ properties = [
     UnitProperty('Angular velocity',
                  [Unit('rad/sec', 'rad/s'),
                   Unit('rev/min', 'rpm', 30 / math.pi),
-                  Unit('deg/sec', 'deg/s', math.pi / 180, display='\u00b0/s')]),
+                  Unit('deg/sec', 'deg/s', 180 / math.pi, display='\u00b0/s')]),
     UnitProperty('Volume flow',
                  [Unit('cubic meter/sec', 'm3/s', display='m\u00b3/s'),
                   Unit('liter/sec', 'l/s', 1000)]),
@@ -86,7 +88,7 @@ def convert(values, from_unit, to_unit):
         return None
     if old_unit[0] != new_unit[0]: # Are they the same property
         return None
-    return ((values - old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
+    return (np.subtract(values, old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
             + new_unit[1].offset)
 
 def check_units(unit):
