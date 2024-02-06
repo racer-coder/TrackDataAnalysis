@@ -87,14 +87,14 @@ class DistanceWrapper:
         for name in names:
             if name not in self.channel_cache:
                 data = self.data.get_channel_data(name)
-                if data is None: data = ([], [])
+                if data is None: continue
                 self.channel_cache[name] = ChannelData(data[0],
                                                        self.outTime2Dist(data[0]),
                                                        data[1],
                                                        self.data.get_channel_units(name),
                                                        self.data.get_channel_dec_points(name))
             if len(self.channel_cache[name].values):
-                break
-        return self.channel_cache[name]
+                return self.channel_cache[name]
+        return ChannelData([], [], [], '', 0)
 
 

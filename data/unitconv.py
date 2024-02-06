@@ -14,7 +14,7 @@ class Unit:
     name: str
     symbol: str
     scale: float = 1 # X base units = Y this_units.  Y = X * scale + offset
-    offset: float = 0
+    offset: float = 0 #                              X = (Y - offset) / scale
     aliases: list[str] = field(default_factory=list)
     display: str = None # usually symbol unless special unicode characters
 
@@ -77,6 +77,17 @@ unit_map = {name: (prop, unit)
             for prop in properties
             for unit in prop.units
             for name in [unit.name, unit.symbol] + unit.aliases}
+
+def convert(values, from_unit, to_unit):
+    try:
+        old_unit = unit_map[from_unit]
+        new_unit = unit_map[to_unit]
+    except KeyError:
+        return None
+    if old_unit[0] != new_unit[0]: # Are they the same property
+        return None
+    return ((values - old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
+            + new_unit[1].offset)
 
 def check_units(unit):
     return # disable check for now
