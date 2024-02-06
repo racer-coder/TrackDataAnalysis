@@ -113,10 +113,13 @@ class MOTEC:
                     seq_start_tc = tc
             else:
                 if v >= 16384:
-                    last_val = v
+                    last_val = int(v)
                 elif v >= 0:
                     if v == 100 or v == 2: # but not 56?
-                        laps.append(seq_start_tc - 1000 + (int(last_val) & 1023))
+                        last_val &= 16383
+                        if last_val >= 8192:
+                            last_val -= 16384
+                        laps.append(seq_start_tc - 1000 + last_val)
                     seq_start_tc = None
         laps.append(max(np.max(d.timecodes) for d in self.data.values()))
         self.laps = [int(l) for l in laps]
