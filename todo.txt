@@ -1,8 +1,5 @@
 UNITS:
-. get_channel_data for Distance can request unit?  cache native and converted format?
 . map various unit names to more consistent convention
-. map should request gps altitude in meters
-. distance.py should do all calculations in ... ??? meters?
 . time/dist detect whether should use meter vs feet depending on speed units?
 . ability to open channel editor and override units (or forget override)
 . store channel overrides in workspace

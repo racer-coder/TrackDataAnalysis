@@ -31,7 +31,7 @@ properties = [
                  [Unit('meter', 'm'),
                   Unit('millimeter', 'mm', 1000),
                   Unit('feet', 'ft', 1 / (.0254*12)),
-                  Unit('mile', 'mile', 1 / (.0254*12*5280))]),
+                  Unit('mile', 'mile', 1 / (.0254*12*5280), aliases=['mi'])]),
     UnitProperty('Velocity',
                  [Unit('meter/sec', 'm/s'),
                   Unit('kilometer/hour', 'km/h', 3.6, aliases=['kph']),
@@ -41,7 +41,7 @@ properties = [
                   Unit('millisecond', 'ms', 1000)]),
     UnitProperty('Angle',
                  [Unit('radian', 'rad'),
-                  Unit('degree', 'deg', 180 / math.pi, display = '\u00b0')]),
+                  Unit('degree', 'deg', 180 / math.pi, display='\u00b0', aliases=['Degrees'])]),
     UnitProperty('Pressure',
                  [Unit('pascal', 'Pa'),
                   Unit('kilopascal', 'kPa', 1e-3),
@@ -88,6 +88,8 @@ def convert(values, from_unit, to_unit):
         return None
     if old_unit[0] != new_unit[0]: # Are they the same property
         return None
+    if old_unit[1] == new_unit[1]:
+        return values # don't waste memory on a name change
     return (np.subtract(values, old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
             + new_unit[1].offset)
 
