@@ -72,7 +72,7 @@ class MapWidget(QWidget):
         gps_long = lap.log.log.get_channel_data('GPS Longitude', 'Longitude')
         gps_alt = lap.log.log.get_channel_data('GPS Altitude', 'Altitude')
 
-        if not len(gps_lat.values) or not len(gps_long.values) or not len(gps_alt.values):
+        if not len(gps_lat.values) or not len(gps_long.values):
             return
 
         zoom_start = bisect.bisect_left(
@@ -81,7 +81,7 @@ class MapWidget(QWidget):
             gps_lat.timecodes, lap.lap.end_time + lap.offset.time + dv.zoom_window[1].time)
         zoom_lat = gps_lat.values[max(0, zoom_start-1) : zoom_end]
         zoom_long = gps_long.values[max(0, zoom_start-1) : zoom_end]
-        zoom_alt = gps_alt.values[max(0, zoom_start-1) : zoom_end]
+        zoom_alt = gps_alt.values[max(0, zoom_start-1) : zoom_end] if len(gps_alt.values) else np.array(0.)
 
         # first, a center
         lat_center = np.mean(zoom_lat)
