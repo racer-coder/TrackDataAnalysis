@@ -72,7 +72,8 @@ class MapWidget(QWidget):
         gps_long = lap.log.log.get_channel_data('GPS Longitude', 'Longitude')
         gps_alt = lap.log.log.get_channel_data('GPS Altitude', 'Altitude')
 
-        if not len(gps_lat.values): return
+        if not len(gps_lat.values) or not len(gps_long.values) or not len(gps_alt.values):
+            return
 
         zoom_start = bisect.bisect_left(
             gps_lat.timecodes, lap.lap.start_time + lap.offset.time + dv.zoom_window[0].time)
