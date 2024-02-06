@@ -6,6 +6,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from . import unitconv
+
 @dataclass
 class ChannelData:
     timecodes: object
@@ -21,6 +23,7 @@ class ChannelData:
         self.distances = distances
         self.values = values
         self.units = units
+        unitconv.check_units(units)
         self.dec_pts = dec_pts
         self.min = np.min(values) if len(values) else None
         self.max = np.max(values) if len(values) else None

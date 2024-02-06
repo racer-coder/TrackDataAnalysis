@@ -1,17 +1,28 @@
+UNITS:
+. get_channel_data for Distance can request unit?  cache native and converted format?
+. map various unit names to more consistent convention
+. map should request gps altitude in meters
+. distance.py should do all calculations in ... ??? meters?
+. time/dist detect whether should use meter vs feet depending on speed units?
+. ability to open channel editor and override units (or forget override)
+. store channel overrides in workspace
+. pretty printer convert deg to small circle
+
+COLORS:
+. store color map in data_view by name?
+. store color map overrides in data_view and workspace.
+. channel editor to change (or forget) color override
+
 MVP:
 * FILE FORMATS
 . aim / motec - metadata? display somehow
 . megalogviewer - file reader
 . channel editor - assign various channel properties globally, like colors, min/max scaling, decimal places, etc
-. better unit handling?
 . calc correction factor per lap across log files?
 
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
 . lat/long g force calculation from GPS? or internal accelerometers? or both?
 . detection of braking/cornering based on exceeding threshold for a duration of time?
-
-* PACKAGE/COMPILE?
-. cleanup script for venv - make it work on windows too
 
 
 
