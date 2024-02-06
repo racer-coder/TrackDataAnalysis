@@ -97,3 +97,17 @@ def check_units(unit):
     return # disable check for now
     if unit and unit not in unit_map:
         print("Found unit", unit)
+
+def display_text(unit):
+    try:
+        entry = unit_map[unit][1]
+        return entry.display or entry.symbol
+    except KeyError:
+        return unit
+
+def comparable_units(unit):
+    try:
+        entry = unit_map[unit][0]
+        return [(u.name, u.display or u.symbol) for u in entry.units]
+    except KeyError:
+        return [(unit, unit)]

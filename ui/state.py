@@ -9,6 +9,8 @@ from PySide2.QtCore import Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import QWidget
 
+from data import distance
+
 # belongs in a theme file, but ...
 lap_colors = (
     QtGui.QColor(240, 0, 0),
@@ -38,6 +40,9 @@ class LogRef:
     video_alignment: typing.Optional[int] = None
     laps: typing.List['LapRef'] = field(default_factory=list)
 
+    def get_channel_data(self, *args, **kwargs):
+        return self.log.get_channel_data(*args, **kwargs)
+
 @dataclass(eq=False)
 class LapRef:
     log: LogRef
@@ -58,6 +63,29 @@ class LapRef:
     def duration(self):
         return self.end.time - self.start.time
 
+    def get_channel_data(self, *args, **kwargs):
+        return self.log.get_channel_data(*args, **kwargs)
+
+@dataclass(eq=False)
+class ChannelProperties:
+    units : str
+    dec_pts : int
+    color : int # index into color array
+
+@dataclass(eq=False)
+class ChannelData(distance.ChannelData):
+    color: int
+
+    def __init__(self, parent, prop):
+        self.timecodes = parent.timecodes
+        self.distances = parent.distances
+        self.values = parent.values
+        self.units = parent.units
+        self.dec_pts = prop.dec_pts
+        self.min = parent.min
+        self.max = parent.max
+        self.color = prop.color
+
 @dataclass(eq=False)
 class DataView:
     ref_lap: typing.Optional[LapRef]
@@ -71,6 +99,15 @@ class DataView:
     active_component: typing.Optional[QWidget] # widget with current focus
     video_alignment: typing.Dict[str, typing.Tuple[str, int]] # {log_fname: (vid_fname, vid_align)}
     maps_key: typing.Optional[typing.Tuple[str, str]] # provider ('maptiler'), key
+
+    # channel_overrides contains only those properties explicitly set by the user.
+    channel_overrides: typing.Dict[str, object] # [name]
+    # channel_properties should be fully populated, either from the
+    # open log file(s), dynamically chosen at runtime (colors), or
+    # from channel_overrides.
+    channel_properties: typing.Dict[str, ChannelProperties] # [name]
+    # channel_defaults should be fully populated from open log files.
+    channel_defaults: typing.Dict[str, ChannelProperties] # [name]
 
     cursor_change: Signal # (old_cursor) when cursor position changed.  Lightest weight update
     values_change: Signal # () lap selection, lap shift, zoom window, time/dist mode.  Redraw all components, maybe more
@@ -158,6 +195,14 @@ class DataView:
         lap_range = self.getLapValue(self.ref_lap)
         return (lap_range[1] - lap_range[0]
                 + self.getTDValue(self.zoom_window[1]) - self.getTDValue(self.zoom_window[0]))
+
+    def get_channel_data(self, ref, ch): # ref is LogRef or LapRef
+        if ch in self.channel_properties:
+            props = self.channel_properties[ch]
+        else:
+            props = ChannelProperties(units='', dec_pts=0, color=0)
+        return ChannelData(ref.get_channel_data(ch, unit=props.units), props)
+
 
 # doesn't really belong here, but ....
 def format_time(time_ms, sign=''): # pass '+' into sign to get +/- instead of ''/-

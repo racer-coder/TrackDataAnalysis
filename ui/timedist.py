@@ -15,22 +15,13 @@ from PySide2.QtWidgets import (
     QMenu,
 )
 
+from data import unitconv
+from data.distance import ChannelData
+from . import channels
 from . import state
 from . import widgets
-from data.distance import ChannelData
 
 
-
-channel_colors = (
-    QtGui.QColor(255, 0, 0),
-    QtGui.QColor(255, 160, 32),
-    QtGui.QColor(64, 255, 64),
-    QtGui.QColor(43, 255, 255),
-    QtGui.QColor(47, 151, 255),
-    QtGui.QColor(186, 117, 255),
-    QtGui.QColor(255, 106, 218),
-    QtGui.QColor(244, 244, 0),
-    )
 
 def roundUpHumanNumber(num):
     if num <= 0: return 1
@@ -178,8 +169,8 @@ class TimeDist(widgets.MouseHelperWidget):
 
     def channelName(self, ch, units=None):
         if not units and self.dataView.ref_lap:
-            units = self.dataView.ref_lap.log.log.get_channel_data(ch).units
-        return '%s [%s]' % (ch, units) if units else ch
+            units = self.dataView.channel_properties[ch].units
+        return '%s [%s]' % (ch, unitconv.display_text(units)) if units else ch
 
     def graph_wheel(self, angle):
         if angle.x():
@@ -275,17 +266,18 @@ class TimeDist(widgets.MouseHelperWidget):
                 units = 's',
                 dec_pts = 3))
 
-    def paintGraph(self, ph, y_offset, height, channels, graph_idx):
+    def paintGraph(self, ph, y_offset, height, channel_list, graph_idx):
         if not self.x_axis: return
         # get laps
         laps = self.dataView.get_laps()
         laps[0] = (self.dataView.ref_lap, None, 0) # special color to mean use channel color
         # get data
         var = []
-        if 'Time Slip' in channels:
+        if 'Time Slip' in channel_list:
             self.calc_time_slip(laps, var)
-        data = [self.dataView.ref_lap.log.log.get_channel_data(ch)
-                for ch in channels if ch != 'Time Slip'] + var
+        data = [
+            self.dataView.get_channel_data(self.dataView.ref_lap, ch)
+            for ch in channel_list if ch != 'Time Slip'] + var
         # calc min/max data
         dmin = min([d.min for d in data if d.min is not None], default=0)
         dmax = max([d.max for d in data if d.max is not None], default=0)
@@ -318,17 +310,19 @@ class TimeDist(widgets.MouseHelperWidget):
         for gy in memoryview(agy):
             ph.painter.drawLine(self.graph_x, gy, ph.size.width(), gy)
         # draw data
-        draw_channels = list(enumerate(channels))
+        draw_channels = channel_list
         if graph_idx == self.current_channel[0]:
-            draw_channels = ([d for d in draw_channels if d[1] != self.current_channel[1]] +
-                             [d for d in draw_channels if d[1] == self.current_channel[1]])
+            draw_channels = ([d for d in draw_channels if d != self.current_channel[1]] +
+                             [d for d in draw_channels if d == self.current_channel[1]])
         for lidx, (lap, color, _) in list(enumerate(laps if self.lapView else laps[:1]))[::-1]:
-            for idx, ch in draw_channels:
-                d = lap.log.log.get_channel_data(ch) if ch != 'Time Slip' else var[lidx]
+            for ch in draw_channels:
+                if ch == 'Time Slip':
+                    d = var[lidx]
+                else:
+                    d = self.dataView.get_channel_data(lap, ch)
                 if not len(d.values): continue
                 # set pen for data
-                pen = QtGui.QPen(color if color else channel_colors[idx])
-                pen.setStyle(Qt.SolidLine)
+                pen = QtGui.QPen(color if color else channels.colors[d.color])
                 ph.painter.setPen(pen)
 
                 xa = d.timecodes if self.dataView.mode_time else d.distances
@@ -356,31 +350,28 @@ class TimeDist(widgets.MouseHelperWidget):
         # color background for text
         ph.painter.fillRect(QRect(QPoint(self.graph_x, y_offset),
                                   QSize(self.channel_ind_width + self.channel_name_width + self.channel_value_width + self.channel_opt_width,
-                                        12 + fontMetrics.height() * len(channels))),
+                                        12 + fontMetrics.height() * len(channel_list))),
                             QtGui.QColor(32, 32, 32, 160))
         nminmax = 4 if self.dataView.alt_lap else 2
         ph.painter.fillRect(QRect(QPoint(ph.size.width() - self.channel_minmax_width * nminmax,
                                          y_offset),
                                   QSize(self.channel_minmax_width * nminmax,
-                                        12 + fontMetrics.height() * len(channels))),
+                                        12 + fontMetrics.height() * len(channel_list))),
                             QtGui.QColor(32, 32, 32, 160))
         # text for data
         pen2 = QtGui.QPen(state.lap_colors[1])
         pen2.setStyle(Qt.SolidLine)
         next_y = y_offset
-        for (color, (ch, lap)), d in zip(
-                (list(zip(channel_colors,
-                          [(ch, self.dataView.ref_lap) for ch in channels if ch != 'Time Slip'])) +
-                 [(c, ('Time Slip', l)) for l, c, _ in laps]),
+        for (color, ch, lap), d in zip(
+                [(channels.colors[self.dataView.channel_properties[ch].color], ch,
+                  self.dataView.ref_lap) for ch in channel_list if ch != 'Time Slip'] +
+                 [(c, 'Time Slip', l) for l, c, _ in laps if c is not None],
                 data + var):
-            if color is None: continue
-
             # set pen for data
             y = next_y
             next_y += fontMetrics.height()
 
             pen = QtGui.QPen(color)
-            pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)
 
             if graph_idx == self.current_channel[0] and ch == self.current_channel[1]:
@@ -430,7 +421,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '\u25b4' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
             if not self.dataView.alt_lap or ch == 'Time Slip': continue
-            d2 = self.dataView.alt_lap.log.log.get_channel_data(ch)
+            d2 = self.dataView.get_channel_data(self.dataView.alt_lap, ch)
             if not len(d2.values): continue
             ph.painter.setPen(pen2)
             start_idx = max(0, bisect.bisect_left(d2.timecodes,
@@ -562,7 +553,7 @@ class TimeDist(widgets.MouseHelperWidget):
         self.channel_ind_width = M_space if self.channel_name_width else 0
         self.channel_value_width = M_space + max([
             self.minmax_width(channel_font_metrics,
-                              self.dataView.ref_lap.log.log.get_channel_data(ch))
+                              self.dataView.get_channel_data(self.dataView.ref_lap, ch))
             for grp in self.channelGroups
             for ch in grp
             if ch != 'Time Slip' and self.dataView.ref_lap], default=0)
@@ -755,8 +746,8 @@ class TimeDist(widgets.MouseHelperWidget):
     def tryAddChannelExistingGroup(self, ch):
         if self.dataView.ref_lap:
             for grp in self.channelGroups:
-                if grp and (self.dataView.ref_lap.log.log.get_channel_data(ch).units ==
-                            self.dataView.ref_lap.log.log.get_channel_data(grp[0]).units):
+                if grp and (self.dataView.channel_properties[ch].units ==
+                            self.dataView.channel_properties[grp[0]].units):
                     grp.append(ch)
                     return True
         return False
@@ -855,6 +846,9 @@ class TimeDist(widgets.MouseHelperWidget):
             # channel specific context menu
             menu = QMenu()
             menu.addAction(ch[1]) # dummy entry so the user knows exactly what we're operating on
+            menu.addSeparator()
+            menu.addAction('Edit channel...').triggered.connect(
+                lambda: channels.channel_editor(self, self.dataView, ch[1]))
             menu.addSeparator()
             menu.addAction('Remove channel').triggered.connect(lambda: self.channelMenuRemove(ch))
             menu.exec_(event.globalPos())

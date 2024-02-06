@@ -24,7 +24,7 @@ assert sys.byteorder == 'little'
 class Channel:
     timecodes: array
     values: array
-    dec_places: int
+    dec_pts: int
     name: str
     short_name: str
     units: str
@@ -50,7 +50,7 @@ def _dec_str(s, offs, maxlen):
 
 def _decode_channel(s, addr):
     (data_addr, data_count, elem_type, elem_size, sample_rate,
-     offset, mul, scale, dec_places) = struct.unpack_from('<IIxxHHHHHHh', s, addr + 8)
+     offset, mul, scale, dec_pts) = struct.unpack_from('<IIxxHHHHHHh', s, addr + 8)
 
     # cast the data into the right datatype
     data = s[data_addr : data_addr + elem_size * data_count]
@@ -64,8 +64,8 @@ def _decode_channel(s, addr):
     else: raise TypeError
 
     return Channel((np.arange(0, data_count) * (1000 / sample_rate)).data,
-                   ((np.multiply(data, 1 / (scale * 10 ** dec_places)) + offset) * mul).data,
-                   dec_places,
+                   ((np.multiply(data, 1 / (scale * 10 ** dec_pts)) + offset) * mul).data,
+                   dec_pts,
                    _dec_str(s, addr+32, 32),
                    _dec_str(s, addr+64, 8),
                    _dec_str(s, addr+72, 12))
@@ -137,7 +137,7 @@ class MOTEC:
         return self.data[name].units if name in self.data else None
 
     def get_channel_dec_points(self, name):
-        return max(0, self.data[name].dec_places) if name in self.data else None
+        return max(0, self.data[name].dec_pts) if name in self.data else None
 
     def get_channel_data(self, name):
         if name not in self.data:

@@ -1,20 +1,12 @@
 UNITS:
 . map various unit names to more consistent convention
 . time/dist detect whether should use meter vs feet depending on speed units?
-. ability to open channel editor and override units (or forget override)
-. store channel overrides in workspace
-. pretty printer convert deg to small circle
 
-COLORS:
-. store color map in data_view by name?
-. store color map overrides in data_view and workspace.
-. channel editor to change (or forget) color override
 
 MVP:
 * FILE FORMATS
 . aim / motec - metadata? display somehow
 . megalogviewer - file reader
-. channel editor - assign various channel properties globally, like colors, min/max scaling, decimal places, etc
 . calc correction factor per lap across log files?
 
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
@@ -51,7 +43,6 @@ Later Milestones:
 . map - drag map
 . map - zoom map
 . map - go back to orig placement
-. values docker - draw channel color for component channels?
 . periodic autosave of workspace?
 . allow selection of workspace on startup
 . multiple monitor/window support for workspaces

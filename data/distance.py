@@ -37,6 +37,14 @@ class ChannelData:
         if span == 0: return self.values[i]
         return self.values[i-1] + (self.values[i] - self.values[i-1]) * (tc - index[i-1]) / span
 
+    def change_units(self, units):
+        converted = unitconv.convert(self.values,self.units, units)
+        if converted is None:
+            return ChannelData([], [], [], '', 0)
+        return ChannelData(self.timecodes, self.distances, converted,
+                           units, self.dec_pts) # ??
+
+
 class DistanceWrapper:
     def __init__(self, data):
         self.data = data
@@ -90,20 +98,19 @@ class DistanceWrapper:
     def get_channels(self):
         return self.data.get_channels()
 
+    # must include units, dec_pts
+    def get_channel_metadata(self, name):
+        return {'units': self.data.get_channel_units(name),
+                'dec_pts': self.data.get_channel_dec_points(name)}
+
     def get_channel_data(self, *names, unit=None):
         for name in names:
             key = (name, unit)
             if key not in self.channel_cache:
                 if unit:
-                    base = self.get_channel_data(name)
-                    if not len(base.values): continue
-                    converted = unitconv.convert(base.values, base.units, unit)
-                    if converted is None: continue
-                    self.channel_cache[key] = ChannelData(base.timecodes,
-                                                          base.distances,
-                                                          converted,
-                                                          unit,
-                                                          base.dec_pts) # XXX what to do here?
+                    converted = self.get_channel_data(name).change_units(unit)
+                    if not len(converted.values): continue
+                    self.channel_cache[key] = converted
                 else:
                     data = self.data.get_channel_data(name)
                     if data is None: continue

@@ -28,6 +28,7 @@ import data.aim_xrk
 import data.autosport_labs
 import data.distance
 import data.motec
+import ui.channels
 import ui.components
 import ui.dockers
 import ui.layout
@@ -79,6 +80,11 @@ class MainWindow(QMainWindow):
                                            active_component=None,
                                            video_alignment={},
                                            maps_key=None,
+
+                                           channel_overrides={},
+                                           channel_properties={},
+                                           channel_defaults={},
+
                                            cursor_change=self.cursor_change,
                                            values_change=self.values_change,
                                            data_change=self.data_change)
@@ -287,6 +293,7 @@ class MainWindow(QMainWindow):
                             ui.state.TimeDistRef(0., 0.))
             for lap in logref.log.get_laps()]
         self.data_view.log_files.append(logref)
+        ui.channels.update_channel_properties(self.data_view)
 
         laps = logref.laps
         if not laps:
@@ -326,6 +333,9 @@ class MainWindow(QMainWindow):
         self.layout_mgr.load_state(ws_data['layout'])
         self.data_view.video_alignment = ws_data['videos']
         self.data_view.maps_key = ws_data['maps_key']
+        self.data_view.channel_overrides = ws_data.get('channels', {})
+        ui.channels.update_channel_properties(self.data_view)
+        self.data_view.data_change.emit() # XXX make a new signal for log file / workspace changes
 
     def save_workspace(self):
         if not self.workspace_fname: return self.save_as_workspace()
@@ -334,6 +344,7 @@ class MainWindow(QMainWindow):
             json.dump({'layout': self.layout_mgr.save_state(),
                        'videos': self.data_view.video_alignment,
                        'maps_key': self.data_view.maps_key,
+                       'channels': self.data_view.channel_overrides,
                        }, f, indent=4)
             f.flush()
             os.fsync(f.fileno())

@@ -14,6 +14,7 @@ from PySide2.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QListWidget,
+    QMenu,
     QStyle,
     QTableView,
     QTableWidget,
@@ -22,6 +23,8 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+from data import unitconv
+from . import channels
 from . import map
 from . import state
 from . import widgets
@@ -266,6 +269,8 @@ class ChannelsDockWidget(TempDockWidget):
         self.chList = QListWidget()
         self.chList.setSelectionMode(QListWidget.NoSelection)
         self.chList.itemActivated.connect(self.activateItem)
+        self.chList.customContextMenuRequested.connect(self.context_menu)
+        self.chList.setContextMenuPolicy(Qt.CustomContextMenu)
 
         self.matcher = TextMatcher('')
         self.recompute()
@@ -287,6 +292,21 @@ class ChannelsDockWidget(TempDockWidget):
     def textChanged(self, txt):
         self.matcher = TextMatcher(txt)
         self.update_hidden()
+
+    def context_menu(self, pos):
+        ch = self.chList.itemAt(pos).text()
+        # channel specific context menu
+        menu = QMenu()
+        menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
+        menu.addSeparator()
+        menu.addAction('Edit channel...').triggered.connect(
+            lambda: channels.channel_editor(self, self.mainwindow.data_view, ch))
+        ac = self.mainwindow.data_view.active_component
+        if ac:
+            menu.addSeparator()
+            act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
+            act.triggered.connect(lambda: ac.addChannel(ch))
+        menu.exec_(self.mapToGlobal(pos))
 
     def update_hidden(self):
         for i in range(self.chList.count()):
@@ -348,21 +368,22 @@ class ValuesTableChannel:
     name: object
     units: object
 
-    def __init__(self, model, data_view, channel, units = None, dec_pts = None):
+    def __init__(self, icon, model, data_view, channel, units = None, dec_pts = None):
         self.model = model
         self.data_view = data_view
         self.channel = channel
-        self.icon = (model.channel_style, None)
+        self.icon = ([channels.colors[data_view.channel_properties[channel].color]] + model.channel_style[1:], '\u25a0') if icon else (model.channel_style, None)
         self.name = (model.channel_style, channel)
         if units is None and data_view.ref_lap:
-            units = data_view.ref_lap.log.log.get_channel_data(channel).units
-            dec_pts = data_view.ref_lap.log.log.get_channel_data(channel).dec_pts
-        self.units = (model.channel_style, units or None) # in case units == '', None is faster
+            units = data_view.channel_properties[channel].units
+            dec_pts = data_view.channel_properties[channel].dec_pts
+        self.units = (model.channel_style,
+                      unitconv.display_text(units) or None) # in case units == '', None is faster
         self.dec_pts = dec_pts
 
     def _calc(self, lap):
         # XXX MOVE INTO state.py
-        d = lap[0].log.log.get_channel_data(self.channel)
+        d = self.data_view.get_channel_data(lap[0], self.channel)
         start_idx = max(0, bisect.bisect_left(d.timecodes, lap[1]) - 1)
         # interpolate between start_idx and start_idx+1?
         if start_idx >= len(d.values):
@@ -383,7 +404,7 @@ class ValuesTableChannel:
 
 class ValuesTableFunc(ValuesTableChannel):
     def __init__(self, model, channel, func, units):
-        super().__init__(model, None, channel, units, 0)
+        super().__init__(False, model, None, channel, units, 0)
         self.func = func
 
     def _calc(self, lap): return self.func(lap[0])
@@ -463,6 +484,8 @@ class ValuesDockWidget(TempDockWidget):
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.setEditTriggers(self.table.NoEditTriggers)
         self.table.activated.connect(self.activate_cell)
+        self.table.customContextMenuRequested.connect(self.context_menu)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
 
         mainwindow.data_view.cursor_change.connect(self.update_cursor)
         mainwindow.data_view.values_change.connect(self.recompute)
@@ -487,6 +510,23 @@ class ValuesDockWidget(TempDockWidget):
 
     def sizeHint(self):
         return QSize(400, 400)
+
+    def context_menu(self, pos):
+        row = self.model.rows[self.table.indexAt(pos).row()]
+        if type(row) is ValuesTableChannel:
+            ch = row.channel
+            # channel specific context menu
+            menu = QMenu()
+            menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
+            menu.addSeparator()
+            menu.addAction('Edit channel...').triggered.connect(
+                lambda: channels.channel_editor(self, self.mainwindow.data_view, ch))
+            ac = self.mainwindow.data_view.active_component
+            if ac:
+                menu.addSeparator()
+                act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
+                act.triggered.connect(lambda: ac.addChannel(ch))
+            menu.exec_(self.mapToGlobal(pos))
 
     def activate_cell(self, index):
         ac = self.mainwindow.data_view.active_component
@@ -542,8 +582,7 @@ class ValuesDockWidget(TempDockWidget):
         heading = ['', ''] + [l[0] + (' \u0394' if i == self.delta_mode else '') for i, l in enumerate(laps)] + ['']
 
         ac = self.mainwindow.data_view.active_component
-        aclist = list(ac.channels()) if ac else []
-        aclist.sort()
+        acset = set(ac.channels()) if ac else set()
 
         allch = list({ch
                       for logfile in self.mainwindow.data_view.log_files
@@ -575,9 +614,9 @@ class ValuesDockWidget(TempDockWidget):
         rowhide.append(False)
         rows.append(ValuesTableSection(self.model, 'Component/Graph'))
 
-        for ch in aclist:
+        for ch in sorted(list(acset)):
             rowhide.append(False)
-            rows.append(ValuesTableChannel(self.model, dv, ch))
+            rows.append(ValuesTableChannel(True, self.model, dv, ch))
 
         # Channels
         self.table.setSpan(len(rows), 1, 1, len(laps) + 2)
@@ -586,7 +625,7 @@ class ValuesDockWidget(TempDockWidget):
 
         for ch in allch:
             rowhide.append(not self.text_hints.match(ch))
-            rows.append(ValuesTableChannel(self.model, dv, ch))
+            rows.append(ValuesTableChannel(ch in acset, self.model, dv, ch))
 
         old_col_count = self.model.columnCount(None)
         self.model.set_data(heading, rows,
