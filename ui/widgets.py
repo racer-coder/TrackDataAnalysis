@@ -309,8 +309,13 @@ class LapWidget(MouseHelperWidget):
 
                 ph.painter.setFont(font)
                 ph.painter.setPen(pen)
-                txt = '[%s] Lap %d [%s]' % (state.format_time(l.duration()), l.num,
-                                            os.path.basename(l.log.log.get_filename()))
+                metadata = l.log.log.get_metadata()
+                txt = '[%s] %s [%s]' % (state.format_time(l.duration()),
+                                        ', '.join(['Lap %d' % l.num] +
+                                                  [metadata[i]
+                                                   for i in ('Log Time', 'Log Date', 'Driver')
+                                                   if i in metadata]),
+                                        os.path.basename(l.log.log.get_filename()))
                 size = max(size, metrics.horizontalAdvance(txt))
                 ph.painter.drawText(lapx + icon_width, y, ph.size.width(), fh,
                                     Qt.AlignTop | Qt.AlignLeft, txt)
