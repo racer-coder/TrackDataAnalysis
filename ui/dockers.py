@@ -193,7 +193,7 @@ class DataDockWidget(TempDockWidget):
         self.table.pressed.connect(self.clickCell)
         self.setWidget(self.table)
 
-        self.margin = 2
+        self.margin = 6
         mainwindow.data_view.values_change.connect(self.recompute)
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()

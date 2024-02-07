@@ -168,7 +168,7 @@ class TimeDist(widgets.MouseHelperWidget):
         self.dataView.values_change.emit()
 
     def channelName(self, ch, units=None):
-        if not units and self.dataView.ref_lap:
+        if not units and self.dataView.ref_lap and ch in self.dataView.channel_properties:
             units = self.dataView.channel_properties[ch].units
         return '%s [%s]' % (ch, unitconv.display_text(units)) if units else ch
 
@@ -365,8 +365,9 @@ class TimeDist(widgets.MouseHelperWidget):
         for (color, ch, lap), d in zip(
                 [(channels.colors[self.dataView.channel_properties[ch].color], ch,
                   self.dataView.ref_lap) for ch in channel_list if ch != 'Time Slip'] +
-                 [(c, 'Time Slip', l) for l, c, _ in laps if c is not None],
+                 [(c, 'Time Slip', l) for l, c, _ in laps],
                 data + var):
+            if color is None: continue # need to do this here because of what we're zipping together
             # set pen for data
             y = next_y
             next_y += fontMetrics.height()
@@ -764,7 +765,8 @@ class TimeDist(widgets.MouseHelperWidget):
     def channels(self):
         return {ch
                 for grp in self.channelGroups
-                for ch in grp}
+                for ch in grp
+                if ch != 'Time Slip'}
 
     def updateCursor(self, old_cursor):
         if not old_cursor: return # something other than cursor updated (video_alignment?)

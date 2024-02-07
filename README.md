@@ -49,7 +49,7 @@ Every data acquisition tool comes with their own software, so why make another t
   logs at 100Hz on a 10+ year old computer (i5-2500 with integrated
   graphics running 1600x1200).
 
-- Cross platform (though only tested on Windows 10+ and Ubuntu 22.04 for now)
+- Cross platform (Windows 8+, Ubuntu 22.04+, Mac Arm)
 
 - Opens AiM XRK, MoTeC LD, and Autosport Lab LOG files natively.
 
@@ -227,3 +227,12 @@ don't need to give them a credit card.  Once your account is created
 navigate to [API Keys](https://cloud.maptiler.com/account/keys/) to
 copy your key, then go to File/Preferences to set it.  You can always
 disable the satellite background by right clicking on the map.
+
+## Changelog
+
+- 0.2.0
+  - Mac/Arm support
+  - Channel editor to set units, decimals places, and color
+  - Basic units support.  Fixes distance calculation when speed is not m/s.
+  - Fix MoTeC beacon support
+  - Fix Autosport Labs lap counter
