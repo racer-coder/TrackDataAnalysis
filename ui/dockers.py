@@ -123,59 +123,58 @@ class TempDockWidget(QDockWidget):
                 if d != self and d.isFloating() and not d.isHidden():
                     d.hide()
 
-class DataDockModel(QAbstractTableModel):
+class DataDockModel(FastTableModel):
     headings = ['Lap', 'Time', 'R', 'A', '3', 'Delta', 'Time off', 'Dist off']
+
     def __init__(self, data_view):
         super().__init__()
         self.data_view = data_view
         self.laps = []
+        self.right_style = [QtGui.QPen(QtGui.QColor(192, 192, 192)), None, None, Qt.AlignRight]
+        self.center_style = self.right_style[:3] + [Qt.AlignHCenter]
 
-    def headerData(self, section, orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
-            return self.headings[section]
-        return None
-
-    def set_data(self, laps):
+    def set_data(self, laps, font):
         old_len = len(self.laps)
         self.laps = laps
-        self.layoutChanged.emit()
+        self.right_style[2] = font
+        self.center_style[2] = font
+        super().set_data(self.headings, len(laps))
 
-    def rowCount(self, index): return len(self.laps)
-    def columnCount(self, index): return 8
+    def present(self, index):
+        lapref, best_lap = self.laps[index.row()]
+        col = index.column()
+        if col == 0: return (self.right_style, str(lapref.num))
+        if col == 1: return (self.right_style, state.format_time(lapref.duration()))
+        if col == 2:
+            return (([state.lap_colors[0]] + self.center_style[1:], '\u278a')
+                    if lapref == self.data_view.ref_lap else (self.center_style, '\u2d54'))
+        if col == 3:
+            return (([state.lap_colors[1]] + self.center_style[1:], '\u278b')
+                    if lapref == self.data_view.alt_lap else (self.center_style, '\u2d54'))
+        if col == 4:
+            for idx, (lap, color) in enumerate(self.data_view.extra_laps):
+                if lap == lapref:
+                    return ([color] + self.center_style[1:], chr(0x278c + idx))
+            return (self.center_style, '\u2d54')
 
-    def data(self, index, role):
-        if role == Qt.DisplayRole:
-            lapref, best_lap = self.laps[index.row()]
-            col = index.column()
-            if col == 0: return str(lapref.num)
-            if col == 1: return state.format_time(lapref.duration())
-            if col == 2: return '\u278a' if lapref == self.data_view.ref_lap else '\u2d54'
-            if col == 3: return '\u278b' if lapref == self.data_view.alt_lap else '\u2d54'
-            if col == 4: return ([chr(0x278c + idx)
-                                  for idx, (lap, color) in enumerate(self.data_view.extra_laps)
-                                  if lap == lapref] +
-                                 ['\u2d54'])[0]
-            if col == 5: return state.format_time(lapref.duration() - best_lap)
-            if col == 6: return state.format_time(lapref.offset.time) if lapref.offset.time else ''
-            if col == 7: return '%.2f' % lapref.offset.dist if lapref.offset.dist else ''
-            return None
-        if role == Qt.TextAlignmentRole:
-            col = index.column()
-            # XXX Can't get QT to respect any vertical alignment here...
-            if col >= 2 and col <= 4: return Qt.AlignHCenter #| Qt.AlignVCenter
-            return Qt.AlignRight # | Qt.AlignVCenter
-        if role == Qt.FontRole:
-            col = index.column()
-            return self.font if col < 2 or col > 4 else self.big_font
+        if col == 5: return (self.right_style, state.format_time(lapref.duration() - best_lap))
+        if col == 6: return (self.right_style,
+                             state.format_time(lapref.offset.time) if lapref.offset.time else '')
+        if col == 7: return (self.right_style,
+                             '%.2f' % lapref.offset.dist if lapref.offset.dist else '')
         return None
 
 class DataDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
         super().__init__('Data', mainwindow, toolbar, True)
 
+        self.margin = 6
+
         self.model = DataDockModel(mainwindow.data_view)
+        self.deleg = FastItemDelegate(self.model, self.margin)
         self.table = QTableView()
         self.table.setModel(self.model)
+        self.table.setItemDelegate(self.deleg)
         self.table.setSelectionMode(self.table.SingleSelection)
         self.table.setSelectionBehavior(self.table.SelectRows)
         self.table.setShowGrid(False)
@@ -189,9 +188,13 @@ class DataDockWidget(TempDockWidget):
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.setEditTriggers(self.table.NoEditTriggers)
         self.table.pressed.connect(self.clickCell)
+
+        pal = self.table.palette()
+        pal.setColor(pal.Base, QtGui.QColor(0, 0, 0))
+        self.table.setPalette(pal)
+
         self.setWidget(self.table)
 
-        self.margin = 6
         mainwindow.data_view.values_change.connect(self.recompute)
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()
@@ -228,14 +231,13 @@ class DataDockWidget(TempDockWidget):
 
     def recompute(self):
         font_size = 12
-        self.model.font = QtGui.QFont('Tahoma')
-        self.model.font.setPixelSize(widgets.devicePointScale(self, font_size))
-        self.model.big_font = QtGui.QFont('Tahoma')
-        self.model.big_font.setPixelSize(widgets.devicePointScale(self, font_size * 1))
+        font = QtGui.QFont('Tahoma')
+        font.setPixelSize(widgets.devicePointScale(self, font_size))
+        metrics = QtGui.QFontMetrics(font)
         logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
         laps = [(lap, best_lap) for logref, best_lap in logs for lap in logref.laps]
-        self.model.set_data(laps)
-        metrics = QtGui.QFontMetrics(self.model.font)
+        self.model.set_data(laps, font)
+        self.deleg.metrics = metrics
         self.table.setColumnWidth(0, self.margin * 2 + metrics.horizontalAdvance('Lap 888'))
         self.table.setColumnWidth(1, self.margin * 2 + metrics.horizontalAdvance('88:88.888'))
         self.table.setColumnWidth(2, self.margin * 2 + metrics.horizontalAdvance('M'))
