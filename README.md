@@ -78,11 +78,11 @@ Every data acquisition tool comes with their own software, so why make another t
 
 ## Installation (from binary)
 
-Right now only Windows x86_64 images are being built.  Head on over to
-[Releases](https://github.com/racer-coder/TrackDataAnalysis/releases)
-and install the most recent.  Once installed, there will be a start
-menu shortcut for "Track Data Analysis" (just press the windows key
-and start typing Track).
+Windows x86_64 and Mac Arm images can be found at
+[Releases](https://github.com/racer-coder/TrackDataAnalysis/releases).
+
+On Windows, it will install a start menu shortcut for "Track Data
+Analysis" (just press the windows key and start typing Track).
 
 ## Installation (from source)
 

@@ -31,7 +31,6 @@ Later Milestones:
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
 . cython or mypyc for aim_xrk?
-. mac support
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
 . time/dist - in paintGraph, label channels even if no x_axis
