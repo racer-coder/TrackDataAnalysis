@@ -48,6 +48,7 @@ class ChannelData:
 class DistanceWrapper:
     def __init__(self, data):
         self.data = data
+        self.metadata = data.get_metadata()
         self.channel_cache = {}
 
         # in case we fail out
@@ -94,6 +95,9 @@ class DistanceWrapper:
 
     def get_laps(self):
         return self.data.get_laps()
+
+    def get_metadata(self):
+        return self.metadata
 
     def get_channels(self):
         return self.data.get_channels()

@@ -318,6 +318,20 @@ def _decode_sequence(s, progress=None):
                     data = _nullterm_string(data)
                 elif tok == 'ENF':
                     data = _decode_sequence(data).messages
+                elif tok == 'TRK':
+                    data = {'name': _nullterm_string(data[:32]),
+                            'sf_lat': memoryview(data).cast('i')[9],
+                            'sf_long': memoryview(data).cast('i')[10]}
+                elif tok == 'ODO':
+                    # not sure how to map fuel.
+                    # Fuel Used channel claims 8.56l used (2046.0-2037.4)
+                    # Fuel Used odo says 70689.
+                    data = {_nullterm_string(data[i:i+16]):
+                            {'time': memoryview(data[i+16:i+24]).cast('I')[0], # seconds
+                             'dist': memoryview(data[i+16:i+24]).cast('I')[1]} # meters
+                            for i in range(0, len(data), 64)
+                            # not sure how to parse fuel, doesn't match any expected units
+                            if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
 
                 assert l2[0] == bytesum, '%x vs %x at %x' % (l2[0], bytesum, pos)
                 messages.append(Message(tok, l[1], data))
@@ -459,6 +473,30 @@ class AIMXRK:
     def get_filename(self):
         return self.file_name
 
+    def get_metadata(self):
+        ret = {}
+        for msg, name in [('RCR', 'Driver'),
+                          ('VEH', 'Vehicle'),
+                          ('TMD', 'Log Date'),
+                          ('TMT', 'Log Time'),
+                          ('VTY', 'Session'),
+                          ('CMP', 'Series'),
+                          ('NTE', 'Long Comment'),
+                          ]:
+            if msg in self.msg_by_type:
+                ret[name] = self.msg_by_type[msg][-1].content
+        if 'TRK' in self.msg_by_type:
+            ret['Venue'] = self.msg_by_type['TRK'][-1].content['name']
+            # ignore the start/finish line?
+        if 'ODO' in self.msg_by_type:
+            for name, stats in self.msg_by_type['ODO'][-1].content.items():
+                ret['Odo/%s Distance (km)' % name] = stats['dist'] / 1000
+                ret['Odo/%s Time' % name] = '%d:%02d:%02d' % (stats['time'] // 3600,
+                                                              stats['time'] // 60 % 60,
+                                                              stats['time'] % 60)
+        return ret
+
+
     def get_channels(self):
         return [ch.long_name for ch in self.data.channels]
 
@@ -489,10 +527,3 @@ class AIMXRK:
         if scale != 1:
             samp = array('d', [a * scale for a in samp])
         return (tc, samp)
-
-
-# CMP = championship
-# ENF = ECU conf?
-# HWNF = wifi
-# VEH = vehicle
-# VTY = session type

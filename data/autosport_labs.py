@@ -8,6 +8,7 @@ import mmap
 import pprint
 import struct
 import sys
+import time
 
 import numpy as np
 
@@ -87,6 +88,18 @@ class AutosportLabs:
 
     def get_filename(self):
         return self.file_name
+
+    def get_metadata(self):
+        # No metadata is provided, but lets parse out the Utc value to determine data/time
+        metadata = {}
+        if 'Utc' in self.data:
+            utc = self.data['Utc'].values[0]
+            # ideally we would grab the time zone from the gps coordinates, but I'm lazy...
+            tm = time.localtime(utc/1000)
+            metadata['Log Date'] = '%d/%d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year) # Yes I'm American
+            metadata['Log Time'] = '%d:%02d:%02d%cM' % (tm.tm_hour % 12 or 12, tm.tm_min,
+                                                        tm.tm_sec, 'P' if tm.tm_hour >= 12 else 'A')
+        return metadata
 
     def get_channels(self):
         return self.data.keys()

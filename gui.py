@@ -5,6 +5,7 @@
 import configparser
 import json
 import os
+import pprint
 import sys
 
 from PySide2.QtCore import QSize, QStandardPaths, Qt, Signal
@@ -283,6 +284,7 @@ class MainWindow(QMainWindow):
             progress.deleteLater()
 
         logref = ui.state.LogRef(data.distance.DistanceWrapper(obj))
+        pprint.pprint(logref.log.get_metadata())
         logref.laps = [
             ui.state.LapRef(logref,
                             lap.num,
