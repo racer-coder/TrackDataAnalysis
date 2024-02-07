@@ -363,7 +363,7 @@ class TimeDist(widgets.MouseHelperWidget):
         pen2.setStyle(Qt.SolidLine)
         next_y = y_offset
         for (color, ch, lap), d in zip(
-                [(channels.colors[self.dataView.channel_properties[ch].color], ch,
+                [(channels.colors[self.dataView.get_channel_prop(ch).color], ch,
                   self.dataView.ref_lap) for ch in channel_list if ch != 'Time Slip'] +
                  [(c, 'Time Slip', l) for l, c, _ in laps],
                 data + var):
@@ -748,7 +748,7 @@ class TimeDist(widgets.MouseHelperWidget):
         if self.dataView.ref_lap:
             for grp in self.channelGroups:
                 if grp and (self.dataView.channel_properties[ch].units ==
-                            self.dataView.channel_properties[grp[0]].units):
+                            self.dataView.get_channel_prop(grp[0]).units):
                     grp.append(ch)
                     return True
         return False

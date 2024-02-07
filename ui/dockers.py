@@ -369,14 +369,16 @@ class ValuesTableChannel:
     units: object
 
     def __init__(self, icon, model, data_view, channel, units = None, dec_pts = None):
+        # properties might not exist if the channel comes from a component
+        props = data_view.get_channel_prop(channel) if data_view else None
         self.model = model
         self.data_view = data_view
         self.channel = channel
-        self.icon = ([channels.colors[data_view.channel_properties[channel].color]] + model.channel_style[1:], '\u25a0') if icon else (model.channel_style, None)
+        self.icon = ([channels.colors[props.color]] + model.channel_style[1:], '\u25a0') if icon else (model.channel_style, None)
         self.name = (model.channel_style, channel)
         if units is None and data_view.ref_lap:
-            units = data_view.channel_properties[channel].units
-            dec_pts = data_view.channel_properties[channel].dec_pts
+            units = props.units
+            dec_pts = props.dec_pts
         self.units = (model.channel_style,
                       unitconv.display_text(units) or None) # in case units == '', None is faster
         self.dec_pts = dec_pts

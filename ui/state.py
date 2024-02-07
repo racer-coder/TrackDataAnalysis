@@ -196,11 +196,14 @@ class DataView:
         return (lap_range[1] - lap_range[0]
                 + self.getTDValue(self.zoom_window[1]) - self.getTDValue(self.zoom_window[0]))
 
-    def get_channel_data(self, ref, ch): # ref is LogRef or LapRef
+    def get_channel_prop(self, ch):
         if ch in self.channel_properties:
-            props = self.channel_properties[ch]
+            return self.channel_properties[ch]
         else:
-            props = ChannelProperties(units='', dec_pts=0, color=0)
+            return ChannelProperties(units='', dec_pts=0, color=0)
+
+    def get_channel_data(self, ref, ch): # ref is LogRef or LapRef
+        props = self.get_channel_prop(ch)
         return ChannelData(ref.get_channel_data(ch, unit=props.units), props)
 
 
