@@ -10,7 +10,6 @@ DATABASE
 . ability to set directory for scanning
 . store somehow (sqlite?)
 . quick/easy search - rework file open dialog
-. aim / motec - metadata? display somehow
 . show metadata in data dock as separators
 .. switch to fast table?
 .. color scheme

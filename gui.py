@@ -15,11 +15,14 @@ from PySide2.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMainWindow,
     QMessageBox,
     QProgressDialog,
+    QTableWidget,
+    QTableWidgetItem,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -150,6 +153,8 @@ class MainWindow(QMainWindow):
         self.comp_menu.addAction('Hi') # dummy entry so Mac OSX will show the Component menu
         self.comp_menu.aboutToShow.connect(self.setup_component_menu)
 
+        data_menu.addAction('Details...').triggered.connect(self.show_details)
+        data_menu.addSeparator()
         data_menu.addAction('Time/Distance').triggered.connect(self.toggle_time_dist)
         self.data_offsets = data_menu.addAction('Show Data Offsets')
         self.data_offsets.triggered.connect(self.toggle_data_offsets)
@@ -190,6 +195,40 @@ class MainWindow(QMainWindow):
         for a in self.comp_menu.actions():
             self.comp_menu.removeAction(a)
         self.comp_menu.addActions(self.data_view.active_component.actions())
+
+    def show_details(self):
+        if not self.data_view.ref_lap:
+            return
+
+        layout = QVBoxLayout()
+
+        metadata = sorted(self.data_view.ref_lap.log.log.get_metadata().items())
+        metadata.append(('Filename',
+                         os.path.basename(self.data_view.ref_lap.log.log.get_filename())))
+        metadata.append(('Dirname', os.path.dirname(self.data_view.ref_lap.log.log.get_filename())))
+        table = QTableWidget(len(metadata), 2)
+        table.setSelectionMode(table.NoSelection)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.horizontalHeader().hide()
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.verticalHeader().hide()
+        table.setEditTriggers(table.NoEditTriggers)
+        row = 0
+        for name, val in metadata:
+            table.setItem(row, 0, QTableWidgetItem(name))
+            table.setItem(row, 1, QTableWidgetItem(str(val)))
+            row += 1
+        layout.addWidget(table)
+
+        bbox = QDialogButtonBox(QDialogButtonBox.Close)
+        layout.addWidget(bbox)
+
+        dia = QDialog(self)
+        dia.setWindowTitle('Details')
+        dia.setLayout(layout)
+
+        bbox.rejected.connect(dia.accept)
+        dia.exec_()
 
     def toggle_time_dist(self):
         self.data_view.mode_time = not self.data_view.mode_time

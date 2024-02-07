@@ -99,10 +99,10 @@ def _decode(s):
         metadata['Event Name'] = _dec_str(s, event_addr, 64)
         metadata['Event Session'] = _dec_str(s, event_addr+64, 64) # how is this different from Session?
         metadata['Long Comment'] = _dec_str(s, event_addr+128, 1024)
-        venue_addr = _dec_u16(s, event_addr+1152)
+        venue_addr = _dec_u32(s, event_addr+1152)
         if venue_addr:
             metadata['Venue Name'] = _dec_str(s, venue_addr, 64) # how is this different than Venu?
-            vehicle_addr = _dec_u16(s, venue_addr+1098)
+            vehicle_addr = _dec_u32(s, venue_addr+1098)
             if vehicle_addr: # 0x1f94
                 metadata['Vehicle Id'] = _dec_str(s, vehicle_addr, 64) # how is this different from Vehicle?
                 metadata['Vehicle Desc'] = _dec_str(s, vehicle_addr+64, 64) # Not sure on length here
@@ -115,7 +115,6 @@ def _decode(s):
                     _set_if(metadata, 'Gear %d' % gear,
                             _dec_u16(s, vehicle_addr + 260 + gear*2) / 1000, '%.3f')
                 _set_if(metadata, 'Vehicle Wheelbase [mm]', _dec_u16(s, vehicle_addr+284))
-
 
     channels = {}
     addr = channel_meta_addr

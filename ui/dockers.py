@@ -17,8 +17,6 @@ from PySide2.QtWidgets import (
     QMenu,
     QStyle,
     QTableView,
-    QTableWidget,
-    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -473,8 +471,8 @@ class ValuesDockWidget(TempDockWidget):
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
         self.table.setShowGrid(False)
-        self.table.setSelectionMode(QTableWidget.SingleSelection)
-        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableView.SingleSelection)
+        self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setHorizontalScrollMode(self.table.ScrollPerPixel)
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setMinimumSectionSize(10)
