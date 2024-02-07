@@ -11,7 +11,6 @@ DATABASE
 . store somehow (sqlite?)
 . quick/easy search - rework file open dialog
 . show metadata in data dock as separators
-.. dividers
 .. test with multiple files
 . calc correction factor per lap across log files?
 
