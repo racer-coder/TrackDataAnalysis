@@ -1,18 +1,17 @@
-MVP:
-* FILE FORMATS
-. megalogviewer - file reader
-
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
 . lat/long g force calculation from GPS? or internal accelerometers? or both?
 . detection of braking/cornering based on exceeding threshold for a duration of time?
 
 DATABASE
 . ability to set directory for scanning
-. store somehow (sqlite?)
+. store somehow (text file of json objects, one per line)
+.. dict of filename, timestamp, size, readable, metadata.  readable is a hint to not bother with files we can't understand.
+.. on start up, if we have set a dir to walk, open and walk 
+.. key/value table mapping filename->id.  Used to notice when new files need parsing, or old metadata should be deleted.
+.. key/value table mapping metadata (id, key)->value, (int, string) to blob or whatever.  Int is arbitrary to differentiate files, but the actual filename/dirname is stored as keys.
+.. scan version so we know if the software requires a rescan to work properly
+.. --- or just do arbitrary json file stored next to config.
 . quick/easy search - rework file open dialog
-. show metadata in data dock as separators
-.. test with multiple files
-. calc correction factor per lap across log files?
 
 Later Milestones:
 
@@ -29,6 +28,11 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. file format - megalogviewer
+. file format - vbox
+. data - close individual log file
+. data - close all log files?
+. data - opening new log file should not reset laps
 . cython or mypyc for aim_xrk?
 . time/dist detect whether should use meter vs feet depending on speed units?
 . motec / non-gps - construct map from G-forces

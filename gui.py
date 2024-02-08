@@ -5,7 +5,6 @@
 import configparser
 import json
 import os
-import pprint
 import sys
 
 from PySide2.QtCore import QSize, QStandardPaths, Qt, Signal
@@ -323,17 +322,17 @@ class MainWindow(QMainWindow):
             progress.deleteLater()
 
         logref = ui.state.LogRef(data.distance.DistanceWrapper(obj))
-        pprint.pprint(logref.log.get_metadata())
-        logref.laps = [
-            ui.state.LapRef(logref,
-                            lap.num,
-                            ui.state.TimeDistRef(lap.start_time,
-                                                 logref.log.outTime2Dist(lap.start_time)),
-                            ui.state.TimeDistRef(lap.end_time,
-                                                 logref.log.outTime2Dist(lap.end_time)),
-                            ui.state.TimeDistRef(0., 0.))
-            for lap in logref.log.get_laps()]
+        logref.update_laps()
         self.data_view.log_files.append(logref)
+        if len(self.data_view.log_files) > 1:
+            # do it all again, but for multiple logs
+            data.distance.unify_lap_distance([logref.log for logref in self.data_view.log_files])
+            for logref in self.data_view.log_files:
+                logref.update_laps()
+            # this sucks but we've lost our mapping to the original laps
+            self.data_view.alt_lap = None
+            self.data_view.extra_laps = []
+
         ui.channels.update_channel_properties(self.data_view)
 
         laps = logref.laps

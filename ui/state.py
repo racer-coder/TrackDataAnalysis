@@ -43,6 +43,15 @@ class LogRef:
     def get_channel_data(self, *args, **kwargs):
         return self.log.get_channel_data(*args, **kwargs)
 
+    def update_laps(self):
+        self.laps = [
+            LapRef(self,
+                   lap.num,
+                   TimeDistRef(lap.start_time, self.log.outTime2Dist(lap.start_time)),
+                   TimeDistRef(lap.end_time, self.log.outTime2Dist(lap.end_time)),
+                   TimeDistRef(0., 0.))
+            for lap in self.log.get_laps()]
+
 @dataclass(eq=False)
 class LapRef:
     log: LogRef

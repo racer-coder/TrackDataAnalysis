@@ -3,6 +3,7 @@
 
 import bisect
 from dataclasses import dataclass
+import typing
 
 import numpy as np
 
@@ -58,12 +59,15 @@ class DistanceWrapper:
         if not self.data.get_laps() or not data.get_speed_channel():
             return
 
-        distdata = data.get_channel_data(data.get_speed_channel())
+        self._update_time_dist()
+
+    def _calc_time_dist(self, expected_len = None):
+        distdata = self.data.get_channel_data(self.data.get_speed_channel())
         converted = unitconv.convert(distdata[1],
-                                     data.get_channel_units(data.get_speed_channel()),
+                                     self.data.get_channel_units(self.data.get_speed_channel()),
                                      'm/s')
         if len(converted) == 0:
-            return
+            return np.array([0.]).data, np.array([0.]).data, 0
 
         # VALIDATED: AiM GPS Speed is just linear interpolation of raw
         # ECEF velocity between datapoints, modulo floating point
@@ -75,14 +79,18 @@ class DistanceWrapper:
         # adjust distances of each lap to match the median, if within a certain percentage
         dividers = [(l.start_time + 5) // 10 for l in self.data.get_laps()]
         lap_len = np.add.reduceat(gs, dividers)[1:-1]  # ignore in/out laps
-        expected_len = np.median(lap_len)
+        if not expected_len:
+            expected_len = np.median(lap_len)
         for s, e, ll in zip(dividers[1:], dividers[2:], lap_len): # ignores in/out laps
             if abs(ll - expected_len) / expected_len <= 0.05:
                 gs[s:e] *= expected_len / ll
 
         ds = np.cumsum(gs / 100)
-        self.dist_map_time = memoryview(tc)
-        self.dist_map_dist = memoryview(ds)
+        return memoryview(tc), memoryview(ds), expected_len
+
+    def _update_time_dist(self, expected_len = None):
+        self.dist_map_time, self.dist_map_dist, _ = self._calc_time_dist(expected_len)
+        self.channel_cache = {}
 
     def outDist2Time(self, dist):
         return np.interp(dist, self.dist_map_dist, self.dist_map_time)
@@ -127,4 +135,11 @@ class DistanceWrapper:
                 return self.channel_cache[key]
         return ChannelData([], [], [], '', 0)
 
+
+def unify_lap_distance(logs: typing.List[DistanceWrapper]):
+    lens = list(filter(bool, [dw._calc_time_dist()[2] for dw in logs]))
+    if not lens: return # what are we supposed to do here?
+    expected_len = np.mean(lens).item()
+    for dw in logs:
+        dw._update_time_dist(expected_len)
 
