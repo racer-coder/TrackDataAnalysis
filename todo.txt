@@ -4,13 +4,6 @@
 
 DATABASE
 . ability to set directory for scanning
-. store somehow (text file of json objects, one per line)
-.. dict of filename, timestamp, size, readable, metadata.  readable is a hint to not bother with files we can't understand.
-.. on start up, if we have set a dir to walk, open and walk 
-.. key/value table mapping filename->id.  Used to notice when new files need parsing, or old metadata should be deleted.
-.. key/value table mapping metadata (id, key)->value, (int, string) to blob or whatever.  Int is arbitrary to differentiate files, but the actual filename/dirname is stored as keys.
-.. scan version so we know if the software requires a rescan to work properly
-.. --- or just do arbitrary json file stored next to config.
 . quick/easy search - rework file open dialog
 
 Later Milestones:

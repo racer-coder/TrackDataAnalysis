@@ -1,9 +1,14 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
+import bisect
 from dataclasses import dataclass
+import json
+import os
+import sys
+import threading
 
-from PySide2.QtCore import QRect, QSize, Qt
+from PySide2.QtCore import QFileSystemWatcher, QRect, QSize, QStandardPaths, Qt, Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import (
     QHeaderView,
@@ -14,6 +19,9 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+import data.aim_xrk
+import data.autosport_labs
+import data.motec
 from .dockers import FastTableModel, FastItemDelegate, TempDockWidget
 from . import state
 from . import widgets
@@ -87,6 +95,9 @@ class DataDockModel(FastTableModel):
         return self.laps[index.row()].present(index, self)
 
 class DataDockWidget(TempDockWidget):
+    wake_watcher = Signal(str)
+    status_msg = Signal(str)
+
     def __init__(self, mainwindow, toolbar):
         super().__init__('Data', mainwindow, toolbar, True)
 
@@ -120,6 +131,126 @@ class DataDockWidget(TempDockWidget):
         mainwindow.data_view.values_change.connect(self.recompute)
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()
+
+        self.status_msg.connect(mainwindow.statusBar().showMessage)
+        self.metadata_fname = (QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
+                               + '/metadata.json')
+        self.metadata_cache = {}
+        self.load_metadata_cache()
+        self.keep_watching = True
+        self.watch_deleted = 0
+        self.watcher = QFileSystemWatcher()
+        self.watcher.directoryChanged.connect(self.add_watch_dir)
+        self.watchqueue = [] # order isn't important
+        self.watch_semaphore = threading.Semaphore(0)
+        threading.Thread(target = self.process_loop).start()
+        try:
+            for d in ['sampledata']: #json.loads(mainwindow.config.get('main', 'watched_dirs')):
+                self.add_watch_dir(d)
+        except:
+            pass
+
+    def rewrite_metadata_cache(self):
+        with open(self.metadata_fname, 'wt') as f:
+            for obj in self.metadata_cache.items():
+                f.write(json.dumps(obj) + '\n')
+        self.watch_deleted = 0
+
+    def load_metadata_cache(self):
+        try:
+            with open(self.metadata_fname, 'rt') as f:
+                for line in f:
+                    obj = json.loads(line)
+                    self.metadata_cache[obj['path']] = obj
+        except: # catch all error handling, grotesque
+            self.rewrite_metadata_cache()
+
+    def add_watch_dir(self, d):
+        self.watchqueue.append(d)
+        self.watch_semaphore.release()
+
+    def stop_metadata_scan(self):
+        self.keep_watching = False
+        self.watch_semaphore.release()
+
+    def process_loop(self):
+        while self.keep_watching:
+            sys.setswitchinterval(0.0001) # need crazy value to keep responsiveness, thanks GIL
+            self.process_watch()
+            sys.setswitchinterval(0.005) # back to default, thanks GIL
+            if not self.watchqueue:
+                self.watch_semaphore.acquire()
+
+    def process_watch(self):
+        if not self.watchqueue: return
+
+        f = None
+        todo = self.watchqueue.pop()
+
+        self.watcher.addPath(todo)
+
+        self.status_msg.emit('Scanning ' + todo)
+        new_files = []
+        new_dirs = []
+        for obj in os.scandir(todo):
+            if obj.is_dir():
+                new_dirs.append(obj.path)
+            else:
+                stat = obj.stat()
+                new_files.append((obj.path, stat.st_size, stat.st_mtime))
+
+        keep = sorted([fname for fname, _, _ in new_files] + [d + os.pathsep for d in new_dirs])
+        to_del = [old for old in self.metadata_cache.keys()
+                  if old.startswith(todo) and
+                  not old.startswith(keep[min(bisect.bisect_left(keep, old),
+                                              len(keep) - 1)])]
+        for elem in to_del:
+            del self.metadata_cache[elem]
+            self.watch_deleted += 1
+
+        for path, size, mtime in new_files:
+            if not self.keep_watching:
+                break
+            if path in self.metadata_cache:
+                entry = self.metadata_cache[path]
+                if entry['size'] == size and entry['mtime'] == mtime:
+                    continue
+
+            if path.endswith('.xrk'):
+                builder = data.aim_xrk.AIMXRK
+            elif path.endswith('.ld'):
+                builder = data.motec.MOTEC
+            elif path.endswith('.log'):
+                builder = data.autosport_labs.AutosportLabs
+            else:
+                continue # not a file we care about
+
+            self.status_msg.emit('Reading ' + path)
+            try:
+                obj = builder(path, lambda x, y: None).get_metadata()
+                readable = True
+            except:
+                obj = None
+                readable = False
+
+            metadata =  {'path': path,
+                         'size': size,
+                         'mtime': mtime,
+                         'readable': readable,
+                         'metadata': obj}
+            self.metadata_cache[path] = metadata
+            if not f:
+                # rewrite the cache if there is enough garbage
+                if self.watch_deleted > len(self.metadata_cache):
+                    self.rewrite_metadata_cache()
+                f = open(self.metadata_fname, 'at')
+            f.write(json.dumps(metadata) + '\n')
+
+        self.watchqueue += new_dirs
+
+        self.status_msg.emit('')
+        if f:
+            f.close()
 
     def clickCell(self, index):
         row = index.row()

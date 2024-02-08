@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         self.dockwidgets = []
 
         ui.dockers.ChannelsDockWidget(self, toolbar)
-        ui.datamgr.DataDockWidget(self, toolbar)
+        self.datamgr = ui.datamgr.DataDockWidget(self, toolbar)
         ui.dockers.ValuesDockWidget(self, toolbar)
         ui.dockers.MapDockWidget(self, toolbar)
 
@@ -419,6 +419,7 @@ class MainWindow(QMainWindow):
                 return
         elif not self.save_workspace():
             return
+        self.datamgr.stop_metadata_scan()
         self.config['main']['geometry'] = bytes(self.saveGeometry()).hex()
         self.config['main']['widgets'] = bytes(self.saveState()).hex()
         new_name = self.config_fname + '.new'

@@ -314,7 +314,7 @@ def _decode_sequence(s, progress=None):
                     data.sampledata = bytearray()
                 elif tok in ('RCR', 'VEH', 'CMP', 'VTY', 'NDV', 'TMD', 'TMT',
                              'DBUN', 'DBUT', 'DVER', 'MANL', 'MODL', 'MANI',
-                             'MODI', 'HWNF', 'PDLT'):
+                             'MODI', 'HWNF', 'PDLT', 'NTE'):
                     data = _nullterm_string(data)
                 elif tok == 'ENF':
                     data = _decode_sequence(data).messages
