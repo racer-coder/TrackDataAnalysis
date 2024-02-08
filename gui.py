@@ -33,6 +33,7 @@ import data.distance
 import data.motec
 import ui.channels
 import ui.components
+import ui.datamgr
 import ui.dockers
 import ui.layout
 import ui.state
@@ -117,7 +118,7 @@ class MainWindow(QMainWindow):
         self.dockwidgets = []
 
         ui.dockers.ChannelsDockWidget(self, toolbar)
-        ui.dockers.DataDockWidget(self, toolbar)
+        ui.datamgr.DataDockWidget(self, toolbar)
         ui.dockers.ValuesDockWidget(self, toolbar)
         ui.dockers.MapDockWidget(self, toolbar)
 
