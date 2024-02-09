@@ -138,6 +138,7 @@ class ChannelsDockWidget(TempDockWidget):
 
         self.edit = QLineEdit()
         self.edit.setClearButtonEnabled(True)
+        self.edit.setPlaceholderText('Channel search')
         self.edit.textChanged.connect(self.textChanged)
 
         self.chList = QListWidget()
@@ -337,6 +338,7 @@ class ValuesDockWidget(TempDockWidget):
 
         self.edit = QLineEdit()
         self.edit.setClearButtonEnabled(True)
+        self.edit.setPlaceholderText('Channel search')
         self.edit.textChanged.connect(self.text_changed)
 
         self.margin = 2

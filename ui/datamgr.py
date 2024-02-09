@@ -11,7 +11,10 @@ import threading
 from PySide2.QtCore import QFileSystemWatcher, QRect, QSize, QStandardPaths, Qt, Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
+    QGridLayout,
     QHeaderView,
     QLineEdit,
     QMenu,
@@ -262,7 +265,25 @@ class DataDockWidget(TempDockWidget):
             f.close()
 
     def open_from_db(self):
-        pass
+        layout = QGridLayout()
+
+        search = QLineEdit()
+        search.setClearButtonEnabled(True)
+        search.setPlaceholderText('Search')
+        layout.addWidget(search, 0, 0, 1, 1)
+
+        bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        layout.addWidget(bbox, 2, 0, 1, 1)
+
+        dia = QDialog(self)
+        dia.setWindowTitle('Open log file from database')
+        dia.setLayout(layout)
+
+        bbox.accepted.connect(dia.accept)
+        bbox.rejected.connect(dia.reject)
+
+        if dia.exec_():
+            pass
 
     def open_from_file(self):
         file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
