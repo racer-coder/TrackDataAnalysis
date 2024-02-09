@@ -8,9 +8,6 @@ DATABASE
 . ability to set directory for scanning
 .. qlistview of directories with add/remove buttons
 .. add pops up qfiledialog choose even within another dialog?
-. quick/easy search - rework file open dialog
-.. ability to choose columns to display in results
-.. separate filter mechanism if you want to see choices?  or drop down on column headers?
 
 Later Milestones:
 
@@ -27,6 +24,7 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. open from db - ability to choose columns to display in results
 . file format - megalogviewer
 . file format - vbox
 . data - close individual log file

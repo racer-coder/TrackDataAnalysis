@@ -16,9 +16,12 @@ from PySide2.QtWidgets import (
     QFileDialog,
     QGridLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
+    QListWidget,
     QMenu,
     QProgressDialog,
+    QPushButton,
     QTableView,
     QTableWidget,
     QTableWidgetItem,
@@ -36,6 +39,9 @@ from .dockers import (FastTableModel,
 from . import channels
 from . import state
 from . import widgets
+
+def closure(func, *args):
+    return lambda *args2: func(*args, *args2)
 
 @dataclass
 class DataModelLap:
@@ -275,7 +281,16 @@ class DataDockWidget(TempDockWidget):
         search = QLineEdit()
         search.setClearButtonEnabled(True)
         search.setPlaceholderText('Search')
-        layout.addWidget(search, 0, 0, 1, 1)
+        layout.addWidget(search, 0, 1, 1, 1)
+
+        active_filters = json.loads(self.config.get('main', 'open_filters', fallback='{}'))
+        filter_order = []
+        filter_layout = QVBoxLayout()
+        for text in ('Venue', 'Driver', 'Vehicle'):
+            button = QPushButton(text)
+            filter_layout.addWidget(button)
+            filter_order.append((button, text))
+        layout.addLayout(filter_layout, 0, 0, 2, 1, Qt.AlignTop)
 
         files = QTableWidget()
         files.setSortingEnabled(True)
@@ -288,19 +303,17 @@ class DataDockWidget(TempDockWidget):
         files.verticalHeader().hide()
         files.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         files.setEditTriggers(files.NoEditTriggers)
-        dblist = [d for d in self.metadata_cache.values()
-                  if d['readable']]
+        dblist = [d for d in self.metadata_cache.values() if d['readable']]
         collist = ['Log Date', 'Log Time', 'Venue', 'Driver']
         files.setRowCount(len(dblist))
         files.setColumnCount(len(collist))
         files.setHorizontalHeaderLabels(collist)
         for i, f in enumerate(dblist):
             for j, c in enumerate(collist):
-                if c in f['metadata']:
-                    item = QTableWidgetItem(f['metadata'][c])
-                    item.setData(Qt.UserRole, f)
-                    files.setItem(i, j, item)
-        layout.addWidget(files, 1, 0, 1, 1)
+                item = QTableWidgetItem(f['metadata'].get(c, ''))
+                item.setData(Qt.UserRole, f)
+                files.setItem(i, j, item)
+        layout.addWidget(files, 1, 1, 1, 1)
 
         metadata = QTableWidget()
         metadata.setSelectionMode(metadata.NoSelection)
@@ -311,15 +324,68 @@ class DataDockWidget(TempDockWidget):
         metadata.verticalHeader().hide()
         metadata.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         metadata.setEditTriggers(metadata.NoEditTriggers)
-        layout.addWidget(metadata, 0, 1, 2, 1)
+        layout.addWidget(metadata, 0, 2, 2, 1)
 
-        def update_matches(txt):
-            matcher = TextMatcher(txt)
+        def update_matches():
+            matcher = TextMatcher(search.text())
             for i in range(len(dblist)):
+                metadata = files.item(i, 0).data(Qt.UserRole)['metadata']
                 files.setRowHidden(
-                    i, not any(matcher.match(str(d))
-                               for d in files.item(i, 0).data(Qt.UserRole)['metadata'].values()))
+                    i, not (any(matcher.match(str(d)) for d in metadata.values())
+                            and all(metadata.get(f, None) in v for f, v in active_filters.items())))
         search.textChanged.connect(update_matches)
+        update_matches()
+
+        # update the qlabels in the layout showing the current filters
+        def update_filter_layout():
+            # remove excess labels
+            for i, (button, text) in enumerate(filter_order):
+                index = filter_layout.indexOf(button)
+                while index > i:
+                    item = filter_layout.takeAt(i)
+                    item.widget().deleteLater()
+                    index -= 1
+            # add labels
+            for i, (button, text) in list(enumerate(filter_order))[::-1]:
+                for f in sorted(active_filters.get(text, {}).keys())[::-1]:
+                    filter_layout.insertWidget(i + 1, QLabel(f))
+        update_filter_layout()
+
+        def update_filter(ftype):
+            chooser = QListWidget()
+            chooser.setSelectionMode(chooser.MultiSelection)
+            choices = sorted({f['metadata'].get(ftype, None) for f in dblist} - {None, ''})
+            for i, text in enumerate(choices):
+                chooser.addItem(text)
+                if text in active_filters.get(ftype, {}):
+                    chooser.item(i).setSelected(True)
+
+            bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel |
+                                    QDialogButtonBox.Reset)
+            layout = QVBoxLayout()
+            layout.addWidget(chooser)
+            layout.addWidget(bbox)
+            d2 = QDialog()
+            d2.setWindowTitle('Filter for ' + ftype)
+            d2.setLayout(layout)
+            bbox.accepted.connect(d2.accept)
+            bbox.rejected.connect(d2.reject)
+            def reset():
+                chooser.clearSelection()
+                d2.accept()
+            bbox.button(bbox.Reset).clicked.connect(reset)
+
+            if d2.exec_():
+                choices = {f.text(): True for f in chooser.selectedItems()}
+                if choices:
+                    active_filters[ftype] = choices
+                elif ftype in active_filters:
+                    del active_filters[ftype]
+                update_filter_layout()
+                update_matches()
+
+        for button, text in filter_order:
+            button.clicked.connect(closure(update_filter, text))
 
         def cell_selected():
             f = files.selectedItems()[0].data(Qt.UserRole)['metadata']
@@ -331,12 +397,12 @@ class DataDockWidget(TempDockWidget):
         files.itemSelectionChanged.connect(cell_selected)
 
         bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        layout.addWidget(bbox, 2, 0, 1, 2)
+        layout.addWidget(bbox, 2, 0, 1, 3)
 
         dia = QDialog(self)
         dia.setWindowTitle('Open log file from database')
         dia.setLayout(layout)
-        dia.resize(QSize(widgets.devicePointScale(self, 600),
+        dia.resize(QSize(widgets.devicePointScale(self, 800),
                          widgets.devicePointScale(self, 400)))
 
         files.cellActivated.connect(dia.accept)
@@ -344,10 +410,11 @@ class DataDockWidget(TempDockWidget):
         bbox.accepted.connect(dia.accept)
         bbox.rejected.connect(dia.reject)
 
-        if not dia.exec_(): return
-        selection = files.selectedItems()
-        if not selection: return
-        self.open_file(selection[0].data(Qt.UserRole)['path'])
+        if dia.exec_():
+            selection = files.selectedItems()
+            if selection:
+                self.open_file(selection[0].data(Qt.UserRole)['path'])
+        self.config['main']['open_filters'] = json.dumps(active_filters)
 
     def open_from_file(self):
         file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
