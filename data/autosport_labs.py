@@ -96,9 +96,8 @@ class AutosportLabs:
             utc = self.data['Utc'].values[0]
             # ideally we would grab the time zone from the gps coordinates, but I'm lazy...
             tm = time.localtime(utc/1000)
-            metadata['Log Date'] = '%d/%d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year) # Yes I'm American
-            metadata['Log Time'] = '%d:%02d:%02d%cM' % (tm.tm_hour % 12 or 12, tm.tm_min,
-                                                        tm.tm_sec, 'P' if tm.tm_hour >= 12 else 'A')
+            metadata['Log Date'] = '%02d/%02d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year) # Yes I'm American
+            metadata['Log Time'] = '%02d:%02d:%02d' % (tm.tm_hour, tm.tm_min, tm.tm_sec)
         return metadata
 
     def get_channels(self):
