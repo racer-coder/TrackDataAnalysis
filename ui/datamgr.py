@@ -20,6 +20,8 @@ from PySide2.QtWidgets import (
     QMenu,
     QProgressDialog,
     QTableView,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -27,7 +29,10 @@ from PySide2.QtWidgets import (
 import data.aim_xrk
 import data.autosport_labs
 import data.motec
-from .dockers import FastTableModel, FastItemDelegate, TempDockWidget
+from .dockers import (FastTableModel,
+                      FastItemDelegate,
+                      TempDockWidget,
+                      TextMatcher)
 from . import channels
 from . import state
 from . import widgets
@@ -272,18 +277,73 @@ class DataDockWidget(TempDockWidget):
         search.setPlaceholderText('Search')
         layout.addWidget(search, 0, 0, 1, 1)
 
+        files = QTableWidget()
+        files.setSelectionMode(files.SingleSelection)
+        files.setSelectionBehavior(files.SelectRows)
+        files.setShowGrid(False)
+        files.horizontalHeader().setHighlightSections(False)
+        files.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        files.setHorizontalScrollMode(files.ScrollPerPixel)
+        files.verticalHeader().hide()
+        files.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        files.setEditTriggers(files.NoEditTriggers)
+        dblist = [d for d in self.metadata_cache.values()
+                  if d['readable']]
+        collist = ['Log Date', 'Log Time', 'Venue', 'Driver']
+        files.setRowCount(len(dblist))
+        files.setColumnCount(len(collist))
+        for i, f in enumerate(dblist):
+            for j, c in enumerate(collist):
+                if c in f['metadata']:
+                    files.setItem(i, j, QTableWidgetItem(f['metadata'][c]))
+        layout.addWidget(files, 1, 0, 1, 1)
+
+        metadata = QTableWidget()
+        metadata.setSelectionMode(metadata.NoSelection)
+        metadata.setShowGrid(False)
+        metadata.horizontalHeader().hide()
+        metadata.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        metadata.setHorizontalScrollMode(metadata.ScrollPerPixel)
+        metadata.verticalHeader().hide()
+        metadata.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        metadata.setEditTriggers(metadata.NoEditTriggers)
+        layout.addWidget(metadata, 0, 1, 2, 1)
+
+        def update_matches(txt):
+            matcher = TextMatcher(txt)
+            for i, f in enumerate(dblist):
+                files.setRowHidden(i, not any(matcher.match(str(d))
+                                              for d in f['metadata'].values()))
+        search.textChanged.connect(update_matches)
+
+        def cell_selected():
+            row = files.selectedIndexes()[0].row()
+            f = dblist[row]['metadata']
+            metadata.setRowCount(len(f))
+            metadata.setColumnCount(2)
+            for i, (k, v) in enumerate(sorted(f.items())):
+                metadata.setItem(i, 0, QTableWidgetItem(k))
+                metadata.setItem(i, 1, QTableWidgetItem(str(v)))
+        files.itemSelectionChanged.connect(cell_selected)
+
         bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        layout.addWidget(bbox, 2, 0, 1, 1)
+        layout.addWidget(bbox, 2, 0, 1, 2)
 
         dia = QDialog(self)
         dia.setWindowTitle('Open log file from database')
         dia.setLayout(layout)
+        dia.resize(QSize(widgets.devicePointScale(self, 600),
+                         widgets.devicePointScale(self, 400)))
+
+        files.cellActivated.connect(dia.accept)
 
         bbox.accepted.connect(dia.accept)
         bbox.rejected.connect(dia.reject)
 
-        if dia.exec_():
-            pass
+        if not dia.exec_(): return
+        selection = files.selectedIndexes()
+        if not selection: return
+        self.open_file(dblist[selection[0].row()]['path'])
 
     def open_from_file(self):
         file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',

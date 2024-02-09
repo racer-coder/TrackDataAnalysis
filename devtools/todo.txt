@@ -1,3 +1,5 @@
+. save_state/restore_state on a bunch of dialogs.  make them more permanent?
+
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
 . lat/long g force calculation from GPS? or internal accelerometers? or both?
 . detection of braking/cornering based on exceeding threshold for a duration of time?
@@ -7,10 +9,6 @@ DATABASE
 .. qlistview of directories with add/remove buttons
 .. add pops up qfiledialog choose even within another dialog?
 . quick/easy search - rework file open dialog
-.. separate open (put before open file)
-.. search line edit
-.. qtablewidget of results
-.. side pane qtablewidget with full metadata
 .. ability to choose columns to display in results
 .. separate filter mechanism if you want to see choices?  or drop down on column headers?
 
