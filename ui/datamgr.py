@@ -95,6 +95,7 @@ class DataDockModel(FastTableModel):
         return self.laps[index.row()].present(index, self)
 
 class DataDockWidget(TempDockWidget):
+    metadata_ver = 1
     wake_watcher = Signal(str)
     status_msg = Signal(str)
 
@@ -152,6 +153,7 @@ class DataDockWidget(TempDockWidget):
 
     def rewrite_metadata_cache(self):
         with open(self.metadata_fname, 'wt') as f:
+            f.write('%d\n' % self.metadata_ver)
             for obj in self.metadata_cache.items():
                 f.write(json.dumps(obj) + '\n')
         self.watch_deleted = 0
@@ -159,6 +161,7 @@ class DataDockWidget(TempDockWidget):
     def load_metadata_cache(self):
         try:
             with open(self.metadata_fname, 'rt') as f:
+                assert json.loads(f.readline()) == self.metadata_ver
                 for line in f:
                     obj = json.loads(line)
                     self.metadata_cache[obj['path']] = obj
