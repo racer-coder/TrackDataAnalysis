@@ -278,6 +278,7 @@ class DataDockWidget(TempDockWidget):
         layout.addWidget(search, 0, 0, 1, 1)
 
         files = QTableWidget()
+        files.setSortingEnabled(True)
         files.setSelectionMode(files.SingleSelection)
         files.setSelectionBehavior(files.SelectRows)
         files.setShowGrid(False)
@@ -292,10 +293,13 @@ class DataDockWidget(TempDockWidget):
         collist = ['Log Date', 'Log Time', 'Venue', 'Driver']
         files.setRowCount(len(dblist))
         files.setColumnCount(len(collist))
+        files.setHorizontalHeaderLabels(collist)
         for i, f in enumerate(dblist):
             for j, c in enumerate(collist):
                 if c in f['metadata']:
-                    files.setItem(i, j, QTableWidgetItem(f['metadata'][c]))
+                    item = QTableWidgetItem(f['metadata'][c])
+                    item.setData(Qt.UserRole, f)
+                    files.setItem(i, j, item)
         layout.addWidget(files, 1, 0, 1, 1)
 
         metadata = QTableWidget()
@@ -311,14 +315,14 @@ class DataDockWidget(TempDockWidget):
 
         def update_matches(txt):
             matcher = TextMatcher(txt)
-            for i, f in enumerate(dblist):
-                files.setRowHidden(i, not any(matcher.match(str(d))
-                                              for d in f['metadata'].values()))
+            for i in range(len(dblist)):
+                files.setRowHidden(
+                    i, not any(matcher.match(str(d))
+                               for d in files.item(i, 0).data(Qt.UserRole)['metadata'].values()))
         search.textChanged.connect(update_matches)
 
         def cell_selected():
-            row = files.selectedIndexes()[0].row()
-            f = dblist[row]['metadata']
+            f = files.selectedItems()[0].data(Qt.UserRole)['metadata']
             metadata.setRowCount(len(f))
             metadata.setColumnCount(2)
             for i, (k, v) in enumerate(sorted(f.items())):
@@ -341,9 +345,9 @@ class DataDockWidget(TempDockWidget):
         bbox.rejected.connect(dia.reject)
 
         if not dia.exec_(): return
-        selection = files.selectedIndexes()
+        selection = files.selectedItems()
         if not selection: return
-        self.open_file(dblist[selection[0].row()]['path'])
+        self.open_file(selection[0].data(Qt.UserRole)['path'])
 
     def open_from_file(self):
         file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
