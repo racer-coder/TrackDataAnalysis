@@ -98,6 +98,7 @@ class DataDockWidget(TempDockWidget):
     metadata_ver = 1
     wake_watcher = Signal(str)
     status_msg = Signal(str)
+    add_watch = Signal(str)
 
     def __init__(self, mainwindow, toolbar):
         super().__init__('Data', mainwindow, toolbar, True)
@@ -142,6 +143,7 @@ class DataDockWidget(TempDockWidget):
         self.watch_deleted = 0
         self.watcher = QFileSystemWatcher()
         self.watcher.directoryChanged.connect(self.add_watch_dir)
+        self.add_watch.connect(self.add_watch_dir)
         self.watchqueue = [] # order isn't important
         self.watch_semaphore = threading.Semaphore(0)
         threading.Thread(target = self.process_loop).start()
@@ -169,6 +171,7 @@ class DataDockWidget(TempDockWidget):
             self.rewrite_metadata_cache()
 
     def add_watch_dir(self, d):
+        self.watcher.addPath(d)
         self.watchqueue.append(d)
         self.watch_semaphore.release()
 
@@ -190,19 +193,19 @@ class DataDockWidget(TempDockWidget):
         f = None
         todo = self.watchqueue.pop()
 
-        self.watcher.addPath(todo)
-
         self.status_msg.emit('Scanning ' + todo)
         new_files = []
         new_dirs = []
         for obj in os.scandir(todo):
             if obj.is_dir():
-                new_dirs.append(obj.path)
+                new_dirs.append(obj.path + os.pathsep)
+                # need to send this back to the main thread to call addPath on self.watcher safely
+                self.add_watch.emit(obj.path)
             else:
                 stat = obj.stat()
                 new_files.append((obj.path, stat.st_size, stat.st_mtime))
 
-        keep = sorted([fname for fname, _, _ in new_files] + [d + os.pathsep for d in new_dirs])
+        keep = sorted([fname for fname, _, _ in new_files] + new_dirs)
         to_del = [old for old in self.metadata_cache.keys()
                   if old.startswith(todo) and
                   not old.startswith(keep[min(bisect.bisect_left(keep, old),
@@ -248,8 +251,6 @@ class DataDockWidget(TempDockWidget):
                     self.rewrite_metadata_cache()
                 f = open(self.metadata_fname, 'at')
             f.write(json.dumps(metadata) + '\n')
-
-        self.watchqueue += new_dirs
 
         self.status_msg.emit('')
         if f:
