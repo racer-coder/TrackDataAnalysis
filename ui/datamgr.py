@@ -11,9 +11,11 @@ import threading
 from PySide2.QtCore import QFileSystemWatcher, QRect, QSize, QStandardPaths, Qt, Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import (
+    QFileDialog,
     QHeaderView,
     QLineEdit,
     QMenu,
+    QProgressDialog,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -23,6 +25,7 @@ import data.aim_xrk
 import data.autosport_labs
 import data.motec
 from .dockers import FastTableModel, FastItemDelegate, TempDockWidget
+from . import channels
 from . import state
 from . import widgets
 
@@ -134,6 +137,8 @@ class DataDockWidget(TempDockWidget):
         mainwindow.data_view.data_change.connect(self.recompute)
         self.recompute()
 
+        self.config = mainwindow.config
+        self.data_view = mainwindow.data_view
         self.status_msg.connect(mainwindow.statusBar().showMessage)
         self.metadata_fname = (QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
                                + '/metadata.json')
@@ -255,6 +260,71 @@ class DataDockWidget(TempDockWidget):
         self.status_msg.emit('')
         if f:
             f.close()
+
+    def open_from_db(self):
+        pass
+
+    def open_from_file(self):
+        file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
+                                                self.config.get('main', 'last_open_dir',
+                                                                fallback=os.getcwd()),
+                                                'Data files (*.xrk *.ld *.log)')[0]
+        if file_name:
+            self.open_file(file_name)
+
+    def open_file(self, file_name):
+        if file_name.endswith('.xrk'):
+            builder = data.aim_xrk.AIMXRK
+        elif file_name.endswith('.ld'):
+            builder = data.motec.MOTEC
+        elif file_name.endswith('.log'):
+            builder = data.autosport_labs.AutosportLabs
+        else:
+            QMessageBox.critical(self, 'Unknown extension',
+                                 'Unable to determine format for file.',
+                                 QMessageBox.Ok)
+            return
+
+        progress = QProgressDialog('Processing file', 'Cancel', 0, 100, self)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.setMinimumDuration(1000)
+        def update_progress(pos, total):
+            progress.setMaximum(total)
+            progress.setValue(pos)
+            if progress.wasCanceled():
+                raise KeyboardInterrupt # really?
+
+        try:
+            obj = builder(file_name, update_progress)
+        except KeyboardInterrupt:
+            return # abort load
+        finally:
+            progress.deleteLater()
+
+        logref = state.LogRef(data.distance.DistanceWrapper(obj))
+        logref.update_laps()
+        self.data_view.log_files.append(logref)
+        if len(self.data_view.log_files) > 1:
+            # do it all again, but for multiple logs
+            data.distance.unify_lap_distance([logref.log for logref in self.data_view.log_files])
+            for logref in self.data_view.log_files:
+                logref.update_laps()
+            # this sucks but we've lost our mapping to the original laps
+            self.data_view.alt_lap = None
+            self.data_view.extra_laps = []
+
+        channels.update_channel_properties(self.data_view)
+
+        laps = logref.laps
+        if not laps:
+            best_lap = None
+        else:
+            best_lap = min(laps[1:-1] if len(laps) >= 3 else laps,
+                           key=lambda x: x.duration())
+        self.data_view.ref_lap = best_lap
+        self.data_view.values_change.emit()
+        self.data_view.data_change.emit()
+        self.config['main']['last_open_dir'] = os.path.dirname(file_name)
 
     def clickCell(self, index):
         row = index.row()
