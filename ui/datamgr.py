@@ -213,9 +213,10 @@ class DataDockWidget(TempDockWidget):
         keep_list = sorted(keep_list)
         to_del = [old for old in self.metadata_cache.keys()
                   if old.startswith(prefix) and
-                  not old.startswith(
-                      keep_list[max(bisect.bisect_right(keep_list, old) - 1,
-                                    0)])]
+                  not (keep_list and
+                       old.startswith(
+                           keep_list[max(bisect.bisect_right(keep_list, old) - 1,
+                                         0)]))]
         for elem in to_del:
             del self.metadata_cache[elem]
             self.watch_deleted += 1
