@@ -77,7 +77,7 @@ class DistanceWrapper:
         gs = np.interp(tc, distdata[0], converted)
 
         # adjust distances of each lap to match the median, if within a certain percentage
-        dividers = [(l.start_time + 5) // 10 for l in self.data.get_laps()]
+        dividers = [int(round(l.start_time / 10)) for l in self.data.get_laps()]
         lap_len = np.add.reduceat(gs, dividers)[1:-1]  # ignore in/out laps
         if not expected_len:
             expected_len = np.median(lap_len)

@@ -58,7 +58,7 @@ def lla2ecef(lat, lon, alt):
 
     x = (N+alt)*clat*np.cos(lon)
     y = (N+alt)*clat*np.sin(lon)
-    z = ((b_sq/a_sq)*N+alt)*slat
+    z = ((b_sq/a_sq)*N+alt)*slat # 1-e_sq instead of b_sq/a_sq.  Then don't compute a_sq, b_sq.
 
     return x, y, z
 
