@@ -249,7 +249,7 @@ class ValuesTableChannel:
         self.model = model
         self.data_view = data_view
         self.channel = channel
-        self.icon = ([channels.colors[props.color]] + model.channel_style[1:], '\u25a0') if icon else (model.channel_style, None)
+        self.icon = ([channels.colors[props.color]] + model.icon_style, '\u2587') if icon else (model.channel_style, None)
         self.name = (model.channel_style, channel)
         if units is None and data_view.ref_lap:
             units = props.units
@@ -301,6 +301,8 @@ class ValuesTableModel(FastTableModel):
         self.data_view = data_view
         self.section_style = [QtGui.QPen(QtGui.QColor(255, 255, 255)), QtGui.QColor(64, 64, 64),
                               None, Qt.AlignTop | Qt.AlignLeft]
+        self.icon_style    = [QtGui.QColor(32, 32, 32),
+                              None, Qt.AlignTop | Qt.AlignHCenter]
         self.channel_style = [QtGui.QPen(QtGui.QColor(192, 192, 192)), QtGui.QColor(32, 32, 32),
                               None, Qt.AlignTop | Qt.AlignLeft]
         self.value_style   = [QtGui.QPen(QtGui.QColor(192, 192, 192)), None,
