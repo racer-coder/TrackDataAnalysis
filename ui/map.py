@@ -186,6 +186,9 @@ class MapWidget(QWidget):
                 msize, msize)
 
         # map attribution
+        font = QtGui.QFont('Tahoma')
+        font.setPixelSize(widgets.deviceScale(self, 13))
+        ph.painter.setFont(font)
         pen = QtGui.QPen(QtGui.QColor(224, 224, 224))
         pen.setStyle(Qt.SolidLine)
         pen.setWidth(1)
