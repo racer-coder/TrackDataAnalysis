@@ -416,11 +416,11 @@ class TimeDist(widgets.MouseHelperWidget):
             ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax + 6,
                                 y, 200, 50,
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '\u25be' + (' %.*f' % (d.dec_pts, np.min(drange)) if len(drange) else ''))
+                                '\u25bc' + (' %.*f' % (d.dec_pts, np.min(drange)) if len(drange) else ''))
             ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax / 2 + 6,
                                 y, 200, 50,
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '\u25b4' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
+                                '\u25b2' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
             if not self.dataView.alt_lap or ch == 'Time Slip': continue
             d2 = self.dataView.get_channel_data(self.dataView.alt_lap, ch)
             if not len(d2.values): continue
