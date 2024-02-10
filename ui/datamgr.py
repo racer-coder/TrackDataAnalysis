@@ -304,7 +304,6 @@ class DataDockWidget(TempDockWidget):
         files.setSortingEnabled(True)
         files.setSelectionMode(files.SingleSelection)
         files.setSelectionBehavior(files.SelectRows)
-        files.setShowGrid(False)
         files.horizontalHeader().setHighlightSections(False)
         files.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         files.setHorizontalScrollMode(files.ScrollPerPixel)
