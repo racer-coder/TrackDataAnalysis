@@ -230,6 +230,9 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
+- 0.3.0
+  - Add automatic scanning of directories for quick access to old log files.
+  - Add ability to diplay metadata from log files (venue/driver/etc)
 - 0.2.0
   - Mac/Arm support
   - Channel editor to set units, decimals places, and color
