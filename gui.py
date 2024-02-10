@@ -14,12 +14,16 @@ from PySide2.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
+    QGroupBox,
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMainWindow,
     QMessageBox,
     QProgressDialog,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
@@ -71,6 +75,15 @@ class MainWindow(QMainWindow):
         self.config_fname = (QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
                              + '/config.ini')
         self.config.read(self.config_fname)
+
+        # upgrade from old versions
+        if 'database_scan_dirs' not in self.config['main']:
+            self.config['main']['database_scan_dirs'] = json.dumps(
+                [d for d in ('C:\\MoTeC\\Logged Data',
+                             'C:\\AIM_SPORT\\RaceStudio3\\user\\data')
+                 if sys.platform == 'win32' and os.path.exists(d)])
+                 
+
 
         self.data_view = ui.state.DataView(ref_lap=None,
                                            alt_lap=None,
@@ -273,8 +286,37 @@ class MainWindow(QMainWindow):
         maptiler_key = QLineEdit(self.data_view.maps_key[1] if self.data_view.maps_key else '')
         layout.addRow('Maptiler Key', maptiler_key)
 
+        sdlayout = QGridLayout()
+        scandirs = QListWidget()
+        scandirs.addItems(json.loads(self.config.get('main', 'database_scan_dirs')))
+
+        def add_scan_dir():
+            d = QFileDialog.getExistingDirectory(
+                self, 'Directory to scan for logs')
+            if d:
+                d = os.path.normpath(d)
+                if d not in [scandirs.item(i).text()
+                             for i in range(scandirs.count())]:
+                    scandirs.addItem(d)
+
+        def rem_scan_dir():
+            for i in scandirs.selectedIndexes():
+                scandirs.takeItem(i.row())
+        
+        sdlayout.addWidget(scandirs, 0, 0, 1, 2)
+        but = QPushButton('Add directory...')
+        but.clicked.connect(add_scan_dir)
+        sdlayout.addWidget(but, 1, 0, 1, 1)
+        but = QPushButton('Remove directory')
+        but.clicked.connect(rem_scan_dir)
+        sdlayout.addWidget(but, 1, 1, 1, 1)
+        
+        scandirbox = QGroupBox('Log file directories')
+        scandirbox.setLayout(sdlayout)
+        layout.addRow(scandirbox)
+
         bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        layout.addWidget(bbox)
+        layout.addRow(bbox)
 
         dia = QDialog(self)
         dia.setWindowTitle('Preferences')
@@ -285,6 +327,9 @@ class MainWindow(QMainWindow):
 
         if dia.exec_():
             self.data_view.maps_key = ['maptiler', maptiler_key.text()]
+            self.config['main']['database_scan_dirs'] = json.dumps(
+                [scandirs.item(i).text() for i in range(scandirs.count())])
+            self.datamgr.update_scan_dirs()
 
     def new_workspace(self):
         ret = QMessageBox.warning(self, 'Warning',

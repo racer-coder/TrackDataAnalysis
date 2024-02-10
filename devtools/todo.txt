@@ -4,11 +4,6 @@
 . lat/long g force calculation from GPS? or internal accelerometers? or both?
 . detection of braking/cornering based on exceeding threshold for a duration of time?
 
-DATABASE
-. ability to set directory for scanning
-.. qlistview of directories with add/remove buttons
-.. add pops up qfiledialog choose even within another dialog?
-
 Later Milestones:
 
 * MATHS

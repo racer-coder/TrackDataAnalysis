@@ -165,12 +165,14 @@ class DataDockWidget(TempDockWidget):
         self.add_watch.connect(self.add_watch_dir)
         self.watchqueue = [] # order isn't important
         self.watch_semaphore = threading.Semaphore(0)
+        self.update_scan_dirs()
         threading.Thread(target = self.process_loop).start()
-        try:
-            for d in ['sampledata']: #json.loads(mainwindow.config.get('main', 'watched_dirs')):
-                self.add_watch_dir(d)
-        except:
-            pass
+
+    def update_scan_dirs(self):
+        self.scan_dirs = json.loads(
+            self.mainwindow.config.get('main', 'database_scan_dirs'))
+        for d in self.scan_dirs:
+            self.add_watch_dir(d)
 
     def rewrite_metadata_cache(self):
         with open(self.metadata_fname, 'wt') as f:
@@ -204,7 +206,19 @@ class DataDockWidget(TempDockWidget):
             self.process_watch()
             sys.setswitchinterval(0.005) # back to default, thanks GIL
             if not self.watchqueue:
+                self.prune_cache('', self.scan_dirs)
                 self.watch_semaphore.acquire()
+
+    def prune_cache(self, prefix, keep_list):
+        keep_list = sorted(keep_list)
+        to_del = [old for old in self.metadata_cache.keys()
+                  if old.startswith(prefix) and
+                  not old.startswith(
+                      keep_list[max(bisect.bisect_right(keep_list, old) - 1,
+                                    0)])]
+        for elem in to_del:
+            del self.metadata_cache[elem]
+            self.watch_deleted += 1
 
     def process_watch(self):
         if not self.watchqueue: return
@@ -217,21 +231,14 @@ class DataDockWidget(TempDockWidget):
         new_dirs = []
         for obj in os.scandir(todo):
             if obj.is_dir():
-                new_dirs.append(obj.path + os.pathsep)
+                new_dirs.append(obj.path + os.sep)
                 # need to send this back to the main thread to call addPath on self.watcher safely
                 self.add_watch.emit(obj.path)
             else:
                 stat = obj.stat()
                 new_files.append((obj.path, stat.st_size, stat.st_mtime))
 
-        keep = sorted([fname for fname, _, _ in new_files] + new_dirs)
-        to_del = [old for old in self.metadata_cache.keys()
-                  if old.startswith(todo) and
-                  not old.startswith(keep[min(bisect.bisect_left(keep, old),
-                                              len(keep) - 1)])]
-        for elem in to_del:
-            del self.metadata_cache[elem]
-            self.watch_deleted += 1
+        self.prune_cache(todo, [fname for fname, _, _ in new_files] + new_dirs)
 
         for path, size, mtime in new_files:
             if not self.keep_watching:
