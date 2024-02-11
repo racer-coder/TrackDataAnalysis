@@ -43,10 +43,8 @@ def web2ll(x, y, zoom=0):
 # x, y, z, alt = meters
 def lla2ecef(lat, lon, alt):
     a = 6378137
-    a_sq = a**2
     e = 8.181919084261345e-2
-    e_sq = e**2
-    b_sq = a_sq*(1 - e_sq)
+    e_sq = e*e
 
     lat = lat*(np.pi/180)
     lon = lon*(np.pi/180)
@@ -54,11 +52,11 @@ def lla2ecef(lat, lon, alt):
     clat = np.cos(lat)
     slat = np.sin(lat)
 
-    N = a/np.sqrt(1 - e_sq*slat**2)
+    N = a/np.sqrt(1 - e_sq*slat*slat)
 
     x = (N+alt)*clat*np.cos(lon)
     y = (N+alt)*clat*np.sin(lon)
-    z = ((b_sq/a_sq)*N+alt)*slat # 1-e_sq instead of b_sq/a_sq.  Then don't compute a_sq, b_sq.
+    z = ((1 - e_sq)*N+alt)*slat
 
     return x, y, z
 
