@@ -770,6 +770,9 @@ class TimeDist(widgets.MouseHelperWidget):
 
     def updateCursor(self, old_cursor):
         if not old_cursor: return # something other than cursor updated (video_alignment?)
+        if not self.x_axis: # maybe we were never painted because we're hidden?
+            self.update()
+            return
         old_cursor_x = self.x_axis.calc(self.dataView.getTDValue(old_cursor))
         new_cursor_x = self.x_axis.calc(self.dataView.getTDValue(self.dataView.cursor_time))
         ratio = self.devicePixelRatioF()
