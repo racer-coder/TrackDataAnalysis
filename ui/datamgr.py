@@ -20,6 +20,7 @@ from PySide2.QtWidgets import (
     QLineEdit,
     QListWidget,
     QMenu,
+    QMessageBox,
     QProgressDialog,
     QPushButton,
     QTableView,
@@ -31,6 +32,7 @@ from PySide2.QtWidgets import (
 
 import data.aim_xrk
 import data.autosport_labs
+import data.iracing
 import data.motec
 from .dockers import (FastTableModel,
                       FastItemDelegate,
@@ -249,13 +251,8 @@ class DataDockWidget(TempDockWidget):
                 if entry['size'] == size and entry['mtime'] == mtime:
                     continue
 
-            if path.endswith('.xrk'):
-                builder = data.aim_xrk.AIMXRK
-            elif path.endswith('.ld'):
-                builder = data.motec.MOTEC
-            elif path.endswith('.log'):
-                builder = data.autosport_labs.AutosportLabs
-            else:
+            builder = self.get_builder(path)
+            if not builder:
                 continue # not a file we care about
 
             self.status_msg.emit('Reading ' + path)
@@ -427,18 +424,25 @@ class DataDockWidget(TempDockWidget):
         file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
                                                 self.config.get('main', 'last_open_dir',
                                                                 fallback=os.getcwd()),
-                                                'Data files (*.xrk *.ld *.log)')[0]
+                                                'Data files (*.ibt *.ld *.log *.xrk)')[0]
         if file_name:
             self.open_file(file_name)
 
-    def open_file(self, file_name):
-        if file_name.endswith('.xrk'):
-            builder = data.aim_xrk.AIMXRK
-        elif file_name.endswith('.ld'):
-            builder = data.motec.MOTEC
-        elif file_name.endswith('.log'):
-            builder = data.autosport_labs.AutosportLabs
+    def get_builder(self, file_name):
+        if file_name.lower().endswith('.xrk'):
+            return data.aim_xrk.AIMXRK
+        elif file_name.lower().endswith('.ld'):
+            return data.motec.MOTEC
+        elif file_name.lower().endswith('.log'):
+            return data.autosport_labs.AutosportLabs
+        elif file_name.lower().endswith('.ibt'):
+            return data.iracing.IRacing
         else:
+            return None
+
+    def open_file(self, file_name):
+        builder = self.get_builder(file_name)
+        if not builder:
             QMessageBox.critical(self, 'Unknown extension',
                                  'Unable to determine format for file.',
                                  QMessageBox.Ok)

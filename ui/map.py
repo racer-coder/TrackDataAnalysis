@@ -68,9 +68,9 @@ class MapWidget(QWidget):
         lap = dv.ref_lap
         if not lap: return
 
-        gps_lat = lap.log.log.get_channel_data('GPS Latitude', 'Latitude', unit='deg')
-        gps_long = lap.log.log.get_channel_data('GPS Longitude', 'Longitude', unit='deg')
-        gps_alt = lap.log.log.get_channel_data('GPS Altitude', 'Altitude', unit='m')
+        gps_lat = lap.log.log.get_channel_data('GPS Latitude', 'Latitude', 'Lat', unit='deg')
+        gps_long = lap.log.log.get_channel_data('GPS Longitude', 'Longitude', 'Lon', unit='deg')
+        gps_alt = lap.log.log.get_channel_data('GPS Altitude', 'Altitude', 'Alt', unit='m')
 
         if not len(gps_lat.values) or not len(gps_long.values):
             return
@@ -178,8 +178,8 @@ class MapWidget(QWidget):
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)
             ph.painter.setBrush(QtGui.QBrush(color))
-            gps_lat = lap.log.log.get_channel_data('GPS Latitude', 'Latitude', unit='deg')
-            gps_long = lap.log.log.get_channel_data('GPS Longitude', 'Longitude', unit='deg')
+            gps_lat = lap.log.log.get_channel_data('GPS Latitude', 'Latitude', 'Lat', unit='deg')
+            gps_long = lap.log.log.get_channel_data('GPS Longitude', 'Longitude', 'Lon', unit='deg')
             lap_out_time = dv.cursor2outTime(lap)
             ph.painter.drawEllipse(
                 QPointF((gps_long.interp(lap_out_time) - long_base) * long_scale,

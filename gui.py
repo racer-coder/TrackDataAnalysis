@@ -31,10 +31,6 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
-import data.aim_xrk
-import data.autosport_labs
-import data.distance
-import data.motec
 import ui.channels
 import ui.components
 import ui.datamgr
@@ -302,7 +298,7 @@ class MainWindow(QMainWindow):
         def rem_scan_dir():
             for i in scandirs.selectedIndexes():
                 scandirs.takeItem(i.row())
-        
+
         sdlayout.addWidget(scandirs, 0, 0, 1, 2)
         but = QPushButton('Add directory...')
         but.clicked.connect(add_scan_dir)
@@ -310,7 +306,7 @@ class MainWindow(QMainWindow):
         but = QPushButton('Remove directory')
         but.clicked.connect(rem_scan_dir)
         sdlayout.addWidget(but, 1, 1, 1, 1)
-        
+
         scandirbox = QGroupBox('Log file directories')
         scandirbox.setLayout(sdlayout)
         layout.addRow(scandirbox)

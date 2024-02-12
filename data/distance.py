@@ -32,6 +32,7 @@ class ChannelData:
     def interp(self, tc, mode_time = True):
         index = self.timecodes if mode_time else self.distances
         i = bisect.bisect_left(index, tc)
+        if len(self.values) == 0: return 0
         if i == 0: return self.values[i]
         if i == len(self.values): return self.values[i - 1]
         span = index[i] - index[i-1]
