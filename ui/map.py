@@ -121,6 +121,7 @@ class MapWidget(QWidget):
             zoom = int(np.ceil(np.max(
                 np.log(np.array([ph.size.width(), ph.size.height()]) * (1/512)
                        / (tile_corner2 - tile_corner1))) / np.log(2)))
+            zoom = min(zoom, 20) # maptiler goes to 22, but it isn't very helpful
             tile_corner1 = np.floor(tile_corner1 * 2 ** zoom).astype(np.int32)
             tile_corner2 = np.ceil(tile_corner2 * 2 ** zoom).astype(np.int32)
             for x in range(tile_corner1[0], tile_corner2[0]):
