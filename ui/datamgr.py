@@ -120,7 +120,7 @@ class DataDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
         super().__init__('Data', mainwindow, toolbar, True)
 
-        self.margin = 6
+        self.margin = 3
 
         self.model = DataDockModel(mainwindow.data_view)
         self.deleg = FastItemDelegate(self.model, self.margin)
