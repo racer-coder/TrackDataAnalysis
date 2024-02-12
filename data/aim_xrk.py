@@ -507,14 +507,26 @@ class AIMXRK:
         D = O[1:] - O[:-1]
         O = O[:-1]
 
+        # Precalculate in which time periods we were traveling at least 4 m/s (~10mph)
+        minspeed = np.sum(D*D, axis=1) > np.square((timecodes[1:] - timecodes[:-1]) * (4 / 1000))
+
         SN = (np.sum(SD * SD, axis=1).reshape((len(SD), 1)) * D
               - np.sum(SD * D, axis=1).reshape((len(D), 1)) * SD)
         t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
         # This only works because the track is considered at altitude 0
-        dist = O + t.reshape((len(t), 1)) * D
-        dist = np.sum(dist * dist, axis=1)
-        # Precalculate in which time periods we were traveling at least 4 m/s (~10mph)
-        minspeed = np.sum(D*D, axis=1) > np.square((timecodes[1:] - timecodes[:-1]) * (4 / 1000))
+        dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
+        pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+
+        # Now that we have a decent candidate selection of lap
+        # crossings, generate a single normal vector for the
+        # start/finish line to use for all lap crossings, to make the
+        # lap times more accurate/consistent.  Weight the crossings by
+        # velocity and add them together.  As it happens, SN is
+        # already weighted by velocity...
+        SN = np.sum(SN[1:][pick & minspeed[1:]], axis=0).reshape((1,3))
+        # recompute t, dist, pick
+        t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+        dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
         pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
 
         # grab the earliest seen timecode from either provided laps or channel (including GPS) data
