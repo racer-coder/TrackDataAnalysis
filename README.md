@@ -230,6 +230,10 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
+- 0.3.1
+  - iRacing IBT support
+  - Automatic GPS lap insert for AiM files
+  - Small bug fixes
 - 0.3.0
   - Add automatic scanning of directories for quick access to old log files.
   - Add ability to diplay metadata from log files (venue/driver/etc)
