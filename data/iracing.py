@@ -18,6 +18,7 @@ class Channel:
     values: memoryview
     name: str
     units: str
+    dec_pts: int
 
 @dataclass
 class Lap:
@@ -49,8 +50,10 @@ def _decode_var(m, offs, timecodes, samples, nrecords, stride):
                           axis=1)
     if rtype == 1:
         data = (data != 0)
-    return Channel(timecodes, np.ascontiguousarray(data).data.cast('B').cast(_types[rtype][1]),
-                   name, unit)
+    data = np.ascontiguousarray(data).data.cast('B').cast(_types[rtype][1])
+    if unit == '%': # encoded actually as a ratio, not a percentage
+        data = (np.array(data) * 100).data
+    return Channel(timecodes, data, name, unit, 2 if rtype >= 4 else 0)
 
 def _decode(m):
     (version, status, tick_rate, session_info_update, session_info_length, session_info_offset,
@@ -136,7 +139,7 @@ class IRacing:
         return self.data[name].units if name in self.data else None
 
     def get_channel_dec_points(self, name):
-        return 2 # XXX
+        return self.data[name].dec_pts
 
     def get_channel_data(self, name):
         if name not in self.data:
