@@ -19,8 +19,12 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
-. don't recreate qmenu/qdialog/etc all the time? memory leak?
-. better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
+. data widget - less forceful column resizing
+. values widget - less forceful column resizing
+. open from db - better performance related to column resizing
+. tech debt - reduce boilerplate in file parsers by relying more heavily on distancewrapper
+. tech debt - don't recreate qmenu/qdialog/etc all the time? memory leak?
+. tech debt - better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
 . open from db - ability to choose columns to display in results
 . file format - megalogviewer
 . file format - vbox
@@ -43,7 +47,6 @@ Later Milestones:
 . periodic autosave of workspace?
 . allow selection of workspace on startup
 . multiple monitor/window support for workspaces
-. improve channel search - CamelCase
 . workbook popup menu - new, rename, delete, editor
 . component widget - optional title bar
 . component widget - make resize a little sticky when butting up against other components
