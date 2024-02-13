@@ -98,10 +98,16 @@ class IRacing:
         assert speed.units == 'm/s'
 
         lap_markers = [0]
+        add_end = True
         for b in (np.nonzero(lap[1:] != lap[:-1])[0] + 1):
+            if lap[b] == 0: # probably no more useful data
+                lap_markers.append(speed.timecodes[b])
+                add_end = False
+                break
             lap_markers.append(max(speed.timecodes[b-1],
                                    speed.timecodes[b] - lapdist[b] / speed.values[b] * 1000))
-        lap_markers.append(speed.timecodes[-1])
+        if add_end:
+            lap_markers.append(speed.timecodes[-1])
 
         self.laps = [Lap(i, s, e)
                      for i, (s, e) in enumerate(zip(lap_markers[:-1], lap_markers[1:]))]
