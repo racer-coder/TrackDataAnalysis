@@ -302,10 +302,10 @@ class DataDockWidget(TempDockWidget):
         files.setSelectionMode(files.SingleSelection)
         files.setSelectionBehavior(files.SelectRows)
         files.horizontalHeader().setHighlightSections(False)
-        files.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        files.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         files.setHorizontalScrollMode(files.ScrollPerPixel)
         files.verticalHeader().hide()
-        files.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        files.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
         files.setEditTriggers(files.NoEditTriggers)
         dblist = [d for d in self.metadata_cache.values() if d['readable']]
         collist = ['Log Date', 'Log Time', 'Venue', 'Driver']
@@ -337,6 +337,8 @@ class DataDockWidget(TempDockWidget):
                 files.setRowHidden(
                     i, not (matcher.match(' '.join(str(d) for d in metadata.values()))
                             and all(metadata.get(f, None) in v for f, v in active_filters.items())))
+            files.horizontalHeader().resizeSections(QHeaderView.ResizeToContents)
+            files.verticalHeader().resizeSections(QHeaderView.ResizeToContents)
         search.textChanged.connect(update_matches)
         update_matches()
 
