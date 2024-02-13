@@ -1,5 +1,3 @@
-. duplicate button for worksheet?
-
 . save_state/restore_state on a bunch of dialogs.  make them more permanent?
 
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
@@ -21,6 +19,7 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. don't recreate qmenu/qdialog/etc all the time? memory leak?
 . better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
 . open from db - ability to choose columns to display in results
 . file format - megalogviewer
@@ -45,7 +44,6 @@ Later Milestones:
 . allow selection of workspace on startup
 . multiple monitor/window support for workspaces
 . improve channel search - CamelCase
-. worksheet tabbar popup menu - new, rename, delete, duplicate, editor
 . workbook popup menu - new, rename, delete, editor
 . component widget - optional title bar
 . component widget - make resize a little sticky when butting up against other components

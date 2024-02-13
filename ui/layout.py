@@ -12,6 +12,7 @@ from PySide2.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
+    QMenu,
     QMessageBox,
     QPushButton,
     QTabBar,
@@ -208,7 +209,8 @@ class LayoutEditor(QDialog):
                                   QMessageBox.Yes | QMessageBox.No,
                                   QMessageBox.No)
         if ret == QMessageBox.Yes:
-            sel.parent().takeChild(sel.parent().indexOfChild(sel))
+            parent = sel.parent() if sel.parent() else self.tree.invisibleRootItem()
+            parent.takeChild(parent.indexOfChild(sel))
             self.reordered() # big hammer
 
     def rename(self):
@@ -242,6 +244,8 @@ class LayoutManager(QWidget):
         self.tabbar.tabMoved.connect(self.tabMoved)
         self.tabbar.tabBarClicked.connect(self.tabClicked)
         self.tabbar.currentChanged.connect(self.tabSelected)
+        self.tabbar.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tabbar.customContextMenuRequested.connect(self.tab_context_menu)
 
         self.new_layout()
 
@@ -263,6 +267,27 @@ class LayoutManager(QWidget):
         layout_menu.addAction('New Worksheet').triggered.connect(self.newWorksheet)
 
         self.setLayout(hbox)
+
+    def tab_context_menu(self, pos):
+        idx = self.tabbar.tabAt(pos)
+        if idx >= 0: # select this tab so it's obvious what we're working on
+            self.tabbar.setCurrentIndex(idx)
+        menu = QMenu()
+        menu.addAction('New Worksheet').triggered.connect(self.newWorksheet)
+        menu.addSeparator()
+        act = menu.addAction('Rename Worksheet')
+        act.triggered.connect(self.rename_worksheet)
+        if idx < 0: act.setEnabled(False)
+        act = menu.addAction('Delete Worksheet')
+        act.triggered.connect(self.delete_worksheet)
+        if idx < 0 or len(self.current_book.sheets) <= 1: act.setEnabled(False)
+        menu.addSeparator()
+        act = menu.addAction('Duplicate Worksheet')
+        act.triggered.connect(self.duplicate_worksheet)
+        if idx < 0: act.setEnabled(False)
+        menu.addSeparator()
+        menu.addAction('Layout Editor...').triggered.connect(self.layoutEditor)
+        menu.exec_(self.tabbar.mapToGlobal(pos))
 
     def new_layout(self):
         ws = Worksheet('Worksheet', True, [])
@@ -342,18 +367,47 @@ class LayoutManager(QWidget):
     def updateWorkbook(self):
         self.current_book.sheets = [self.tabbar.tabData(i) for i in range(self.tabbar.count())]
 
-    def newWorksheet(self, *args):
-        name = 'Worksheet %d' % self.tabbar.count()
-        worksheet = Worksheet(name=name, mode_time=self.data_view.mode_time, components=[])
+    def rename_worksheet(self):
+        idx = self.tabbar.currentIndex()
+        new_name, ok = QInputDialog.getText(self.parent(), 'Rename',
+                                            'Enter a new name for "%s"' % self.tabbar.tabText(idx))
+        if ok and new_name:
+            self.tabbar.setTabText(idx, new_name)
+            self.current_sheet.name = new_name
+
+    def delete_worksheet(self):
+        self.tabbar.removeTab(self.tabbar.currentIndex())
+        self.updateWorkbook()
+        self.tabClicked(self.tabbar.currentIndex())
+
+    def insert_worksheet_like(self, ws):
+        for i in range(1, self.tabbar.count() + 2):
+            name = '%s %d' % (ws.name, i)
+            if all(name != ws.name for ws in self.current_book.sheets):
+                break
+        worksheet = Worksheet(name=name, mode_time=ws.mode_time, components=ws.components)
         idx = self.tabbar.addTab(name)
         self.tabbar.setTabData(idx, worksheet)
         self.last_book.last_sheet = worksheet
         self.updateWorkbook()
         self.tabbar.setCurrentIndex(idx)
 
+    def duplicate_worksheet(self):
+        self.saveCurrentTab()
+        self.insert_worksheet_like(self.current_sheet)
+
+    def newWorksheet(self, *args):
+        self.insert_worksheet_like(Worksheet(name='Worksheet',
+                                             mode_time=self.data_view.mode_time,
+                                             components=[]))
+
     def newWorkbook(self, *args):
+        for i in range(1, len(self.workspace) + 2):
+            name = 'Workbook %d' % i
+            if all(name != wb.name for wb in self.workspace):
+                break
         ws = Worksheet('Worksheet', True, [])
-        wb = Workbook('Workbook %d' % len(self.workspace), ws, [ws])
+        wb = Workbook(name, ws, [ws])
         self.workspace.append(wb)
         self.last_book = wb
         self.workbook_selector.addItem(wb.name)
