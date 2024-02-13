@@ -230,7 +230,10 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
-- 0.3.2.dev
+- 0.3.2
+  - Context menu for worksheet tabs (new/rename/delete/duplicate/etc)
+  - Parse some metadata from iRacing files for use in db
+  - Fix bug in parsing some iRacing files
   - Allow * in channel search
 - 0.3.1
   - iRacing IBT support
