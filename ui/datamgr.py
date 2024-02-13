@@ -461,6 +461,11 @@ class DataDockWidget(TempDockWidget):
             obj = builder(file_name, update_progress)
         except KeyboardInterrupt:
             return # abort load
+        except:
+            QMessageBox.critical(self, 'Unable to parse',
+                                 'Unable to read file.  Please file a bug.',
+                                 QMessageBox.Ok)
+            return
         finally:
             progress.deleteLater()
 
