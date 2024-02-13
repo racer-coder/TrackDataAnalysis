@@ -103,7 +103,7 @@ you'll want to stick to `python3.10` or older.
 Ubuntu 22.04:
 ```
 sudo apt install python3-pyside2.qtwidgets python3-numpy libmpv1
-pip3 install glfw # Ubuntu 23.04+ has apt package python3-pyglfw
+pip3 install pyyaml glfw # Ubuntu 23.04+ has apt package python3-pyglfw
 ```
 
 You should then be able to run the program using either of the following:
@@ -149,7 +149,7 @@ running various commands.
 brew install pyside@2
 brew link pyside@2
 brew install mpv
-pip3.10 install glfw numpy
+pip3.10 install glfw numpy pyyaml
 ```
 
 Then you should be able to run the program with either:

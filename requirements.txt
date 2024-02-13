@@ -1,5 +1,6 @@
-numpy
 glfw
+numpy
+pyyaml
 # For Mac, install pyside@2 via homebrew
 PySide2 ; sys_platform != 'darwin'
 

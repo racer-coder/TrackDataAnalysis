@@ -10,6 +10,7 @@ import sys
 import time
 
 import numpy as np
+import yaml
 
 
 @dataclass
@@ -71,8 +72,15 @@ def _decode(m):
     vars = [_decode_var(m, var_header_offset + i * 144, timecodes, samples, record_count, buf_len)
             for i in range(num_vars)]
 
-    return {v.name: v for v in vars}, {'Log Date': '%02d/%02d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year), # Yes I'm American
-                                       'Log Time': '%02d:%02d:%02d' % (tm.tm_hour, tm.tm_min, tm.tm_sec)}
+    idata = yaml.safe_load(m[session_info_offset : session_info_offset+session_info_length].tobytes())
+
+    return ({v.name: v for v in vars},
+            {'Log Date': '%02d/%02d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year), # Yes I'm American
+             'Log Time': '%02d:%02d:%02d' % (tm.tm_hour, tm.tm_min, tm.tm_sec),
+             'Driver': [d['UserName'] for d in idata['DriverInfo']['Drivers']
+                        if d['UserID'] == idata['DriverInfo']['DriverUserID']][0],
+             'Venue': idata['WeekendInfo']['TrackDisplayName'],
+             })
 
 
 class IRacing:
