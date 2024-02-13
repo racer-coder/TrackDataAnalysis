@@ -4,6 +4,7 @@
 import bisect
 from dataclasses import dataclass
 import math
+import re
 import sys
 
 from PySide2.QtCore import QAbstractTableModel, QRect, QSize, Qt
@@ -125,10 +126,12 @@ class TempDockWidget(QDockWidget):
 
 class TextMatcher:
     def __init__(self, txt):
-        self.text_hints = txt.lower().split(' ')
+        self.text_hints = [re.compile(''.join(['.*' if c == '*' else re.escape(c) for c in t]),
+                                      re.IGNORECASE)
+                           for t in txt.lower().split(' ')]
 
     def match(self, other):
-        return all(any(piece.startswith(h)
+        return all(any(h.match(piece)
                        for piece in other.lower().replace('_', ' ').split())
                    for h in self.text_hints)
 

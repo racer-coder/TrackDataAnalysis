@@ -335,7 +335,7 @@ class DataDockWidget(TempDockWidget):
             for i in range(len(dblist)):
                 metadata = files.item(i, 0).data(Qt.UserRole)['metadata']
                 files.setRowHidden(
-                    i, not (any(matcher.match(str(d)) for d in metadata.values())
+                    i, not (matcher.match(' '.join(str(d) for d in metadata.values()))
                             and all(metadata.get(f, None) in v for f, v in active_filters.items())))
         search.textChanged.connect(update_matches)
         update_matches()

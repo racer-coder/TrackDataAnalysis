@@ -230,6 +230,8 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
+- 0.3.2.dev
+  - Allow * in channel search
 - 0.3.1
   - iRacing IBT support
   - Automatic GPS lap insert for AiM files

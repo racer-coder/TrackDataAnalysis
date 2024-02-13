@@ -1,3 +1,6 @@
+. duplicate button for worksheet?
+. catch load error and display messagebox?
+
 . save_state/restore_state on a bunch of dialogs.  make them more permanent?
 
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
