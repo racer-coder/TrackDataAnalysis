@@ -602,6 +602,7 @@ class DataDockWidget(TempDockWidget):
             if date != last_date:
                 self.table.setSpan(len(laps), 0, 1, 8)
                 laps.append(DataModelSection('\u25bc ' + date))
+                last_date = date
             self.table.setSpan(len(laps), 0, 1, 8)
             laps.append(DataModelSection('  \u25bc %s' % ', '.join(
                 filter(bool, [metadata['Log Time'],

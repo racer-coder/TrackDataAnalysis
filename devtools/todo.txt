@@ -19,6 +19,8 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. channel drag/drop - display visual of channel being dragged
+. channel drag/drop - support dropping to actual place in graph for time/dist
 . data widget - less forceful column resizing
 . values widget - less forceful column resizing
 . open from db - less forceful column resizing
