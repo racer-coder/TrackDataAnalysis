@@ -407,7 +407,7 @@ class DataDockWidget(TempDockWidget):
         bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         layout.addWidget(bbox, 2, 0, 1, 3)
 
-        dia = QDialog(self)
+        dia = QDialog()
         dia.setWindowTitle('Open log file from database')
         dia.setLayout(layout)
         dia.resize(QSize(widgets.devicePointScale(self, 800),

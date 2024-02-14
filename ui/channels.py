@@ -112,7 +112,7 @@ def channel_editor(parent, data_view, channel):
     bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     layout.addWidget(bbox, layout.rowCount(), 0, 1, 3)
 
-    dia = QDialog(parent)
+    dia = QDialog()
     dia.setWindowTitle('Channel editor for %s' % channel)
     dia.setLayout(layout)
 

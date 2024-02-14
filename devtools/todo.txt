@@ -25,7 +25,6 @@ Later Milestones:
 . values widget - less forceful column resizing
 . open from db - less forceful column resizing
 . tech debt - reduce boilerplate in file parsers by relying more heavily on distancewrapper
-. tech debt - don't recreate qmenu/qdialog/etc all the time? memory leak?
 . tech debt - better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
 . open from db - ability to choose columns to display in results
 . file format - megalogviewer

@@ -234,7 +234,7 @@ class MainWindow(QMainWindow):
         bbox = QDialogButtonBox(QDialogButtonBox.Close)
         layout.addWidget(bbox)
 
-        dia = QDialog(self)
+        dia = QDialog()
         dia.setWindowTitle('Details')
         dia.setLayout(layout)
 
@@ -315,7 +315,7 @@ class MainWindow(QMainWindow):
         bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         layout.addRow(bbox)
 
-        dia = QDialog(self)
+        dia = QDialog()
         dia.setWindowTitle('Preferences')
         dia.setLayout(layout)
 
