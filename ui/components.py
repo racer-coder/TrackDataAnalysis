@@ -7,7 +7,6 @@ from PySide2 import QtGui
 from PySide2.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
 from PySide2.QtWidgets import (
     QAction,
-    QApplication,
     QVBoxLayout,
     QWidget,
 )
@@ -68,7 +67,7 @@ class ComponentManager(QWidget):
         return lambda p: QPointF(p.x() / self.size().width(),
                                  p.y() / self.size().height())
 
-    def resizeEvent(self, e):
+    def resizeEvent(self, event):
         m = self.resizeLambda()
         for cb in self.findChildren(ComponentBase):
             cb.parentResize(m)
@@ -206,7 +205,7 @@ class ComponentBase(QWidget):
         self.fracGeometry = QRectF(m(geof.topLeft()),
                                    m(geof.bottomRight()))
 
-    def focusInEvent(self, a0: QtGui.QFocusEvent):
+    def focusInEvent(self, event):
         self.data_view.active_component = self.childWidget
         self.m_infocus = True
         self.raise_()
@@ -214,7 +213,7 @@ class ComponentBase(QWidget):
         self.inFocus.emit(True)
         self.data_view.data_change.emit()
 
-    def focusOutEvent(self, a0: QtGui.QFocusEvent):
+    def focusOutEvent(self, event):
         if not self.m_isEditing:
             return
         self.mode = ResizerMode.MOVE

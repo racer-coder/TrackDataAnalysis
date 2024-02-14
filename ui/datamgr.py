@@ -7,8 +7,9 @@ import json
 import os
 import sys
 import threading
+import typing
 
-from PySide2.QtCore import QFileSystemWatcher, QRect, QSize, QStandardPaths, Qt, Signal
+from PySide2.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import (
     QDialog,
@@ -27,7 +28,6 @@ from PySide2.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
-    QWidget,
 )
 
 import data.aim_xrk
@@ -82,7 +82,7 @@ class DataModelLap:
 @dataclass
 class DataModelSection:
     text: str
-    lap: state.LapRef = None
+    lap: typing.Optional[state.LapRef] = None
 
     def present(self, index, model):
         col = index.column()
@@ -103,12 +103,11 @@ class DataDockModel(FastTableModel):
                               None, Qt.AlignLeft]
 
     def set_data(self, laps, font, section_font):
-        old_len = len(self.laps)
         self.laps = laps
         self.right_style[2] = font
         self.center_style[2] = font
         self.section_style[2] = section_font
-        super().set_data(self.headings, len(laps))
+        self.set_model_param(self.headings, len(laps))
 
     def present(self, index):
         return self.laps[index.row()].present(index, self)
@@ -179,7 +178,7 @@ class DataDockWidget(TempDockWidget):
             self.add_watch_dir(d)
 
     def rewrite_metadata_cache(self):
-        with open(self.metadata_fname, 'wt') as f:
+        with open(self.metadata_fname, 'wt', encoding='utf-8') as f:
             f.write('%d\n' % self.metadata_ver)
             for obj in self.metadata_cache.items():
                 f.write(json.dumps(obj) + '\n')
@@ -187,12 +186,12 @@ class DataDockWidget(TempDockWidget):
 
     def load_metadata_cache(self):
         try:
-            with open(self.metadata_fname, 'rt') as f:
+            with open(self.metadata_fname, 'rt', encoding='utf-8') as f:
                 assert json.loads(f.readline()) == self.metadata_ver
                 for line in f:
                     obj = json.loads(line)
                     self.metadata_cache[obj['path']] = obj
-        except: # catch all error handling, grotesque
+        except: # pylint: disable=bare-except
             self.rewrite_metadata_cache()
 
     def add_watch_dir(self, d):
@@ -261,7 +260,7 @@ class DataDockWidget(TempDockWidget):
             try:
                 obj = builder(path, lambda x, y: None).get_metadata()
                 readable = True
-            except:
+            except: # pylint: disable=bare-except
                 obj = None
                 readable = False
 
@@ -275,7 +274,7 @@ class DataDockWidget(TempDockWidget):
                 # rewrite the cache if there is enough garbage
                 if self.watch_deleted > len(self.metadata_cache):
                     self.rewrite_metadata_cache()
-                f = open(self.metadata_fname, 'at')
+                f = open(self.metadata_fname, 'at', encoding='utf-8')
             f.write(json.dumps(metadata) + '\n')
 
         self.status_msg.emit('')
@@ -465,7 +464,7 @@ class DataDockWidget(TempDockWidget):
             obj = builder(file_name, update_progress)
         except KeyboardInterrupt:
             return # abort load
-        except:
+        except: # pylint: disable=bare-except
             QMessageBox.critical(self, 'Unable to parse',
                                  'Unable to read file.  Please file a bug.',
                                  QMessageBox.Ok)

@@ -9,7 +9,6 @@ from PySide2.QtWidgets import (
     QDialogButtonBox,
     QGridLayout,
     QLabel,
-    QLineEdit,
     QSpinBox,
 )
 
@@ -59,10 +58,9 @@ def update_channel_properties(data_view):
     # set this at the end in case we fail along the way
     data_view.channel_properties = props
 
-def channel_editor(parent, data_view, channel):
+def channel_editor(_parent, data_view, channel):
     try:
         defaults = data_view.channel_defaults[channel]
-        props = data_view.channel_properties[channel]
     except KeyError:
         return # nothing to do, channel doesn't exist right now
 

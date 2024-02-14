@@ -35,7 +35,7 @@ class TimeDistRef:
 
 @dataclass(eq=False)
 class LogRef:
-    log: object # usually data.Distance
+    log: distance.DistanceWrapper
     video_file: typing.Optional[str] = None
     video_alignment: typing.Optional[int] = None
     laps: typing.List['LapRef'] = field(default_factory=list)
@@ -85,7 +85,7 @@ class ChannelProperties:
 class ChannelData(distance.ChannelData):
     color: int
 
-    def __init__(self, parent, prop):
+    def __init__(self, parent, prop): # pylint: disable=super-init-not-called
         self.timecodes = parent.timecodes
         self.distances = parent.distances
         self.values = parent.values
@@ -152,9 +152,6 @@ class DataView:
 
     def offMode2outMode(self, lapref: LapRef, val):
         return self.getTDValue(lapref.start) + self.getTDValue(lapref.offset) + val
-
-    def offMode2outTime(self, lapref: LapRef, val):
-        return self.outMode2Time(lapref, self.offMode2outMode(lapref, val))
 
     def offMode2Dist(self, lapref: LapRef, val):
         return self.offMode2outDist(lapref, val) - lapref.start.dist - lapref.offset.dist

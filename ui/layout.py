@@ -396,12 +396,12 @@ class LayoutManager(QWidget):
         self.saveCurrentTab()
         self.insert_worksheet_like(self.current_sheet)
 
-    def newWorksheet(self, *args):
+    def newWorksheet(self, *_args):
         self.insert_worksheet_like(Worksheet(name='Worksheet',
                                              mode_time=self.data_view.mode_time,
                                              components=[]))
 
-    def newWorkbook(self, *args):
+    def newWorkbook(self, *_args):
         for i in range(1, len(self.workspace) + 2):
             name = 'Workbook %d' % i
             if all(name != wb.name for wb in self.workspace):

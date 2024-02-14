@@ -8,7 +8,7 @@ import urllib.request
 import numpy as np
 
 from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt, Signal
+from PySide2.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
 from PySide2.QtWidgets import (
     QAction,
     QWidget,
@@ -173,7 +173,7 @@ class MapWidget(QWidget):
 
         # track position
         msize = widgets.deviceScale(self, 4)
-        for lap, color, idx in dv.get_laps()[::-1]:
+        for lap, color, _idx in dv.get_laps()[::-1]:
             pen = QtGui.QPen(QtGui.QColor(0, 0, 0))
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)

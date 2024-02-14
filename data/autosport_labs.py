@@ -4,10 +4,6 @@
 from array import array
 import csv
 from dataclasses import dataclass
-import mmap
-import pprint
-import struct
-import sys
 import time
 
 import numpy as np
@@ -48,7 +44,7 @@ def _decode_header(lines):
 class AutosportLabs:
     def __init__(self, fname, progress):
         self.file_name = fname
-        with open(fname, 'rt') as f:
+        with open(fname, 'rt', encoding='utf-8') as f:
             prefetch = 1000 # used to find # decimal places desired
             first_lines = [f.readline() for l in range(prefetch)]
             channels = _decode_header(first_lines)
@@ -56,7 +52,7 @@ class AutosportLabs:
             channels = channels[1:]
             base_timecode = float(first_lines[1].split(',')[0])
             total_len = prefetch + f.read().count(chr(10))
-        with open(fname, 'rt') as f:
+        with open(fname, 'rt', encoding='utf-8') as f:
             f.readline() # skip header
             update_count = 0
             for l in f:

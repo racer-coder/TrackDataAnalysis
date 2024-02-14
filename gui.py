@@ -22,7 +22,6 @@ from PySide2.QtWidgets import (
     QListWidget,
     QMainWindow,
     QMessageBox,
-    QProgressDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -350,7 +349,7 @@ class MainWindow(QMainWindow):
             self.update_title()
 
     def load_workspace(self, file_name):
-        with open(file_name, 'rt') as f:
+        with open(file_name, 'rt', encoding='utf-8') as f:
             ws_data = json.load(f)
         self.layout_mgr.load_state(ws_data['layout'])
         self.data_view.video_alignment = ws_data['videos']
@@ -362,7 +361,7 @@ class MainWindow(QMainWindow):
     def save_workspace(self):
         if not self.workspace_fname: return self.save_as_workspace()
         new_name = self.workspace_fname + '.new'
-        with open(new_name, 'wt') as f:
+        with open(new_name, 'wt', encoding='utf-8') as f:
             json.dump({'layout': self.layout_mgr.save_state(),
                        'videos': self.data_view.video_alignment,
                        'maps_key': self.data_view.maps_key,
@@ -404,7 +403,7 @@ class MainWindow(QMainWindow):
         self.config['main']['geometry'] = bytes(self.saveGeometry()).hex()
         self.config['main']['widgets'] = bytes(self.saveState()).hex()
         new_name = self.config_fname + '.new'
-        with open(new_name, 'wt') as f:
+        with open(new_name, 'wt', encoding='utf-8') as f:
             self.config.write(f)
             f.flush()
             os.fsync(f.fileno())

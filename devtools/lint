@@ -1,0 +1,3 @@
+#!/bin/bash
+~/.local/bin/pylint gui.py data ui
+mypy gui.py

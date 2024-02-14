@@ -9,8 +9,8 @@ import numpy as np
 import pprint
 import struct
 import sys
-import traceback
-from typing import Dict, List, Optional
+import traceback # pylint: disable=unused-import
+from typing import List, Optional
 
 from . import gps
 
@@ -38,10 +38,10 @@ class Group:
     index: int
     channels: List[int]
     samples: bytearray = field(default_factory=bytearray, repr=False)
-    # internal fields:
-    _add_helper: int = 0
-    _row_size: int = 0
-    _last_timecode: int = -1
+    # used during building:
+    add_helper: int = 0
+    row_size: int = 0
+    last_timecode: int = -1
 
 @dataclass(**dc_slots)
 class GroupRef:
@@ -60,7 +60,8 @@ class Channel:
     group: Optional[GroupRef] = None
     timecodes: object = field(default=None, repr=False)
     sampledata: object = field(default=None, repr=False)
-    _last_timecode: int = -1
+    # used during building:
+    last_timecode: int = -1
 
 @dataclass(**dc_slots)
 class Lap:
@@ -89,17 +90,15 @@ def _nullterm_string(s):
     if zero >= 0: s = s[:zero]
     return s.decode('ascii')
 
-def _fast_f16():
-    _f16_mult = [(s * (1 / 2**25) * 2**max(e, 1)) if e != 31 else math.nan
-                 for s in (1, -1)
-                 for e in range(32)]
-    _f16_adder = [((e != 0) - e - s) * 1024
-                  for s in (0, 32)
-                  for e in range(32)]
-
-    return array('f', [(i + _f16_adder[i >> 10]) * _f16_mult[i >> 10]
-                       for i in range(65536)])
-_fast_f16 = _fast_f16()
+_fast_f16 = (lambda
+             _f16_mult = [(s * (1 / 2**25) * 2**max(e, 1)) if e != 31 else math.nan
+                          for s in (1, -1)
+                          for e in range(32)],
+             _f16_adder = [((e != 0) - e - s) * 1024
+                           for s in (0, 32)
+                           for e in range(32)]:
+             array('f', [(i + _f16_adder[i >> 10]) * _f16_mult[i >> 10]
+                         for i in range(65536)]))()
 
 # A couple examples from wikipedia
 assert _fast_f16[0x0000] == 0
@@ -196,11 +195,11 @@ def _decode_sequence(s, progress=None):
                     # print('G of', hdr[1], 'at', '%x' % pos)
                     tc, idx = IH_decoder.unpack_from(s, pos + 1)
                     g = groups[idx]
-                    pos += g._add_helper
+                    pos += g.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    if tc > g._last_timecode:
-                        g.samples += s[pos - g._row_size:pos]
-                        g._last_timecode = tc
+                    if tc > g.last_timecode:
+                        g.samples += s[pos - g.row_size:pos]
+                        g.last_timecode = tc
                     pos += 1
                 elif s[pos] == ord_S:
                     tc, idx = IH_decoder.unpack_from(s, pos + 1)
@@ -208,10 +207,10 @@ def _decode_sequence(s, progress=None):
                     # print(hdr[1], ch)
                     pos += 7 + ch.size
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    if tc > ch._last_timecode:
+                    if tc > ch.last_timecode:
                         ch.timecodes.append(tc)
                         ch.sampledata += s[oldpos+8:pos]
-                        ch._last_timecode = tc
+                        ch.last_timecode = tc
                     pos += 1
                 elif s[pos] == ord_M:
                     pos += 1
@@ -221,10 +220,10 @@ def _decode_sequence(s, progress=None):
                     pos += ch.size * cnt
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     ms = Mms[ch.unknown[64]]
-                    assert tc > ch._last_timecode # Not sure how to handle
+                    assert tc > ch.last_timecode # Not sure how to handle
                     ch.timecodes += array('i', [tc + off for off in range(0, cnt*ms, ms)])
                     ch.sampledata += s[oldpos+10:pos]
-                    ch._last_timecode = tc + cnt * ms - ms
+                    ch.last_timecode = tc + cnt * ms - ms
                     pos += 1
                 else:
                     assert False, "%c at %x" % (s[pos], pos)
@@ -277,10 +276,10 @@ def _decode_sequence(s, progress=None):
 
                             align = max(4, max(channels[ch].size for ch in m.content.channels))
                             assert align == 4 or align == 8 # What else can we do?
-                            m.content._add_helper = 7 + sum(channels[ch].size
+                            m.content.add_helper = 7 + sum(channels[ch].size
                                                             for ch in m.content.channels)
-                            m.content._row_size = (m.content._add_helper + align - 2) & -align
-                            idx = m.content._row_size - (m.content._add_helper - 7)
+                            m.content.row_size = (m.content.add_helper + align - 2) & -align
+                            idx = m.content.row_size - (m.content.add_helper - 7)
                             for ch in m.content.channels:
                                 channels[ch].group = GroupRef(m.content, idx)
                                 idx += channels[ch].size
@@ -337,10 +336,10 @@ def _decode_sequence(s, progress=None):
                 messages.append(Message(tok, l[1], data))
             else:
                 assert False, "%c at %x" % (s[pos], pos)
-        except Exception as err:
+        except Exception as _err: # pylint: disable=broad-exception-caught
             if not badbytes:
                 # traceback.print_exc()
-                badpos = oldpos
+                badpos = oldpos # pylint: disable=unused-variable
             badbytes.append(s[oldpos])
             pos = oldpos + 1
         else:
@@ -360,12 +359,12 @@ def _decode_sequence(s, progress=None):
 
         if c.group:
             idx = c.group.group.channels.index(c.index)
-            tcidx = c.group.group._row_size - c.group.group._add_helper + 1
+            tcidx = c.group.group.row_size - c.group.group.add_helper + 1
             sidx = c.group.offset
             samp = c.group.group.samples
-            c.timecodes = samp[tcidx:len(samp)-(-tcidx&3)].cast('i')[::c.group.group._row_size//4]
+            c.timecodes = samp[tcidx:len(samp)-(-tcidx&3)].cast('i')[::c.group.group.row_size//4]
             samp = samp[sidx:len(samp)-(-sidx & (c.size - 1))]
-            c.sampledata = samp.cast(d.stype)[::c.group.group._row_size//c.size]
+            c.sampledata = samp.cast(d.stype)[::c.group.group.row_size//c.size]
             c.group = None # doesn't matter anymore, we've extracted our data
         else:
             c.sampledata = memoryview(c.sampledata).cast(d.stype)
@@ -406,17 +405,17 @@ class AIMXRK:
         alldata = memoryview(b''.join(m.content for m in gpsmsg))
         assert len(alldata) % 56 == 0
         timecodes = alldata[0:].cast('i')[::56//4]
-        itow_ms = alldata[4:].cast('I')[::56//4]
-        weekN = alldata[12:].cast('H')[::56//2]
+        #itow_ms = alldata[4:].cast('I')[::56//4]
+        #weekN = alldata[12:].cast('H')[::56//2]
         ecefX_cm = alldata[16:].cast('i')[::56//4]
         ecefY_cm = alldata[20:].cast('i')[::56//4]
         ecefZ_cm = alldata[24:].cast('i')[::56//4]
-        posacc_cm = alldata[28:].cast('i')[::56//4]
+        #posacc_cm = alldata[28:].cast('i')[::56//4]
         ecefdX_cms = alldata[32:].cast('i')[::56//4]
         ecefdY_cms = alldata[36:].cast('i')[::56//4]
         ecefdZ_cms = alldata[40:].cast('i')[::56//4]
-        velacc_cms = alldata[44:].cast('i')[::56//4]
-        nsat = alldata[51::56]
+        #velacc_cms = alldata[44:].cast('i')[::56//4]
+        #nsat = alldata[51::56]
 
         timecodes = memoryview(np.subtract(timecodes, self.time_offset))
 

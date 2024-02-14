@@ -26,34 +26,36 @@ Later Milestones:
 . open from db - less forceful column resizing
 . tech debt - reduce boilerplate in file parsers by relying more heavily on distancewrapper
 . tech debt - better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
+. tech debt - commit to using np.array for channel timecodes/values/etc to avoid rewrapping all the time
 . open from db - ability to choose columns to display in results
 . file format - megalogviewer
 . file format - vbox
 . cython or mypyc for aim_xrk?
-. time/dist detect whether should use meter vs feet depending on speed units?
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
-. time/dist - in paintGraph, label channels even if no x_axis
-. values dock - video playback can be choppy when values tab open - consider rendering values in a separate thread
 . widgets - consider qpixmap cache for timedist graph and maps widget
 . values dock - add/remove channel should scroll to keep selection in place?
+. values dock - video playback can be choppy when values tab open - consider rendering values in a separate thread
 . map - work as either dock or component
 . map - save_state/load_state/ComponentManager integration for use as component
 . map - drag map
 . map - zoom map
 . map - go back to orig placement
-. periodic autosave of workspace?
-. allow selection of workspace on startup
-. multiple monitor/window support for workspaces
-. workbook popup menu - new, rename, delete, editor
+. workspace - periodic autosave of workspace?
+. workspace - allow selection of workspace on startup
+. workspace - multiple monitor/window support for workspaces
+. workspace - workbook popup menu - new, rename, delete, editor
 . component widget - optional title bar
 . component widget - make resize a little sticky when butting up against other components
 . component widget - handle device scaling properly - proximity for mouse based resize
 . component widget - click to drag only in upper left corner?
 . component widget - maybe ctrl click or alt click to move/resize?
+. component widget - maximize option
 . keyboard shortcut for workspace selection
 . keyboard shortcut ESC for closing floating dock widget
 . keyboard shortcut for bringing up channels dock widget
+. time/dist - in paintGraph, label channels even if no x_axis
+. time/dist detect whether should use meter vs feet depending on speed units?
 . time/distance widget - vertical zoom bar to easily adjust range on the fly
 . time/distance widget - resizable groups
 . bar graph widget - title!
@@ -62,8 +64,6 @@ Later Milestones:
 . bar graph widget - 2 graphs when comparing laps
 . playback button with variable replay rate
 . link g4+ - file reader
-. layout dock widget? or skip in favor of dialog box
-. video keyboard shortcuts for frame by frame, arrow keys for second/5s/10s?
-. video change overall playback speed (good for machines that have a hard time playing two streams)
-. video ability to disable either video for performance
-. component widget - maximize option
+. video - keyboard shortcuts for frame by frame, arrow keys for second/5s/10s?
+. video - change overall playback speed (good for machines that have a hard time playing two streams)
+. video - ability to disable either video for performance

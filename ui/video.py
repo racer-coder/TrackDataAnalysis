@@ -36,7 +36,7 @@ class GetProcAddressGetter:
         self.surface.create()
 
         if not glfw.init():
-            raise 'Cannot initialize OpenGL'
+            raise AssertionError('Cannot initialize OpenGL')
 
         glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
         window = glfw.create_window(1, 1, "tda-OpenGL", None, None)
@@ -266,9 +266,9 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         font.setPixelSize(widgets.deviceScale(self, 11.25))
         return font
 
-    def wheelEvent(self, ev):
-        self.zoom_window *= 2 ** (ev.angleDelta().y() / 540)
-        ev.accept()
+    def wheelEvent(self, event):
+        self.zoom_window *= 2 ** (event.angleDelta().y() / 540)
+        event.accept()
         self.update()
 
     def paintEvent(self, event):

@@ -261,7 +261,7 @@ class LapWidget(MouseHelperWidget):
                 self.dataView.values_change.emit()
                 break
 
-    def getFont(self, big):
+    def getFont(self):
         font = QtGui.QFont('Tahoma')
         font.setPixelSize(deviceScale(self, 11.25))
         return font
@@ -276,16 +276,15 @@ class LapWidget(MouseHelperWidget):
         return round(self.dataView.outTime2Mode(self.dataView.ref_lap, time) * self.scale)
 
     def sizeHint(self):
-        fontMetrics = QtGui.QFontMetrics(self.getFont(False))
+        fontMetrics = QtGui.QFontMetrics(self.getFont())
         return QSize(200, 3 * fontMetrics.height() / self.devicePixelRatioF() + 2)
 
     def paintEvent(self, e):
         ph = makePaintHelper(self, e)
-        font = self.getFont(False)
-        bigfont = self.getFont(True)
+        font = self.getFont()
         metrics = QtGui.QFontMetrics(font)
         fh = metrics.height()
-        icon_width = QtGui.QFontMetrics(bigfont).horizontalAdvance(chr(0x278a))
+        icon_width = metrics.horizontalAdvance(chr(0x278a))
         pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
         ph.painter.setPen(pen)
 
@@ -302,7 +301,7 @@ class LapWidget(MouseHelperWidget):
             lapx = 4
             for pos, (l, c, idx) in enumerate(self.dataView.get_laps()):
                 y = (pos & 1) * fh
-                ph.painter.setFont(bigfont)
+                ph.painter.setFont(font)
                 ph.painter.setPen(c)
                 ph.painter.drawText(lapx, y, ph.size.width(), fh,
                                     Qt.AlignTop | Qt.AlignLeft, chr(0x2789 + idx))

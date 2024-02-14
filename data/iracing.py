@@ -6,7 +6,6 @@
 from dataclasses import dataclass
 import mmap
 import struct
-import sys
 import time
 
 import numpy as np
@@ -42,9 +41,9 @@ _types = [(1, 'c'),
           (8, 'd')]
 
 def _decode_var(m, offs, timecodes, samples, nrecords, stride):
-    rtype, offset, count, count_as_time = struct.unpack_from('<3ib', m, offs)
+    rtype, offset, _count, _count_as_time = struct.unpack_from('<3ib', m, offs)
     name = _dec_str(m, offs + 16, 32)
-    desc = _dec_str(m, offs + 48, 112 - 48)
+    #desc = _dec_str(m, offs + 48, 112 - 48)
     unit = _dec_str(m, offs + 112, 32)
     data = np.concatenate([np.array(samples[offset + i::stride]).reshape((nrecords, 1))
                            for i in range(_types[rtype][0])],
@@ -57,24 +56,25 @@ def _decode_var(m, offs, timecodes, samples, nrecords, stride):
     return Channel(timecodes, data, name, unit, 2 if rtype >= 4 else 0)
 
 def _decode(m):
-    (version, status, tick_rate, session_info_update, session_info_length, session_info_offset,
+    (_version, _status, tick_rate, _session_info_update, session_info_length, session_info_offset,
      num_vars, var_header_offset, num_buf, buf_len, buf_offset) = \
          struct.unpack_from('<10i12xi', m, 0)
     # not sure what to do with half these fields
     if num_buf != 1: print("Don't understand multiple buffers")
 
-    utc, start_time, end_time, lap_count, record_count = \
+    utc, _start_time, _end_time, _lap_count, record_count = \
         struct.unpack_from('<I4xddii', m, 112)
     tm = time.localtime(utc)
 
     timecodes = (np.arange(record_count) * (1000 / tick_rate)).data
     samples = m[buf_offset : buf_offset+buf_len*record_count]
-    vars = [_decode_var(m, var_header_offset + i * 144, timecodes, samples, record_count, buf_len)
-            for i in range(num_vars)]
+    channels = [_decode_var(m, var_header_offset + i * 144, timecodes, samples,
+                            record_count, buf_len)
+                for i in range(num_vars)]
 
     idata = yaml.safe_load(m[session_info_offset : session_info_offset+session_info_length].tobytes())
 
-    return ({v.name: v for v in vars},
+    return ({v.name: v for v in channels},
             {'Log Date': '%02d/%02d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year), # Yes I'm American
              'Log Time': '%02d:%02d:%02d' % (tm.tm_hour, tm.tm_min, tm.tm_sec),
              'Driver': [d['UserName'] for d in idata['DriverInfo']['Drivers']

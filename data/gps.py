@@ -23,7 +23,7 @@ import numpy as np
 # Systems, 32 (1996) 473-476.
 # difficult to vectorize (poor for numpy/python)
 
-gps_type = namedtuple('GPS', ['lat', 'long', 'alt'])
+GPS = namedtuple('GPS', ['lat', 'long', 'alt'])
 
 # convert lat/long/zoom to web mercator.  lat/long are degrees
 # returns x,y as floats - integer component is which tile to download
@@ -117,10 +117,10 @@ def ecef2lla_osen(x, y, z):
     wv = w * v
     # compute altitude
     invuv = 1 / (u * v)
-    return gps_type(np.arctan2(zu, wv) * (180/np.pi),
-                    np.arctan2(y, x) * (180/np.pi),
-                    np.sqrt(np.square(w - wv * invuv) +
-                            np.square(z - zu * p1mee * invuv)) * (1 - 2 * (u < 1)))
+    return GPS(np.arctan2(zu, wv) * (180/np.pi),
+               np.arctan2(y, x) * (180/np.pi),
+               np.sqrt(np.square(w - wv * invuv) +
+                       np.square(z - zu * p1mee * invuv)) * (1 - 2 * (u < 1)))
 
 
 # https://www.researchgate.net/publication/227215135_Transformation_from_Cartesian_to_Geodetic_Coordinates_Accelerated_by_Halley's_Method/link/0912f50af90e6de252000000/download
@@ -133,9 +133,9 @@ def ecef2lla_fukushima2006(x, y, z):
     e2 = (2-f) * f
     ec2 = 1 - e2
     ec = np.sqrt(ec2)
-    b = a * ec
+    #b = a * ec
     c = a * e2
-    PIH = 2 * np.arctan(1.)
+    #PIH = 2 * np.arctan(1.)
 
     lamb = np.arctan2(y, x)
     s0 = np.abs(z)
@@ -191,7 +191,7 @@ def ecef2lla_fukushima2006(x, y, z):
     cc2 = None
     phi = np.copysign(phi, z)
 
-    return gps_type(phi * (180/np.pi), lamb * (180/np.pi), h)
+    return GPS(phi * (180/np.pi), lamb * (180/np.pi), h)
 
 # Computing geodetic coordinates from geocentric coordinates
 # H. Vermeille, 2003/2004
@@ -217,40 +217,42 @@ def ecef2lla_vermeille2003(x, y, z):
     k = np.sqrt(u+w*w) - w
     D = k * np.sqrt(x*x + y*y) / (k + e**2)
     rtDDzz = np.sqrt(D*D + z*z)
-    return gps_type((180/np.pi) * 2 * np.arctan2(z, D + rtDDzz),
-                    (180/np.pi) * np.arctan2(y, x),
-                    (k + e**2 - 1) / k * rtDDzz)
+    return GPS((180/np.pi) * 2 * np.arctan2(z, D + rtDDzz),
+               (180/np.pi) * np.arctan2(y, x),
+               (k + e**2 - 1) / k * rtDDzz)
 
 
 ecef2lla = ecef2lla_vermeille2003
 
 if __name__ == '__main__':
-    import time
-    samples = 10000000
-    lat  = -90. + 180.*np.random.rand(samples, 1)
-    long = -180. + 360.*np.random.rand(samples, 1)
-    alt  = -11e3 + (20e3)*np.random.rand(samples, 1) # From approximately the bottom of the Mariana trench, to the top of the Everest
+    def perf_test():
+        import time
+        samples = 10000000
+        lat  = -90. + 180.*np.random.rand(samples, 1)
+        long = -180. + 360.*np.random.rand(samples, 1)
+        alt  = -11e3 + (20e3)*np.random.rand(samples, 1) # From approximately the bottom of the Mariana trench, to the top of the Everest
 
-    print("generating x,y,z")
-    x, y, z = lla2ecef(lat, long, alt)
-    algos = [('osen', ecef2lla_osen),
-             ('fukushima2006', ecef2lla_fukushima2006),
-             ('vermeille2003', ecef2lla_vermeille2003)]
-    stats = {name:[] for name, algo in algos}
-    for repeat in range(5):
-        for name, algo in algos:
-            start = time.time()
-            ilat, ilong, ialt = algo(x, y, z)
-            duration = time.time() - start
-            stats[name].append(duration)
-            print("algorithm %s took %.3f" % (name, duration))
-            print('  avg',
-                  np.sqrt(np.sum((ilat-lat) ** 2)) / len(ilat),
-                  np.sqrt(np.sum((ilong-long) ** 2)) / len(ilong),
-                  np.sqrt(np.sum((ialt-alt) ** 2)) / len(ialt))
-            print('  max',
-                  np.max(np.abs(ilat-lat)),
-                  np.max(np.abs(ilong-long)),
-                  np.max(np.abs(ialt-alt)))
-    for name, stat in stats.items():
-        print(name, ', '.join(['%.3f' % s for s in stat]))
+        print("generating x,y,z")
+        x, y, z = lla2ecef(lat, long, alt)
+        algos = [('osen', ecef2lla_osen),
+                 ('fukushima2006', ecef2lla_fukushima2006),
+                 ('vermeille2003', ecef2lla_vermeille2003)]
+        stats = {name:[] for name, algo in algos}
+        for _ in range(5):
+            for name, algo in algos:
+                start = time.time()
+                ilat, ilong, ialt = algo(x, y, z)
+                duration = time.time() - start
+                stats[name].append(duration)
+                print("algorithm %s took %.3f" % (name, duration))
+                print('  avg',
+                      np.sqrt(np.sum((ilat-lat) ** 2)) / len(ilat),
+                      np.sqrt(np.sum((ilong-long) ** 2)) / len(ilong),
+                      np.sqrt(np.sum((ialt-alt) ** 2)) / len(ialt))
+                print('  max',
+                      np.max(np.abs(ilat-lat)),
+                      np.max(np.abs(ilong-long)),
+                      np.max(np.abs(ialt-alt)))
+        for name, stat in stats.items():
+            print(name, ', '.join(['%.3f' % s for s in stat]))
+    perf_test()

@@ -11,9 +11,9 @@ from . import unitconv
 
 @dataclass
 class ChannelData:
-    timecodes: object
-    distances: object
-    values: object
+    timecodes: memoryview
+    distances: memoryview
+    values: memoryview
     units: str
     dec_pts: int
     min: float
@@ -138,9 +138,9 @@ class DistanceWrapper:
 
 
 def unify_lap_distance(logs: typing.List[DistanceWrapper]):
-    lens = list(filter(bool, [dw._calc_time_dist()[2] for dw in logs]))
+    lens = list(filter(bool, [dw._calc_time_dist()[2] for dw in logs])) # pylint: disable=protected-access
     if not lens: return # what are we supposed to do here?
     expected_len = np.mean(lens).item()
     for dw in logs:
-        dw._update_time_dist(expected_len)
+        dw._update_time_dist(expected_len) # pylint: disable=protected-access
 

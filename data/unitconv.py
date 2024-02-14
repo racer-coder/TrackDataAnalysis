@@ -18,7 +18,7 @@ class Unit:
     scale: float = 1 # X base units = Y this_units.  Y = X * scale + offset
     offset: float = 0 #                              X = (Y - offset) / scale
     aliases: list[str] = field(default_factory=list)
-    display: str = None # usually symbol unless special unicode characters
+    display: str = '' # usually symbol unless special unicode characters
 
 
 @dataclass
@@ -93,10 +93,10 @@ def convert(values, from_unit, to_unit):
     return (np.subtract(values, old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
             + new_unit[1].offset)
 
-def check_units(unit):
+def check_units(_unit):
     return # disable check for now
-    if unit and unit not in unit_map:
-        print("Found unit", unit)
+    #if unit and unit not in unit_map:
+    #    print("Found unit", unit)
 
 def display_text(unit):
     try:

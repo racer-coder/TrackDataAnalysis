@@ -151,10 +151,10 @@ class TimeDist(widgets.MouseHelperWidget):
         self.dataView.values_change.emit()
 
     def rightDrag(self, rel_pos, abs_pos, saved_state):
-        range = self.dataView.getLapValue(self.dataView.ref_lap)
+        span = self.dataView.getLapValue(self.dataView.ref_lap)
         self.dataView.zoom_window = (
             self.dataView.zoom_window[0],
-            self.dataView.makeTD(self.x_axis.invert(abs_pos.x()) - (range[1] - range[0]), True))
+            self.dataView.makeTD(self.x_axis.invert(abs_pos.x()) - (span[1] - span[0]), True))
         self.dataView.values_change.emit()
 
     def offsetCapture(self, absPos):
@@ -246,7 +246,7 @@ class TimeDist(widgets.MouseHelperWidget):
     def calc_time_slip(self, laps, var):
         target_window = self.dataView.lapTime2Mode(self.dataView.ref_lap,
                                                    self.dataView.ref_lap.duration())
-        for lapref, color, _ in laps:
+        for lapref, _color, _ in laps:
             start_idx = max(0,
                             bisect.bisect_left(lapref.log.log.dist_map_time,
                                                self.dataView.offMode2outTime(lapref, 0)) - 1)
@@ -473,9 +473,9 @@ class TimeDist(widgets.MouseHelperWidget):
                 graph_idx=(graph_idx+1, True)))
 
         # draw Y axis
-        self.paintYAxis(ph, y_offset, height, y_axis, dmin, dmax)
+        self.paintYAxis(ph, y_offset, height, y_axis)
 
-    def paintYAxis(self, ph, y_offset, height, y_axis, dmin, dmax):
+    def paintYAxis(self, ph, y_offset, height, y_axis):
         if self.graph_x < ph.rect.left():
             return # nothing to do
 

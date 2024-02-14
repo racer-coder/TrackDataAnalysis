@@ -24,7 +24,7 @@ from PySide2.QtWidgets import (
 
 from data import unitconv
 from . import channels
-from . import map
+from . import map # pylint: disable=redefined-builtin
 from . import state
 from . import widgets
 
@@ -35,7 +35,7 @@ class FastTableModel(QAbstractTableModel):
         self.row_count = 0
         self.col_count = 0
 
-    def set_data(self, heading, nrows):
+    def set_model_param(self, heading, nrows):
         self.heading = heading
         self.row_count = nrows
         self.col_count = len(heading)
@@ -222,7 +222,7 @@ class ChannelsDockWidget(TempDockWidget):
 
 @dataclass
 class ValuesTableSection:
-    model: object
+    model: 'ValuesTableModel'
     icon: object
     name: object
     units: object
@@ -238,7 +238,7 @@ class ValuesTableSection:
 @dataclass
 class ValuesTableChannel:
     model: 'ValuesTableModel'
-    data_view: object
+    data_view: state.DataView
     channel: str
     dec_pts: int
 
@@ -290,13 +290,13 @@ class ValuesTableFunc(ValuesTableChannel):
     def _calc(self, lap): return self.func(lap[0])
 
 class ValuesTableFuncTime(ValuesTableFunc):
-    def _format(self, ms):
-        return '%d:%06.3f' % (math.copysign(math.trunc(ms / 60000), ms),
-                              abs(ms) % 60000 / 1000)
+    def _format(self, v):
+        return '%d:%06.3f' % (math.copysign(math.trunc(v / 60000), v),
+                              abs(v) % 60000 / 1000)
 
-    def _format_delta(self, ms):
-        return '%+.f:%06.3f' % (math.copysign(math.trunc(ms / 60000), ms),
-                               abs(ms) % 60000 / 1000)
+    def _format_delta(self, v):
+        return '%+d:%06.3f' % (math.copysign(math.trunc(v / 60000), v),
+                               abs(v) % 60000 / 1000)
 
 class ValuesTableModel(FastTableModel):
     def __init__(self, data_view):
@@ -321,7 +321,7 @@ class ValuesTableModel(FastTableModel):
         self.laps = laps
         self.delta_idx = delta_idx
         self.update_cursor()
-        super().set_data(heading, len(rows))
+        self.set_model_param(heading, len(rows))
 
     def update_cursor(self):
         self.laps = [(l, float(self.data_view.cursor2outTime(l))) for l, old_time in self.laps]

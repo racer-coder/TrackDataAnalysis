@@ -47,9 +47,9 @@ def _dec_str(s, offs, maxlen):
         s = s[:idx]
     return s.decode('ascii')
 
-def _set_if(meta, name, val, format=None):
+def _set_if(meta, name, val, formatter=None):
     if val:
-        meta[name] = format % val if format else val
+        meta[name] = formatter % val if formatter else val
 
 def _decode_channel(s, addr):
     (data_addr, data_count, elem_type, elem_size, sample_rate,
@@ -118,7 +118,7 @@ def _decode(s):
 
     channels = {}
     addr = channel_meta_addr
-    for i in range(num_channels):
+    for _ in range(num_channels):
         ch = _decode_channel(s, addr)
         channels[ch.name] = ch
         addr = _dec_u32(s, addr+4)
