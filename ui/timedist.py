@@ -377,10 +377,12 @@ class TimeDist(widgets.MouseHelperWidget):
             ph.painter.setPen(pen)
 
             if graph_idx == self.current_channel[0] and ch == self.current_channel[1]:
-                ph.painter.drawText(self.graph_x + 6, y, 200, 50,
+                ph.painter.drawText(self.graph_x + 6, y,
+                                    self.channel_ind_width, fontMetrics.height(),
                                     Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                     '\u25aa')
-            ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width, y, 200, 50,
+            ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width, y,
+                                self.channel_name_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 self.channelName(ch, d.units))
             if ch != 'Time Slip':
@@ -400,7 +402,8 @@ class TimeDist(widgets.MouseHelperWidget):
             # interpolate between start_idx and start_idx+1?
             main_val = d.values[start_idx]
             self.cursor_values.append(y_axis.calc(main_val))
-            ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y, 200, 50,
+            ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y,
+                                self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '%.*f' % (d.dec_pts, main_val))
 
@@ -417,11 +420,11 @@ class TimeDist(widgets.MouseHelperWidget):
                     self.dataView.offMode2outMode(
                         lap, zoomsize + self.dataView.getTDValue(self.dataView.zoom_window[0])))]
             ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax + 6,
-                                y, 200, 50,
+                                y, self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '\u25bc' + (' %.*f' % (d.dec_pts, np.min(drange)) if len(drange) else ''))
             ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax / 2 + 6,
-                                y, 200, 50,
+                                y, self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '\u25b2' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
             if not self.dataView.alt_lap or ch == 'Time Slip': continue
@@ -435,12 +438,14 @@ class TimeDist(widgets.MouseHelperWidget):
             ph.painter.setPen(pen2)
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width,
-                                y, 200, 50, Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                y, self.channel_value_width, fontMetrics.height(),
+                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '%.*f' % (d.dec_pts, d2.values[start_idx]))
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width
                                 + self.channel_opt_width / 2,
-                                y, 200, 50, Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                y, self.channel_value_width, fontMetrics.height(),
+                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '\u0394 %.*f' % (d.dec_pts, d2.values[start_idx] - main_val))
             drange = d.values[
                 bisect.bisect_left(
@@ -455,11 +460,11 @@ class TimeDist(widgets.MouseHelperWidget):
                         zoomsize + self.dataView.getTDValue(self.dataView.zoom_window[0])))]
             if len(drange):
                 ph.painter.drawText(ph.size.width() - self.channel_minmax_width * 3 + 6,
-                                    y, 200, 50,
+                                    y, self.channel_value_width, fontMetrics.height(),
                                     Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                     '%.*f' % (d.dec_pts, np.min(drange)))
                 ph.painter.drawText(ph.size.width() - self.channel_minmax_width + 6,
-                                    y, 200, 50,
+                                    y, self.channel_value_width, fontMetrics.height(),
                                     Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                     '%.*f' % (d.dec_pts, np.max(drange)))
 
@@ -552,7 +557,7 @@ class TimeDist(widgets.MouseHelperWidget):
         self.graph_x = 50 * ph.scale
         self.graph_max = ph.size.width()
         channel_font_metrics = QtGui.QFontMetrics(self.selectFont('channel'))
-        M_space = channel_font_metrics.horizontalAdvance('M')
+        M_space = channel_font_metrics.horizontalAdvance('\u25bc ')
         self.channel_name_width = max(
             [channel_font_metrics.horizontalAdvance(self.channelName(ch)) + 2 * M_space
              for grp in self.channelGroups
