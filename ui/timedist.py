@@ -730,9 +730,14 @@ class TimeDist(widgets.MouseHelperWidget):
                                         x + self.CURSOR_WIDTH - 1, val)
 
         # update mouse helper boundaries
-        self.cursorClick.geometry.setCoords(self.graph_x, 0, ph.size.width(), y_div)
-        self.xaxisClick.geometry.setRect(0, y_div, ph.size.width(), 16 * ph.scale)
-        self.offsetClick.geometry.setCoords(0, y_div + 16 * ph.scale, ph.size.width(), ph.size.height())
+        if self.x_axis:
+            self.cursorClick.geometry.setCoords(self.graph_x, 0, ph.size.width(), y_div)
+            self.xaxisClick.geometry.setRect(0, y_div, ph.size.width(), 16 * ph.scale)
+            self.offsetClick.geometry.setCoords(0, y_div + 16 * ph.scale, ph.size.width(), ph.size.height())
+        else:
+            self.cursorClick.geometry.setRect(0, 0, 0, 0)
+            self.xaxisClick.geometry.setRect(0, 0, 0, 0)
+            self.offsetClick.geometry.setRect(0, 0, 0, 0)
         self.lookupCursor()
 
     def tryRemoveChannel(self, ch):
