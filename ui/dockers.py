@@ -409,7 +409,7 @@ class ValuesDockWidget(TempDockWidget):
                 menu.addSeparator()
                 act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
                 act.triggered.connect(lambda: ac.addChannel(ch))
-            menu.exec_(self.mapToGlobal(pos))
+            menu.exec_(self.table.mapToGlobal(pos))
 
     def activate_cell(self, index):
         ac = self.mainwindow.data_view.active_component

@@ -142,6 +142,8 @@ class DataDockWidget(TempDockWidget):
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.setEditTriggers(self.table.NoEditTriggers)
         self.table.pressed.connect(self.clickCell)
+        self.table.customContextMenuRequested.connect(self.context_menu)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
 
         pal = self.table.palette()
         pal.setColor(pal.Base, QtGui.QColor(0, 0, 0))
@@ -480,21 +482,75 @@ class DataDockWidget(TempDockWidget):
             for logref in self.data_view.log_files:
                 logref.update_laps()
             # this sucks but we've lost our mapping to the original laps
-            self.data_view.alt_lap = None
-            self.data_view.extra_laps = []
+            self.data_view.ref_lap = self.update_lap_ref(self.data_view.ref_lap)
+            self.data_view.alt_lap = self.update_lap_ref(self.data_view.alt_lap)
+            self.data_view.extra_laps = [
+                (self.update_lap_ref(lap), color)
+                for lap, color in self.data_view.extra_laps]
+        else:
+            laps = logref.laps
+            best_lap = min(laps[1:-1] if len(laps) >= 3 else laps,
+                           key=lambda x: x.duration(),
+                           default=None)
+            self.data_view.ref_lap = best_lap
 
         channels.update_channel_properties(self.data_view)
 
-        laps = logref.laps
-        if not laps:
-            best_lap = None
-        else:
-            best_lap = min(laps[1:-1] if len(laps) >= 3 else laps,
-                           key=lambda x: x.duration())
-        self.data_view.ref_lap = best_lap
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
         self.config['main']['last_open_dir'] = os.path.dirname(file_name)
+
+    def update_lap_ref(self, lap):
+        return [l for l in lap.log.laps if l.num == lap.num][0] if lap else None
+
+    def close_all_logs(self):
+        self.data_view.ref_lap = None
+        self.data_view.alt_lap = None
+        self.data_view.extra_laps = []
+        self.data_view.cursor_time = state.TimeDistRef(0, 0)
+        self.data_view.zoom_window = (state.TimeDistRef(0, 0),
+                                      state.TimeDistRef(0, 0))
+        self.data_view.log_files = []
+        self.data_view.values_change.emit()
+        self.data_view.data_change.emit()
+        print('close all')
+
+    def close_one_log(self, log):
+        self.data_view.log_files.remove(log)
+        if not self.data_view.log_files:
+            self.close_all_logs()
+            return
+        if self.data_view.ref_lap and self.data_view.ref_lap.log == log:
+            self.data_view.ref_lap = None
+        if self.data_view.alt_lap and self.data_view.alt_lap.log == log:
+            self.data_view.alt_lap = None
+        self.data_view.extra_laps = [(l, c) for l, c in self.data_view.extra_laps
+                                     if l.log != log]
+        if not self.data_view.ref_lap:
+            if self.data_view.alt_lap:
+                self.data_view.ref_lap = self.data_view.alt_lap
+                self.data_view.alt_lap = None
+            else:
+                self.data_view.ref_lap = min(
+                    [lap
+                     for log in self.data_view.log_files
+                     for lap in (log.laps[1:-1] if len(log.laps) >= 3
+                                 else log.laps)],
+                    key=lambda x: x.duration(),
+                    default=None)
+        self.data_view.values_change.emit()
+        self.data_view.data_change.emit()
+
+    def context_menu(self, pos):
+        lap = self.model.laps[self.table.indexAt(pos).row()].lap
+        if lap:
+            menu = QMenu()
+            menu.addAction('Open from db...').triggered.connect(self.open_from_db)
+            menu.addAction('Open from file...').triggered.connect(self.open_from_file)
+            menu.addAction('Close all log files').triggered.connect(self.close_all_logs)
+            (menu.addAction('Close log "%s"' % os.path.basename(lap.log.log.get_filename()))
+             .triggered.connect(lambda: self.close_one_log(lap.log)))
+            menu.exec_(self.table.mapToGlobal(pos))
 
     def clickCell(self, index):
         row = index.row()

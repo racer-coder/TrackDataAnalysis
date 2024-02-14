@@ -150,6 +150,7 @@ class MainWindow(QMainWindow):
 
         file_menu.addAction('Open from db...').triggered.connect(self.datamgr.open_from_db)
         file_menu.addAction('Open from file...').triggered.connect(self.datamgr.open_from_file)
+        file_menu.addAction('Close all log files').triggered.connect(self.datamgr.close_all_logs)
         file_menu.addSeparator()
         file_menu.addAction('New Workspace').triggered.connect(self.new_workspace)
         file_menu.addAction('Open Workspace...').triggered.connect(self.open_workspace)

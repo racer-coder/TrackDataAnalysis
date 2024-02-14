@@ -28,9 +28,6 @@ Later Milestones:
 . open from db - ability to choose columns to display in results
 . file format - megalogviewer
 . file format - vbox
-. data - close individual log file
-. data - close all log files?
-. data - opening new log file should not reset laps
 . cython or mypyc for aim_xrk?
 . time/dist detect whether should use meter vs feet depending on speed units?
 . motec / non-gps - construct map from G-forces
