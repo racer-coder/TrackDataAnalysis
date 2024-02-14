@@ -391,11 +391,10 @@ class AIMXRK:
         # determine time offset
         self.time_offset = 0
         laps = self.get_laps()
-        if laps:
-            self.time_offset = laps[0].start_time
-            for ch in self.data.channels:
-                ch.timecodes = memoryview(np.subtract(ch.timecodes,
-                                                      self.time_offset))
+        self.time_offset = min([ch.timecodes[0] for ch in self.data.channels if len(ch.timecodes)] +
+                               ([laps[0].start_time] if laps else []))
+        for ch in self.data.channels:
+            ch.timecodes = memoryview(np.subtract(ch.timecodes, self.time_offset))
         # decode GPS data.  Do this after determining time offset
         # since we have to fudge the data to get higher resolution
         self.decode_gps()
