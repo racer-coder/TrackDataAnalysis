@@ -237,26 +237,26 @@ class ComponentBase(QWidget):
         ph.painter.setPen(pen)
         ph.painter.drawRect(rect)
 
-    def keyPressEvent(self, e: QtGui.QKeyEvent):
-        if not self.m_isEditing: return
-        if e.key() == Qt.Key_Delete:
-            self.deleteLater()
-        # Moving container with arrows
-        elif QApplication.keyboardModifiers() == Qt.ControlModifier:
-            if   e.key() == Qt.Key_Up:    self.move(self.x(),     self.y() - 1)
-            elif e.key() == Qt.Key_Down:  self.move(self.x(),     self.y() + 1)
-            elif e.key() == Qt.Key_Left:  self.move(self.x() - 1, self.y())
-            elif e.key() == Qt.Key_Right: self.move(self.x() + 1, self.y())
-            else: return
-        elif QApplication.keyboardModifiers() == Qt.ShiftModifier:
-            if   e.key() == Qt.Key_Up:    self.resize(self.width(),     self.height() - 1)
-            elif e.key() == Qt.Key_Down:  self.resize(self.width(),     self.height() + 1)
-            elif e.key() == Qt.Key_Left:  self.resize(self.width() - 1, self.height())
-            elif e.key() == Qt.Key_Right: self.resize(self.width() + 1, self.height())
-            else: return
-        else:
-            return
-        self.saveGeometry()
+    #def keyPressEvent(self, e: QtGui.QKeyEvent):
+    #    if not self.m_isEditing: return
+    #    if e.key() == Qt.Key_Delete:
+    #        self.deleteLater()
+    #    # Moving container with arrows
+    #    elif QApplication.keyboardModifiers() == Qt.ControlModifier:
+    #        if   e.key() == Qt.Key_Up:    self.move(self.x(),     self.y() - 1)
+    #        elif e.key() == Qt.Key_Down:  self.move(self.x(),     self.y() + 1)
+    #        elif e.key() == Qt.Key_Left:  self.move(self.x() - 1, self.y())
+    #        elif e.key() == Qt.Key_Right: self.move(self.x() + 1, self.y())
+    #        else: return
+    #    elif QApplication.keyboardModifiers() == Qt.ShiftModifier:
+    #        if   e.key() == Qt.Key_Up:    self.resize(self.width(),     self.height() - 1)
+    #        elif e.key() == Qt.Key_Down:  self.resize(self.width(),     self.height() + 1)
+    #        elif e.key() == Qt.Key_Left:  self.resize(self.width() - 1, self.height())
+    #        elif e.key() == Qt.Key_Right: self.resize(self.width() + 1, self.height())
+    #        else: return
+    #    else:
+    #        return
+    #    self.saveGeometry()
 
     def setCursorShape(self, e_pos: QPoint):
         diff = 4
