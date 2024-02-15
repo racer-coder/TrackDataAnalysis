@@ -79,20 +79,22 @@ class LapRef:
 class ChannelProperties:
     units : str
     dec_pts : int
+    interpolate: bool
     color : int # index into color array
 
 @dataclass(eq=False)
 class ChannelData(distance.ChannelData):
     color: int
 
-    def __init__(self, parent, prop): # pylint: disable=super-init-not-called
-        self.timecodes = parent.timecodes
-        self.distances = parent.distances
-        self.values = parent.values
-        self.units = parent.units
-        self.dec_pts = prop.dec_pts
-        self.min = parent.min
-        self.max = parent.max
+    def __init__(self, parent, prop):
+        super().__init__(parent.timecodes,
+                         parent.distances,
+                         parent.values,
+                         parent.units,
+                         prop.dec_pts,
+                         prop.interpolate,
+                         parent.min,
+                         parent.max)
         self.color = prop.color
 
 @dataclass(eq=False)
@@ -206,7 +208,7 @@ class DataView:
         if ch in self.channel_properties:
             return self.channel_properties[ch]
         else:
-            return ChannelProperties(units='', dec_pts=0, color=0)
+            return ChannelProperties(units='', dec_pts=0, interpolate=True, color=0)
 
     def get_channel_data(self, ref, ch): # ref is LogRef or LapRef
         props = self.get_channel_prop(ch)

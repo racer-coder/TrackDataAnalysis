@@ -37,10 +37,11 @@ def update_channel_properties(data_view):
                 if ch in data_view.channel_defaults:
                     prop = data_view.channel_defaults[ch]
                 else:
-                    prop = state.ChannelProperties(None, None, cidx & 7) # XXX color?
+                    prop = state.ChannelProperties(None, None, None, cidx & 7) # XXX color?
                 metadata = log.log.get_channel_metadata(ch)
                 prop.units = metadata['units']
                 prop.dec_pts = metadata['dec_pts']
+                prop.interpolate = metadata['interpolate']
                 props[ch] = prop
                 cidx += 1
 
@@ -50,9 +51,11 @@ def update_channel_properties(data_view):
     for ch, override in data_view.channel_overrides.items():
         if ch in props:
             p = props[ch]
-            p = state.ChannelProperties(p.units, p.dec_pts, p.color) # copy to leave defaults intact
+            p = state.ChannelProperties(p.units, p.dec_pts, p.interpolate,
+                                        p.color) # copy to leave defaults intact
             p.units = override.get('units', p.units)
             p.dec_pts = override.get('dec_pts', p.dec_pts)
+            p.interpolate = override.get('interpolate', p.interpolate)
             p.color = override.get('color', p.color)
             props[ch] = p
 
@@ -89,6 +92,14 @@ def channel_editor(_parent, data_view, channel):
     dplace_spin.setMaximum(10)
     dplace_spin.setValue(overrides.get('dec_pts', -1))
     adder('Decimal places', dplace_spin)
+
+    interp_combo = QComboBox()
+    interp_combo.addItem('default: %s' % ['previous value', 'interpolate'][defaults.interpolate],
+                         None)
+    interp_combo.addItem('interpolate', True)
+    interp_combo.addItem('previous value', False)
+    interp_combo.setCurrentIndex({None: 0, True: 1, False: 2}[overrides.get('interpolate', None)])
+    adder('Upsampling', interp_combo)
 
     color_combo = QComboBox()
     color_combo.setIconSize(QSize(60, 6))
@@ -130,6 +141,12 @@ def channel_editor(_parent, data_view, channel):
             overrides['dec_pts'] = dec_pts
         elif 'dec_pts' in overrides:
             del overrides['dec_pts']
+
+        interpolate = interp_combo.currentData()
+        if interpolate is not None:
+            overrides['interpolate'] = interpolate
+        elif 'interpolate' in overrides:
+            del overrides['interpolate']
 
         color = color_combo.currentData()
         if color is not None:

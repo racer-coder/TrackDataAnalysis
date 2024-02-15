@@ -9,32 +9,31 @@ import numpy as np
 
 from . import unitconv
 
-@dataclass
+@dataclass(eq=False)
 class ChannelData:
     timecodes: memoryview
     distances: memoryview
     values: memoryview
     units: str
     dec_pts: int
+    interpolate: bool
     min: float
     max: float
 
-    def __init__(self, timecodes, distances, values, units, dec_pts):
-        self.timecodes = timecodes
-        self.distances = distances
-        self.values = values
-        self.units = units
+    @classmethod
+    def from_data(cls, timecodes, distances, values, units, dec_pts, interpolate):
         unitconv.check_units(units)
-        self.dec_pts = dec_pts
-        self.min = np.min(values) if len(values) else None
-        self.max = np.max(values) if len(values) else None
+        return cls(timecodes, distances, values, units, dec_pts, interpolate,
+                   np.min(values) if len(values) else None,
+                   np.max(values) if len(values) else None)
 
     def interp(self, tc, mode_time = True):
         index = self.timecodes if mode_time else self.distances
-        i = bisect.bisect_left(index, tc)
+        # the 'not interpolate' mode requires bisect_right
+        i = bisect.bisect_right(index, tc)
         if len(self.values) == 0: return 0
         if i == 0: return self.values[i]
-        if i == len(self.values): return self.values[i - 1]
+        if i == len(self.values) or not self.interpolate: return self.values[i - 1]
         span = index[i] - index[i-1]
         if span == 0: return self.values[i]
         return self.values[i-1] + (self.values[i] - self.values[i-1]) * (tc - index[i-1]) / span
@@ -42,9 +41,9 @@ class ChannelData:
     def change_units(self, units):
         converted = unitconv.convert(self.values,self.units, units)
         if converted is None:
-            return ChannelData([], [], [], '', 0)
-        return ChannelData(self.timecodes, self.distances, converted,
-                           units, self.dec_pts) # ??
+            return ChannelData.from_data([], [], [], '', 0, True)
+        return ChannelData.from_data(self.timecodes, self.distances, converted, units,
+                                     self.dec_pts, self.interpolate) # what to do for dec_pts?
 
 
 class DistanceWrapper:
@@ -113,8 +112,10 @@ class DistanceWrapper:
 
     # must include units, dec_pts
     def get_channel_metadata(self, name):
-        return {'units': self.data.channels[name].units,
-                'dec_pts': self.data.channels[name].dec_pts}
+        ch = self.data.channels[name]
+        return {'units': ch.units,
+                'dec_pts': ch.dec_pts,
+                'interpolate': ch.interpolate}
 
     def get_channel_data(self, name, unit=None):
         key = (name, unit)
@@ -125,14 +126,15 @@ class DistanceWrapper:
                     self.channel_cache[key] = converted
             elif name in self.data.channels:
                 data = self.data.channels[name]
-                self.channel_cache[key] = ChannelData(data.timecodes,
-                                                      self.outTime2Dist(data.timecodes),
-                                                      data.values,
-                                                      data.units,
-                                                      data.dec_pts)
+                self.channel_cache[key] = ChannelData.from_data(data.timecodes,
+                                                                self.outTime2Dist(data.timecodes),
+                                                                data.values,
+                                                                data.units,
+                                                                data.dec_pts,
+                                                                data.interpolate)
         if key in self.channel_cache and len(self.channel_cache[key].values):
             return self.channel_cache[key]
-        return ChannelData([], [], [], '', 0)
+        return ChannelData.from_data([], [], [], '', 0, True)
 
 
 def unify_lap_distance(logs: typing.List[DistanceWrapper]):

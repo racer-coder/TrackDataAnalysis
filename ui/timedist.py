@@ -258,14 +258,15 @@ class TimeDist(widgets.MouseHelperWidget):
 
             time_base = lapref.start.time + lapref.offset.time
             dist_base = lapref.start.dist + lapref.offset.dist
-            var.append(ChannelData(
+            var.append(ChannelData.from_data(
                 timecodes = lapref.log.log.dist_map_time[start_idx:end_idx],
                 distances = lapref.log.log.dist_map_dist[start_idx:end_idx],
                 values = [] if lapref == self.dataView.ref_lap else
                 (np.subtract(lapref.log.log.dist_map_time[start_idx:end_idx], time_base) -
                  self.dataView.ref_lap.offDist2Time(lapref.log.log.dist_map_dist[start_idx:end_idx] - dist_base)) / 1000,
                 units = 's',
-                dec_pts = 3))
+                dec_pts = 3,
+                interpolate = True))
 
     def paintGraph(self, ph, y_offset, height, channel_list, graph_idx):
         if not self.x_axis: return
@@ -333,15 +334,23 @@ class TimeDist(widgets.MouseHelperWidget):
                 search = self.x_axis.invert(max(ph.rect.right() + 0.5, self.graph_x)) + lap_base
                 end_idx = min(len(xa), bisect.bisect_right(xa, search) + 1)
                 xa = memoryview(np.round(self.x_axis.calc(np.subtract(xa[start_idx:end_idx], lap_base))).astype(int))
-                dv = memoryview(np.round(y_axis.calc(d.values[start_idx:end_idx])).astype(int))
+                dv = np.round(y_axis.calc(d.values[start_idx:end_idx])).astype(int)
+                dvd1 = dv.data
                 xa_uniqval, xa_uniqidx = np.unique(xa, return_index=True)
+                umin = np.minimum.reduceat(dv, xa_uniqidx)
+                umax = np.maximum.reduceat(dv, xa_uniqidx)
+                if d.interpolate:
+                    dvd2 = dv[1:].data
+                else:
+                    dvd2 = dvd1
+                    dvval = dv[xa_uniqidx[1:]-1]
+                    np.minimum(umin[1:], dvval, out=umin[1:])
+                    np.maximum(umax[1:], dvval, out=umax[1:])
                 # paint lines that live across pixel columns
-                for idx in memoryview(xa_uniqidx[1:]):
-                    ph.painter.drawLine(xa[idx-1], dv[idx-1], xa[idx], dv[idx])
+                for idx in memoryview(xa_uniqidx[1:] - 1):
+                    ph.painter.drawLine(xa[idx], dvd1[idx], xa[idx+1], dvd2[idx])
                 # paint lines within pixel columns
-                for x, y1, y2 in zip(xa_uniqval.data,
-                                     np.minimum.reduceat(dv, xa_uniqidx).data,
-                                     np.maximum.reduceat(dv, xa_uniqidx).data):
+                for x, y1, y2 in zip(xa_uniqval.data, umin.data, umax.data):
                     if y1 != y2:
                         ph.painter.drawLine(x, y1, x, y2)
         # font for data stats
@@ -397,10 +406,7 @@ class TimeDist(widgets.MouseHelperWidget):
                         drop_rect=QRect(self.graph_x, y - 2,
                                         ph.size.width() - self.graph_x, 4)))
             if not len(d.values): continue
-            start_idx = max(0, bisect.bisect_left(d.timecodes,
-                                                  self.dataView.cursor2outTime(lap)) - 1)
-            # interpolate between start_idx and start_idx+1?
-            main_val = d.values[start_idx]
+            main_val = d.interp(self.dataView.cursor2outTime(lap))
             self.cursor_values.append(y_axis.calc(main_val))
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y,
                                 self.channel_value_width, fontMetrics.height(),
@@ -431,16 +437,12 @@ class TimeDist(widgets.MouseHelperWidget):
             d2 = self.dataView.get_channel_data(self.dataView.alt_lap, ch)
             if not len(d2.values): continue
             ph.painter.setPen(pen2)
-            start_idx = max(0, bisect.bisect_left(d2.timecodes,
-                                                  self.dataView.cursor2outTime(
-                                                      self.dataView.alt_lap)) - 1)
-            # interpolate between start_idx and start_idx+1?
-            ph.painter.setPen(pen2)
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width,
                                 y, self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '%.*f' % (d.dec_pts, d2.values[start_idx]))
+                                '%.*f' % (d.dec_pts,
+                                          d2.interp(self.dataView.cursor2outTime(self.dataView.alt_lap))))
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width
                                 + self.channel_opt_width / 2,

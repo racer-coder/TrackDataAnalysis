@@ -1,7 +1,6 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
-import bisect
 from dataclasses import dataclass
 import math
 import re
@@ -274,13 +273,7 @@ class ValuesTableChannel:
         self.dec_pts = dec_pts
 
     def _calc(self, lap):
-        # XXX MOVE INTO state.py
-        d = self.data_view.get_channel_data(lap[0], self.channel)
-        start_idx = max(0, bisect.bisect_left(d.timecodes, lap[1]) - 1)
-        # interpolate between start_idx and start_idx+1?
-        if start_idx >= len(d.values):
-            return None
-        return d.values[start_idx]
+        return self.data_view.get_channel_data(lap[0], self.channel).interp(lap[1])
 
     def _format(self, v): return '%.*f' % (self.dec_pts, v)
     def _format_delta(self, v): return '%+.*f' % (self.dec_pts, v)

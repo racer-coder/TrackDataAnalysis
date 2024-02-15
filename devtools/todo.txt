@@ -8,15 +8,7 @@ Later Milestones:
 
 * MATHS
 . add notion of interpolate vs last value
-.. add notion to data/base
 .. add notion to each parser
-.. add notion to data/distance
-.. add notion to channel overrides
-.. accessor/compute func in state or DistanceWrapper
-.. graph correctly (draw lines)
-.. display value correctly in time/dist graph
-.. put cursor at right spot in time/dist graph
-.. display value correctly in values dock
 
 * KEYBOARD SHORTCUTS
 
