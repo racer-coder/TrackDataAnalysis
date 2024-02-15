@@ -135,6 +135,16 @@ class TextMatcher:
                        for piece in other.lower().replace('_', ' ').split())
                    for h in self.text_hints)
 
+class ChannelsListWidget(QListWidget):
+    def __init__(self, data_view):
+        super().__init__()
+        self.data_view = data_view
+
+    def startDrag(self, actions):
+        item = self.currentItem()
+        if not item: return
+        channels.initiate_drag(self, self.data_view, item.text())
+
 class ChannelsDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
         super().__init__('Channels', mainwindow, toolbar, True)
@@ -144,8 +154,9 @@ class ChannelsDockWidget(TempDockWidget):
         self.edit.setPlaceholderText('Channel search')
         self.edit.textChanged.connect(self.textChanged)
 
-        self.chList = QListWidget()
-        self.chList.setSelectionMode(QListWidget.NoSelection)
+        self.chList = ChannelsListWidget(mainwindow.data_view)
+        self.chList.setDragEnabled(True)
+        self.chList.setDragDropMode(self.chList.DragOnly)
         self.chList.itemActivated.connect(self.activateItem)
         self.chList.customContextMenuRequested.connect(self.context_menu)
         self.chList.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -214,6 +225,7 @@ class ChannelsDockWidget(TempDockWidget):
             chSet = set()
         for i in range(self.chList.count()):
             it = self.chList.item(i)
+            it.setFlags(it.flags() | Qt.ItemIsDragEnabled)
             if it.text() in chSet:
                 it.setBackgroundColor(QtGui.QColor(255, 255, 0))
             else:
@@ -336,6 +348,24 @@ class ValuesTableModel(FastTableModel):
             self.laps[col],
             None if self.delta_idx is None else self.laps[self.delta_idx])
 
+    def supportedDragActions(self):
+        return Qt.CopyAction
+
+    def flags(self, index):
+        flags = super().flags(index)
+        if type(self.rows[index.row()]) is ValuesTableChannel:
+            flags |= Qt.ItemIsDragEnabled
+        return flags
+
+
+class ValuesTableView(QTableView):
+    def startDrag(self, actions):
+        indexes = self.selectedIndexes()
+        if not indexes: return
+        model = self.model()
+        ch = model.rows[indexes[0].row()]
+        if type(ch) is not ValuesTableChannel: return
+        channels.initiate_drag(self, model.data_view, ch.channel)
 
 class ValuesDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
@@ -350,7 +380,9 @@ class ValuesDockWidget(TempDockWidget):
 
         self.model = ValuesTableModel(mainwindow.data_view)
         self.deleg = FastItemDelegate(self.model, self.margin)
-        self.table = QTableView()
+        self.table = ValuesTableView()
+        self.table.setDragEnabled(True)
+        self.table.setDragDropMode(self.table.DragOnly)
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
         self.table.setShowGrid(False)

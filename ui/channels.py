@@ -1,8 +1,8 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
-from PySide2.QtCore import QSize, Qt
-from PySide2.QtGui import QColor, QIcon, QPainter, QPixmap
+from PySide2.QtCore import QMimeData, QSize, Qt
+from PySide2.QtGui import QColor, QDrag, QFont, QFontMetrics, QIcon, QPainter, QPixmap
 from PySide2.QtWidgets import (
     QComboBox,
     QDialog,
@@ -13,6 +13,7 @@ from PySide2.QtWidgets import (
 )
 
 from . import state
+from . import widgets
 from data import unitconv
 
 colors = (
@@ -143,3 +144,26 @@ def channel_editor(_parent, data_view, channel):
 
         update_channel_properties(data_view)
         data_view.values_change.emit()
+
+def initiate_drag(parent, data_view, channel):
+    drag = QDrag(parent)
+    mime = QMimeData()
+    mime.setText(channel)
+
+    prop = data_view.get_channel_prop(channel)
+    text = '%s [%s]' % (channel, prop.units) if prop.units else channel
+    font = QFont('Tahoma')
+    font.setPixelSize(widgets.deviceScale(parent, 13))
+    metrics = QFontMetrics(font)
+    pixmap = QPixmap(QSize(metrics.horizontalAdvance(text) + 10, metrics.height()))
+    pixmap.fill(QColor(32, 32, 32, 160))
+    painter = QPainter()
+    painter.begin(pixmap)
+    painter.setFont(font)
+    painter.setPen(colors[prop.color])
+    painter.drawText(pixmap.rect(), Qt.AlignVCenter | Qt.AlignHCenter, text)
+    painter.end()
+    drag.setPixmap(pixmap)
+
+    drag.setMimeData(mime)
+    drag.exec_(Qt.MoveAction)

@@ -19,8 +19,6 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
-. channel drag/drop - display visual of channel being dragged
-. channel drag/drop - support dropping to actual place in graph for time/dist
 . data widget - less forceful column resizing
 . values widget - less forceful column resizing
 . open from db - less forceful column resizing
@@ -30,6 +28,7 @@ Later Milestones:
 . open from db - ability to choose columns to display in results
 . file format - megalogviewer
 . file format - vbox
+. file format - link g4+
 . cython or mypyc for aim_xrk?
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
@@ -63,7 +62,6 @@ Later Milestones:
 . bar graph widget - value. update with cursor
 . bar graph widget - 2 graphs when comparing laps
 . playback button with variable replay rate
-. link g4+ - file reader
 . video - keyboard shortcuts for frame by frame, arrow keys for second/5s/10s?
 . video - change overall playback speed (good for machines that have a hard time playing two streams)
 . video - ability to disable either video for performance

@@ -127,6 +127,7 @@ class TimeDist(widgets.MouseHelperWidget):
         self.setAcceptDrops(True) # for reordering channels
 
         self.axis_pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
+        self.drop_indicator = None
 
     def save_state(self):
         return {'type': 'timedist',
@@ -390,7 +391,9 @@ class TimeDist(widgets.MouseHelperWidget):
                         clicks=[widgets.MouseHelperClick(button_type=Qt.LeftButton,
                                                          state_capture=self.selectChannel,
                                                          move=self.moveChannel)],
-                        channel=(graph_idx, ch)))
+                        channel=(graph_idx, ch),
+                        drop_rect=QRect(self.graph_x, y - 2,
+                                        ph.size.width() - self.graph_x, 4)))
             if not len(d.values): continue
             start_idx = max(0, bisect.bisect_left(d.timecodes,
                                                   self.dataView.cursor2outTime(lap)) - 1)
@@ -462,15 +465,18 @@ class TimeDist(widgets.MouseHelperWidget):
 
         self.graph_mouse_helpers.append(
             widgets.MouseHelperItem(
-                geometry=QRectF(self.graph_x + 6 + self.channel_ind_width, y_offset,
-                                self.channel_name_width, (next_y - y_offset + height) / 2),
-                graph_idx=(graph_idx, False)))
+                geometry=QRectF(self.graph_x, y_offset,
+                                ph.size.width() - self.graph_x, (next_y - y_offset + height) / 2),
+                graph_idx=(graph_idx, False),
+                drop_rect=QRect(self.graph_x, next_y - 2,
+                                ph.size.width() - self.graph_x, 4)))
         self.graph_mouse_helpers.append(
             widgets.MouseHelperItem(
-                geometry=QRectF(self.graph_x + 6 + self.channel_ind_width,
-                                (next_y + y_offset + height)/2,
-                                self.channel_name_width, (y_offset - next_y + height)/2),
-                graph_idx=(graph_idx+1, True)))
+                geometry=QRectF(self.graph_x, (next_y + y_offset + height)/2,
+                                ph.size.width() - self.graph_x, (y_offset - next_y + height)/2),
+                graph_idx=(graph_idx+1, True),
+                drop_rect=QRect(self.graph_x, (next_y + y_offset + height)/2,
+                                ph.size.width() - self.graph_x, (y_offset - next_y + height)/2)))
 
         # draw Y axis
         self.paintYAxis(ph, y_offset, height, y_axis)
@@ -628,25 +634,26 @@ class TimeDist(widgets.MouseHelperWidget):
 
         # paint each channel group graph
         self.cursor_values = []
-        if self.channelGroups:
-            # each graph
-            last_cutoff = graph_y
-            separation = 6
-            for i, grp in enumerate(self.channelGroups):
-                next_cutoff = graph_y + i * separation + (i + 1) * (y_div - graph_y - separation * (len(self.channelGroups) - 1)) // len(self.channelGroups)
-                self.paintGraph(ph, last_cutoff, next_cutoff - last_cutoff, grp, i)
-                last_cutoff = next_cutoff + separation
+        groups = self.channelGroups or [[]]
+        # each graph
+        last_cutoff = graph_y
+        separation = 6
+        for i, grp in enumerate(groups):
+            next_cutoff = graph_y + i * separation + (i + 1) * (y_div - graph_y - separation * (len(groups) - 1)) // len(groups)
+            self.paintGraph(ph, last_cutoff, next_cutoff - last_cutoff, grp, i)
+            last_cutoff = next_cutoff + separation
 
-            # separation lines
-            pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
-            pen.setStyle(Qt.SolidLine)
-            ph.painter.setPen(pen)
-            for i in range(1, len(self.channelGroups)):
-                cutoff = graph_y + i * separation + i * (y_div - graph_y - separation * (len(self.channelGroups) - 1)) / len(self.channelGroups)
-                ph.painter.drawLine(self.graph_x, cutoff,
-                                    ph.size.width(), cutoff)
-                ph.painter.drawLine(self.graph_x, cutoff - separation,
-                                    ph.size.width(), cutoff - separation)
+        # separation lines
+        pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
+        pen.setStyle(Qt.SolidLine)
+        ph.painter.setPen(pen)
+        for i in range(1, len(groups)):
+            cutoff = graph_y + i * separation + i * (y_div - graph_y - separation * (len(groups) - 1)) / len(groups)
+            ph.painter.drawLine(self.graph_x, cutoff,
+                                ph.size.width(), cutoff)
+            ph.painter.drawLine(self.graph_x, cutoff - separation,
+                                ph.size.width(), cutoff - separation)
+
         # draw lap boundaries
         pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
         pen.setStyle(Qt.DashLine)
@@ -701,6 +708,10 @@ class TimeDist(widgets.MouseHelperWidget):
                                 Qt.AlignTop | Qt.AlignRight | Qt.TextSingleLine,
                                 'm:s' if self.dataView.mode_time else 'meter')
             ph.painter.restore()
+
+        # draw drag and drop indicator, if in progress
+        if self.drop_indicator:
+            ph.painter.fillRect(self.drop_indicator, QtGui.QColor(64, 64, 255, 192))
 
         # draw zoom selection, if in progress
         if self.zoom_highlight:
@@ -794,54 +805,72 @@ class TimeDist(widgets.MouseHelperWidget):
 
     def moveChannel(self, delta_pos, abs_pos, state):
         if delta_pos.manhattanLength() < QApplication.startDragDistance(): return
-        drag = QtGui.QDrag(self)
-        mime = QMimeData()
-        mime.setText(self.current_channel[1])
-
-        #pixmap = QPixmap(self.size())
-        #self.render(pixmap)
-        #drag.setPixmap(pixmap)
-
-        drag.setMimeData(mime)
-        drag.exec_(Qt.MoveAction)
+        channels.initiate_drag(self, self.dataView, self.current_channel[1])
 
     def dragEnterEvent(self, e):
-        if e.source() == self:
+        if e.source() == self or e.mimeData().hasText():
             e.accept()
 
+    def dragMoveEvent(self, e):
+        drop_ind = self.getEventMouseHelperData('drop_rect', e.posF())
+        if drop_ind != self.drop_indicator:
+            self.drop_indicator = drop_ind
+            self.update()
+
+    def dragLeaveEvent(self, e):
+        print('leave')
+        self.drop_indicator = None
+        self.update()
+
     def dropEvent(self, e):
-        if e.source() != self: return
+        self.drop_indicator = None
+        if e.source() != self and not e.mimeData().hasText(): return
         dst_ch = self.getEventMouseHelperData('channel', e.posF())
-        src_grp = self.channelGroups[self.current_channel[0]]
+        if e.source() == self:
+            src_grp = self.channelGroups[self.current_channel[0]]
+            channel = self.current_channel[1]
+        else:
+            src_grp = None
+            channel = e.mimeData().text()
         if not dst_ch:
             grp = self.getEventMouseHelperData('graph_idx', e.posF())
-            if grp is None: return # Shouldn't happen
-            src_grp.remove(self.current_channel[1])
-            if not src_grp:
-                self.channelGroups[self.current_channel[0]] = None
+            if grp is None:
+                print('what?', self.channelGroups)
+                return # Shouldn't happen
+            if src_grp is not None:
+                src_grp.remove(channel)
+                if not src_grp and (grp[1] or grp[0] != self.current_channel[0]):
+                    self.channelGroups[self.current_channel[0]] = None
             if grp[1]:
                 self.channelGroups.insert(grp[0], [])
+            if not self.channelGroups:
+                self.channelGroups.append([]) # dropping into an empty graph
             grp = self.channelGroups[grp[0]]
-            grp.append(self.current_channel[1])
+            if channel not in grp:
+                grp.append(channel)
         else:
-            src_idx = src_grp.index(self.current_channel[1])
             grp = self.channelGroups[dst_ch[0]]
             dst_idx = grp.index(dst_ch[1])
-            # src/dst may be equal if the groups are different, so don't short circuit equality
-            if src_idx < dst_idx:
-                grp.insert(dst_idx, self.current_channel[1])
-                src_grp.remove(self.current_channel[1])
-            else: # >=
-                src_grp.remove(self.current_channel[1])
-                grp.insert(dst_idx, self.current_channel[1])
-            if not src_grp:
-                self.channelGroups[self.current_channel[0]] = None
+            if src_grp is not None:
+                src_idx = src_grp.index(channel)
+                # src/dst may be equal if the groups are different, so don't short circuit equality
+                if src_idx < dst_idx:
+                    grp.insert(dst_idx, channel)
+                    src_grp.remove(channel)
+                else: # >=
+                    src_grp.remove(channel)
+                    grp.insert(dst_idx, channel)
+                if not src_grp:
+                    self.channelGroups[self.current_channel[0]] = None
+            elif channel not in grp:
+                grp.insert(dst_idx, channel)
         if None in self.channelGroups:
             self.channelGroups.remove(None)
         for idx, g in enumerate(self.channelGroups):
             if g is grp:
-                self.current_channel = (idx, self.current_channel[1])
+                self.current_channel = (idx, channel)
         e.accept()
+        self.dataView.data_change.emit()
         self.update()
 
     def channelMenuRemove(self, ch):
