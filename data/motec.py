@@ -125,6 +125,5 @@ def MOTEC(fname, progress):
     return base.LogFile(data,
                         [base.Lap(l, s, e) for l, (s, e) in enumerate(zip(laps[:-1], laps[1:]))],
                         metadata,
-                        [ch if ch in data else None
-                         for ch in ['Ground Speed', 'GPS Latitude', 'GPS Longitude', 'Altitude']],
+                        ['Ground Speed', 'GPS Latitude', 'GPS Longitude', 'Altitude'],
                         fname)

@@ -64,7 +64,7 @@ class DistanceWrapper:
     def _calc_time_dist(self, expected_len = None):
         distdata = self.data.channels[self.data.key_channel_map[0]]
         converted = unitconv.convert(distdata.values, distdata.units, 'm/s')
-        if len(converted) == 0:
+        if converted is None or len(converted) == 0:
             return np.array([0.]).data, np.array([0.]).data, 0
 
         # VALIDATED: AiM GPS Speed is just linear interpolation of raw
@@ -105,6 +105,9 @@ class DistanceWrapper:
     def get_metadata(self):
         return self.data.metadata
 
+    def get_key_channel_map(self):
+        return [ch if ch in self.data.channels else None for ch in self.data.key_channel_map]
+
     def get_channels(self):
         return self.data.channels.keys()
 
@@ -113,24 +116,22 @@ class DistanceWrapper:
         return {'units': self.data.channels[name].units,
                 'dec_pts': self.data.channels[name].dec_pts}
 
-    def get_channel_data(self, *names, unit=None):
-        for name in names:
-            key = (name, unit)
-            if key not in self.channel_cache:
-                if unit:
-                    converted = self.get_channel_data(name).change_units(unit)
-                    if not len(converted.values): continue
+    def get_channel_data(self, name, unit=None):
+        key = (name, unit)
+        if key not in self.channel_cache:
+            if unit:
+                converted = self.get_channel_data(name).change_units(unit)
+                if len(converted.values):
                     self.channel_cache[key] = converted
-                else:
-                    if name not in self.data.channels: continue
-                    data = self.data.channels[name]
-                    self.channel_cache[key] = ChannelData(data.timecodes,
-                                                          self.outTime2Dist(data.timecodes),
-                                                          data.values,
-                                                          data.units,
-                                                          data.dec_pts)
-            if len(self.channel_cache[key].values):
-                return self.channel_cache[key]
+            elif name in self.data.channels:
+                data = self.data.channels[name]
+                self.channel_cache[key] = ChannelData(data.timecodes,
+                                                      self.outTime2Dist(data.timecodes),
+                                                      data.values,
+                                                      data.units,
+                                                      data.dec_pts)
+        if key in self.channel_cache and len(self.channel_cache[key].values):
+            return self.channel_cache[key]
         return ChannelData([], [], [], '', 0)
 
 
