@@ -38,10 +38,11 @@ properties = [
                   Unit('mile/hour', 'mph', 100/2.54/12/5280*3600, aliases=['mile/h'])]),
     UnitProperty('Time',
                  [Unit('second', 's'),
-                  Unit('millisecond', 'ms', 1000)]),
+                  Unit('millisecond', 'ms', 1000),
+                  Unit('minute', 'min', 1/60)]),
     UnitProperty('Angle',
                  [Unit('radian', 'rad'),
-                  Unit('degree', 'deg', 180 / math.pi, display='\u00b0', aliases=['Degrees'])]),
+                  Unit('degree', 'deg', 180 / math.pi, display='\u00b0', aliases=['degrees'])]),
     UnitProperty('Pressure',
                  [Unit('pascal', 'Pa'),
                   Unit('kilopascal', 'kPa', 1e-3),
@@ -55,35 +56,36 @@ properties = [
                  [Unit('ratio', 'ratio'),
                   Unit('percent', '%', 100)]),
     UnitProperty('Voltage',
-                 [Unit('volt', 'V'),
+                 [Unit('volt', 'V', aliases=['volts']),
                   Unit('millivolt', 'mV', 1000)]),
     UnitProperty('Current',
                  [Unit('amp', 'A')]),
     UnitProperty('Volume',
-                 [Unit('cubic meter', 'm3', display='m\u00b3'),
+                 [Unit('cubic meter', 'm^3', display='m\u00b3'),
                   Unit('liter', 'l', 1000),
                   Unit('US gallon', 'USgal', 264.172052)]),
     UnitProperty('Acceleration',
-                 [Unit('meter/sec squared', 'm/s/s', display='m/s\u00b2'),
+                 [Unit('meter/sec squared', 'm/s^2', display='m/s\u00b2', aliases=['m/s/s']),
                   Unit('G force', 'G', 0.10197162129779283)]),
     UnitProperty('Angular velocity',
                  [Unit('rad/sec', 'rad/s'),
-                  Unit('rev/min', 'rpm', 30 / math.pi),
+                  Unit('Hertz', 'Hz', 1 / (2*math.pi)),
+                  Unit('rev/min', 'rpm', 30 / math.pi, aliases=['revs/min']),
                   Unit('deg/sec', 'deg/s', 180 / math.pi, display='\u00b0/s')]),
     UnitProperty('Volume flow',
-                 [Unit('cubic meter/sec', 'm3/s', display='m\u00b3/s'),
+                 [Unit('cubic meter/sec', 'm^3/s', display='m\u00b3/s'),
                   Unit('liter/sec', 'l/s', 1000)]),
 ]
 
-unit_map = {name: (prop, unit)
+unit_map = {name.lower(): (prop, unit)
             for prop in properties
             for unit in prop.units
             for name in [unit.name, unit.symbol] + unit.aliases}
 
 def convert(values, from_unit, to_unit):
     try:
-        old_unit = unit_map[from_unit]
-        new_unit = unit_map[to_unit]
+        old_unit = unit_map[from_unit.lower()]
+        new_unit = unit_map[to_unit.lower()]
     except KeyError:
         return None
     if old_unit[0] != new_unit[0]: # Are they the same property
@@ -93,21 +95,21 @@ def convert(values, from_unit, to_unit):
     return (np.subtract(values, old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
             + new_unit[1].offset)
 
-def check_units(_unit):
-    return # disable check for now
-    #if unit and unit not in unit_map:
+def check_units(unit):
+    #if unit and unit.lower() not in unit_map:
     #    print("Found unit", unit)
+    return
 
 def display_text(unit):
     try:
-        entry = unit_map[unit][1]
+        entry = unit_map[unit.lower()][1]
         return entry.display or entry.symbol
     except KeyError:
         return unit
 
 def comparable_units(unit):
     try:
-        entry = unit_map[unit][0]
+        entry = unit_map[unit.lower()][0]
         return [(u.name, u.display or u.symbol) for u in entry.units]
     except KeyError:
         return [(unit, unit)]
