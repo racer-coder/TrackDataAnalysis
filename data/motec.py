@@ -45,7 +45,8 @@ def _decode_channel(s, addr):
                         dec_pts=max(dec_pts, 0),
                         name=_dec_str(s, addr+32, 32),
                         #_dec_str(s, addr+64, 8),
-                        units=_dec_str(s, addr+72, 12))
+                        units=_dec_str(s, addr+72, 12),
+                        interpolate=True) # XXX decode
 
 def _decode(s):
     metadata = {}

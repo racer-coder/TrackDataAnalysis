@@ -21,7 +21,8 @@ def _decode_channel_hdr(ch):
                         units=fields[1],
                         timecodes=array('d'),
                         values=array('d'),
-                        dec_pts=dec_places)
+                        dec_pts=dec_places,
+                        interpolate=True)
 
 def _decode_header(lines):
     return [_decode_channel_hdr(column)

@@ -21,9 +21,10 @@ assert sys.byteorder == 'little'
 class Channel:
     timecodes: array
     values: array
-    dec_pts: int
     name: str
     units: str
+    dec_pts: int
+    interpolate: bool # if False, use the previous value until next timecode
 
 @dataclass(eq=False)
 class Lap:

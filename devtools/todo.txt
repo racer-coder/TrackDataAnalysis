@@ -15,6 +15,7 @@ Later Milestones:
 .. accessor/compute func in state or DistanceWrapper
 .. graph correctly (draw lines)
 .. display value correctly in time/dist graph
+.. put cursor at right spot in time/dist graph
 .. display value correctly in values dock
 
 * KEYBOARD SHORTCUTS

@@ -39,7 +39,9 @@ def _decode_var(m, offs, timecodes, samples, nrecords, stride):
     data = np.ascontiguousarray(data).data.cast('B').cast(_types[rtype][1])
     if unit == '%': # encoded actually as a ratio, not a percentage
         data = (np.array(data) * 100).data
-    return Channel(timecodes, data, name=name, units=unit, dec_pts=2 if rtype >= 4 else 0)
+    return Channel(timecodes, data, name=name, units=unit,
+                   dec_pts=2 if rtype >= 4 else 0,
+                   interpolate=True)
 
 def _decode(m):
     (_version, _status, tick_rate, _session_info_update, session_info_length, session_info_offset,

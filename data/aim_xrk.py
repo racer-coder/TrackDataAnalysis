@@ -543,7 +543,8 @@ def AIMXRK(fname, progress):
                                     ch.sampledata,
                                     ch.dec_pts,
                                     ch.long_name,
-                                    ch.units if ch.size != 1 else '')
+                                    ch.units if ch.size != 1 else '',
+                                    interpolate = ch.size != 1)
          for ch in data.channels.values()},
         _get_laps(data.channels, msg_by_type, time_offset),
         _get_metadata(msg_by_type),
