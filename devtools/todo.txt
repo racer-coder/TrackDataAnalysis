@@ -24,10 +24,10 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. documentation - split among multiple files, add some pictures, quick start up front
 . data widget - less forceful column resizing
 . values widget - less forceful column resizing
 . open from db - less forceful column resizing
-. tech debt - reduce boilerplate in file parsers by relying more heavily on distancewrapper
 . tech debt - better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
 . tech debt - commit to using np.array for channel timecodes/values/etc to avoid rewrapping all the time
 . open from db - ability to choose columns to display in results

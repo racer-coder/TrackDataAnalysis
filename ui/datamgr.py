@@ -258,7 +258,7 @@ class DataDockWidget(TempDockWidget):
 
             self.status_msg.emit('Reading ' + path)
             try:
-                obj = builder(path, lambda x, y: None).get_metadata()
+                obj = builder(path, lambda x, y: None).metadata
                 readable = True
             except: # pylint: disable=bare-except
                 obj = None

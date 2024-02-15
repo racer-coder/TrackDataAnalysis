@@ -1,38 +1,12 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
-from array import array
-from dataclasses import dataclass
 import mmap
 import struct
-import sys
 
 import numpy as np
 
-# We use array and memoryview for efficient operations, but that
-# assumes the sizes we expect match the file format.  Lets assert a
-# few of those assumptions here.  Our use of struct is safe since it
-# has tighter control over byte order and sizing.
-assert array('H').itemsize == 2
-assert array('I').itemsize == 4
-assert array('f').itemsize == 4
-assert array('Q').itemsize == 8
-assert sys.byteorder == 'little'
-
-@dataclass
-class Channel:
-    timecodes: array
-    values: array
-    dec_pts: int
-    name: str
-    short_name: str
-    units: str
-
-@dataclass
-class Lap:
-    num: int
-    start_time: int
-    end_time: int
+from . import base
 
 def _dec_u16(s, offs):
     return s[offs:offs+2].cast('H')[0]
@@ -66,12 +40,12 @@ def _decode_channel(s, addr):
         else: raise TypeError
     else: raise TypeError
 
-    return Channel((np.arange(0, data_count) * (1000 / sample_rate)).data,
-                   ((np.multiply(data, 1 / (scale * 10 ** dec_pts)) + offset) * mul).data,
-                   dec_pts,
-                   _dec_str(s, addr+32, 32),
-                   _dec_str(s, addr+64, 8),
-                   _dec_str(s, addr+72, 12))
+    return base.Channel((np.arange(0, data_count) * (1000 / sample_rate)).data,
+                        ((np.multiply(data, 1 / (scale * 10 ** dec_pts)) + offset) * mul).data,
+                        dec_pts=max(dec_pts, 0),
+                        name=_dec_str(s, addr+32, 32),
+                        #_dec_str(s, addr+64, 8),
+                        units=_dec_str(s, addr+72, 12))
 
 def _decode(s):
     metadata = {}
@@ -124,54 +98,32 @@ def _decode(s):
         addr = _dec_u32(s, addr+4)
     return channels, metadata
 
-class MOTEC:
-    def __init__(self, fname, progress):
-        self.file_name = fname
-        with open(fname, 'rb') as f:
-            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
-                self.data, self.metadata = _decode(memoryview(m))
-        laps = [0]
-        seq_start_tc = None
-        for tc, v in zip(self.data['Beacon'].timecodes, self.data['Beacon'].values):
-            if seq_start_tc is None:
-                if v < 0:
-                    seq_start_tc = tc
-            else:
-                if v >= 16384:
-                    last_val = int(v)
-                elif v >= 0:
-                    if v == 100 or v == 2: # but not 56?
-                        last_val &= 16383
-                        if last_val >= 8192:
-                            last_val -= 16384
-                        laps.append(seq_start_tc - 1000 + last_val)
-                    seq_start_tc = None
-        laps.append(max(np.max(d.timecodes) for d in self.data.values()))
-        self.laps = [int(l) for l in laps]
+def MOTEC(fname, progress):
+    with open(fname, 'rb') as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            data, metadata = _decode(memoryview(m))
+    laps = [0]
+    seq_start_tc = None
+    for tc, v in zip(data['Beacon'].timecodes, data['Beacon'].values):
+        if seq_start_tc is None:
+            if v < 0:
+                seq_start_tc = tc
+        else:
+            if v >= 16384:
+                last_val = int(v)
+            elif v >= 0:
+                if v == 100 or v == 2: # but not 56?
+                    last_val &= 16383
+                    if last_val >= 8192:
+                        last_val -= 16384
+                    laps.append(seq_start_tc - 1000 + last_val)
+                seq_start_tc = None
+    laps.append(max(np.max(d.timecodes) for d in data.values()))
+    laps = [int(l) for l in laps]
 
-    def get_laps(self):
-        return [Lap(l, s, e) for l, (s, e) in enumerate(zip(self.laps[:-1], self.laps[1:]))]
-
-    def get_speed_channel(self):
-        return 'Ground Speed'
-
-    def get_filename(self):
-        return self.file_name
-
-    def get_metadata(self):
-        return self.metadata
-
-    def get_channels(self):
-        return self.data.keys()
-
-    def get_channel_units(self, name):
-        return self.data[name].units if name in self.data else None
-
-    def get_channel_dec_points(self, name):
-        return max(0, self.data[name].dec_pts) if name in self.data else None
-
-    def get_channel_data(self, name):
-        if name not in self.data:
-            return None
-        d = self.data[name]
-        return (d.timecodes, d.values)
+    return base.LogFile(data,
+                        [base.Lap(l, s, e) for l, (s, e) in enumerate(zip(laps[:-1], laps[1:]))],
+                        metadata,
+                        [ch if ch in data else None
+                         for ch in ['Ground Speed', 'GPS Latitude', 'GPS Longitude', 'Altitude']],
+                        fname)

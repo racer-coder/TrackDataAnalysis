@@ -8,7 +8,7 @@ import math
 import numpy as np
 
 from PySide2 import QtGui
-from PySide2.QtCore import QMimeData, QPoint, QRect, QRectF, QSize, Qt
+from PySide2.QtCore import QPoint, QRect, QRectF, QSize, Qt
 from PySide2.QtWidgets import (
     QAction,
     QApplication,

@@ -6,32 +6,20 @@ from dataclasses import dataclass, field
 import math
 import mmap
 import numpy as np
-import pprint
+from pprint import pprint # pylint: disable=unused-import
 import struct
 import sys
 import traceback # pylint: disable=unused-import
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from . import gps
+from . import base
 
 # 1,2,5,10,20,25,50 Hz
 # units
 # dec ptr
 
-pp = pprint.PrettyPrinter()
-
 dc_slots = {'slots': True} if sys.version_info.minor >= 10 else {}
-
-# We use array and memoryview for efficient operations, but that
-# assumes the sizes we expect match the file format.  Lets assert a
-# few of those assumptions here.  Our use of struct is safe since it
-# has tighter control over byte order and sizing.
-assert array('H').itemsize == 2
-assert array('I').itemsize == 4
-assert array('f').itemsize == 4
-assert array('Q').itemsize == 8
-assert sys.byteorder == 'little'
-
 
 @dataclass(**dc_slots)
 class Group:
@@ -64,12 +52,6 @@ class Channel:
     last_timecode: int = -1
 
 @dataclass(**dc_slots)
-class Lap:
-    num: int
-    start_time: int
-    end_time: int
-
-@dataclass(**dc_slots)
 class Message:
     token: bytes
     num: int
@@ -77,7 +59,7 @@ class Message:
 
 @dataclass(**dc_slots)
 class DataStream:
-    channels: List[Channel]
+    channels: Dict[str, Channel]
     messages: List[Message]
 
 @dataclass(**dc_slots)
@@ -373,236 +355,211 @@ def _decode_sequence(s, progress=None):
             c.sampledata = memoryview(d.fixup(c.sampledata))
 
     return DataStream(
-        channels=list(ch for ch in channels.values()
-                      if len(ch.sampledata) and ch.long_name not in ('StrtRec', 'MasterClk')),
+        channels={ch.long_name: ch for ch in channels.values()
+                  if len(ch.sampledata) and ch.long_name not in ('StrtRec', 'MasterClk')},
         messages=messages)
 
-class AIMXRK:
-    def __init__(self, fname, progress):
-        self.file_name = fname
-        with open(fname, 'rb') as f:
-            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
-                self.data = _decode_sequence(m, progress)
-        self.msg_by_type = {}
-        for m in self.data.messages:
-            self.msg_by_type.setdefault(m.token, []).append(m)
-        #pp.pprint({k: len(v) for k, v in self.msg_by_type.items()})
-        # determine time offset
-        self.time_offset = 0
-        laps = self.get_laps()
-        self.time_offset = min([ch.timecodes[0] for ch in self.data.channels if len(ch.timecodes)] +
-                               ([laps[0].start_time] if laps else []))
-        for ch in self.data.channels:
-            ch.timecodes = memoryview(np.subtract(ch.timecodes, self.time_offset))
-        # decode GPS data.  Do this after determining time offset
-        # since we have to fudge the data to get higher resolution
-        self.decode_gps()
+def _get_metadata(msg_by_type):
+    ret = {}
+    for msg, name in [('RCR', 'Driver'),
+                      ('VEH', 'Vehicle'),
+                      ('TMD', 'Log Date'),
+                      ('TMT', 'Log Time'),
+                      ('VTY', 'Session'),
+                      ('CMP', 'Series'),
+                      ('NTE', 'Long Comment'),
+                      ]:
+        if msg in msg_by_type:
+            ret[name] = msg_by_type[msg][-1].content
+    if 'TRK' in msg_by_type:
+        ret['Venue'] = msg_by_type['TRK'][-1].content['name']
+        # ignore the start/finish line?
+    if 'ODO' in msg_by_type:
+        for name, stats in msg_by_type['ODO'][-1].content.items():
+            ret['Odo/%s Distance (km)' % name] = stats['dist'] / 1000
+            ret['Odo/%s Time' % name] = '%d:%02d:%02d' % (stats['time'] // 3600,
+                                                          stats['time'] // 60 % 60,
+                                                          stats['time'] % 60)
+    return ret
 
-    def decode_gps(self):
-        # look for either GPS or GPS1 messages
-        gpsmsg = self.msg_by_type.get('GPS', self.msg_by_type.get('GPS1', None))
-        if not gpsmsg: return
-        alldata = memoryview(b''.join(m.content for m in gpsmsg))
-        assert len(alldata) % 56 == 0
-        timecodes = alldata[0:].cast('i')[::56//4]
-        #itow_ms = alldata[4:].cast('I')[::56//4]
-        #weekN = alldata[12:].cast('H')[::56//2]
-        ecefX_cm = alldata[16:].cast('i')[::56//4]
-        ecefY_cm = alldata[20:].cast('i')[::56//4]
-        ecefZ_cm = alldata[24:].cast('i')[::56//4]
-        #posacc_cm = alldata[28:].cast('i')[::56//4]
-        ecefdX_cms = alldata[32:].cast('i')[::56//4]
-        ecefdY_cms = alldata[36:].cast('i')[::56//4]
-        ecefdZ_cms = alldata[40:].cast('i')[::56//4]
-        #velacc_cms = alldata[44:].cast('i')[::56//4]
-        #nsat = alldata[51::56]
+def _decode_gps(channels, msg_by_type, time_offset):
+    # look for either GPS or GPS1 messages
+    gpsmsg = msg_by_type.get('GPS', msg_by_type.get('GPS1', None))
+    if not gpsmsg: return
+    alldata = memoryview(b''.join(m.content for m in gpsmsg))
+    assert len(alldata) % 56 == 0
+    timecodes = alldata[0:].cast('i')[::56//4]
+    #itow_ms = alldata[4:].cast('I')[::56//4]
+    #weekN = alldata[12:].cast('H')[::56//2]
+    ecefX_cm = alldata[16:].cast('i')[::56//4]
+    ecefY_cm = alldata[20:].cast('i')[::56//4]
+    ecefZ_cm = alldata[24:].cast('i')[::56//4]
+    #posacc_cm = alldata[28:].cast('i')[::56//4]
+    ecefdX_cms = alldata[32:].cast('i')[::56//4]
+    ecefdY_cms = alldata[36:].cast('i')[::56//4]
+    ecefdZ_cms = alldata[40:].cast('i')[::56//4]
+    #velacc_cms = alldata[44:].cast('i')[::56//4]
+    #nsat = alldata[51::56]
 
-        timecodes = memoryview(np.subtract(timecodes, self.time_offset))
+    timecodes = memoryview(np.subtract(timecodes, time_offset))
 
-        self.data.channels.append(
-            Channel(long_name='GPS Speed',
-                    units='m/s',
-                    dec_pts=1,
-                    timecodes=timecodes,
-                    sampledata=memoryview(np.sqrt(np.square(ecefdX_cms) +
-                                                  np.square(ecefdY_cms) +
-                                                  np.square(ecefdZ_cms)) / 100.)))
+    channels['GPS Speed'] = Channel(
+        long_name='GPS Speed',
+        units='m/s',
+        dec_pts=1,
+        timecodes=timecodes,
+        sampledata=memoryview(np.sqrt(np.square(ecefdX_cms) +
+                                      np.square(ecefdY_cms) +
+                                      np.square(ecefdZ_cms)) / 100.))
 
-        gpsconv = gps.ecef2lla(np.divide(ecefX_cm, 100),
-                               np.divide(ecefY_cm, 100),
-                               np.divide(ecefZ_cm, 100))
+    gpsconv = gps.ecef2lla(np.divide(ecefX_cm, 100),
+                           np.divide(ecefY_cm, 100),
+                           np.divide(ecefZ_cm, 100))
 
-        self.data.channels.append(Channel(long_name='GPS Latitude',  units='deg', dec_pts=4,
-                                          timecodes=timecodes, sampledata=memoryview(gpsconv.lat)))
-        self.data.channels.append(Channel(long_name='GPS Longitude', units='deg', dec_pts=4,
-                                          timecodes=timecodes, sampledata=memoryview(gpsconv.long)))
-        self.data.channels.append(Channel(long_name='GPS Altitude', units='m', dec_pts=1,
-                                          timecodes=timecodes, sampledata=memoryview(gpsconv.alt)))
+    channels['GPS Latitude'] = Channel(long_name='GPS Latitude',  units='deg', dec_pts=4,
+                                       timecodes=timecodes, sampledata=memoryview(gpsconv.lat))
+    channels['GPS Longitude'] = Channel(long_name='GPS Longitude', units='deg', dec_pts=4,
+                                        timecodes=timecodes, sampledata=memoryview(gpsconv.long))
+    channels['GPS Altitude'] = Channel(long_name='GPS Altitude', units='m', dec_pts=1,
+                                       timecodes=timecodes, sampledata=memoryview(gpsconv.alt))
 
-    def _help_decode_channels(self, chmap):
-        pp.pprint(chmap)
-        for i in range(len(self.data.channels[0].unknown)):
-            d = sorted([(v.unknown[i], chmap.get(v.long_name, ''), v.long_name)
-                        for v in self.data.channels
-                        if len(v.unknown) > i])
-            if len(set([x[0] for x in d])) == 1:
-                continue
-            pp.pprint((i, d))
-        d = sorted([(len(v.sampledata), chmap.get(v.long_name, ''), v.long_name)
-                    for v in self.data.channels])
-        if len(set([x[0] for x in d])) != 1:
-            pp.pprint(('len', d))
-
-    def get_laps(self):
-        ret = []
-        if 'LAP' in self.msg_by_type:
-            for m in self.msg_by_type['LAP']:
-                # 2nd byte is segment #, see M4GT4
-                segment, lap, duration, end_time = struct.unpack('xBHIxxxxxxxxI', m.content)
-                end_time -= self.time_offset
-                if (not ret or ret[-1].num != lap) and segment == 0:
-                    assert not ret or ret[-1].num + 1 == lap # deal with missing data later
-                    ret.append(Lap(lap, end_time - duration, end_time))
-        lat_ch = self.get_channel_data('GPS Latitude')
-        lon_ch = self.get_channel_data('GPS Longitude')
+def _get_laps(channels, msg_by_type, time_offset):
+    ret = []
+    if 'LAP' in msg_by_type:
+        for m in msg_by_type['LAP']:
+            # 2nd byte is segment #, see M4GT4
+            segment, lap, duration, end_time = struct.unpack('xBHIxxxxxxxxI', m.content)
+            end_time -= time_offset
+            if (not ret or ret[-1].num != lap) and segment == 0:
+                assert not ret or ret[-1].num + 1 == lap # deal with missing data later
+                ret.append(base.Lap(lap, end_time - duration, end_time))
+    try:
+        lat_ch = channels['GPS Latitude']
+        lon_ch = channels['GPS Longitude']
+    except KeyError:
         # If we don't have GPS data, just return whatever laps we found.
-        if not lat_ch: return ret
-        # otherwise, we do gps lap insert.
-
-        # gps lap insert.  We assume the start finish "line" is a
-        # plane containing the vector that goes through the GPS
-        # coordinates sf lat/long from altitude 0 to 1000.  The normal
-        # of the plane is generally in line with the direction of
-        # travel, given the above constraint.
-
-        # O, D = vehicle vector (O=origin, D=direction, [0]=O, [1]=O+D)
-        # SO, SD = start finish origin, direction (plane must contain SO and SO+SD poitns)
-        # SN = start finish plane normal
-
-        # D = a*SD + SN
-        # 0 = SD . SN
-        # combine to get:  0 = SD . (D - a*SD)
-        #                  a * (SD . SD) = SD . D
-        # plug back into first eq:
-        # SN = D - (SD . D) / (SD . SD) * SD
-        # or to avoid division, and because length doesn't matter:
-        # SN = (SD . SD) * D - (SD. D) * SD
-
-        # now determine intersection with plane SO,SN from vector O,O+D:
-        # SN . (O + tD - SO) = 0
-        # t * (D . SN) + SN . (O - SO) = 0
-        # t = -SN.(O-SO) / D.SN
-
-        track = self.msg_by_type['TRK'][-1].content
-        SO = np.array(gps.lla2ecef(track['sf_lat'], track['sf_long'], 0)).reshape((1, 3))
-        SD = np.array(gps.lla2ecef(track['sf_lat'], track['sf_long'], 1000)).reshape((1, 3)) - SO
-
-        O = np.concatenate([x.reshape((len(x), 1))
-                            for x in gps.lla2ecef(np.array(lat_ch[1]), np.array(lon_ch[1]), 0)],
-                           axis=1) - SO
-        timecodes = np.array(lat_ch[0])
-
-        D = O[1:] - O[:-1]
-        O = O[:-1]
-
-        # Precalculate in which time periods we were traveling at least 4 m/s (~10mph)
-        minspeed = np.sum(D*D, axis=1) > np.square((timecodes[1:] - timecodes[:-1]) * (4 / 1000))
-
-        SN = (np.sum(SD * SD, axis=1).reshape((len(SD), 1)) * D
-              - np.sum(SD * D, axis=1).reshape((len(D), 1)) * SD)
-        t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
-        # This only works because the track is considered at altitude 0
-        dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
-        pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
-
-        # Now that we have a decent candidate selection of lap
-        # crossings, generate a single normal vector for the
-        # start/finish line to use for all lap crossings, to make the
-        # lap times more accurate/consistent.  Weight the crossings by
-        # velocity and add them together.  As it happens, SN is
-        # already weighted by velocity...
-        SN = np.sum(SN[1:][pick & minspeed[1:]], axis=0).reshape((1,3))
-        # recompute t, dist, pick
-        t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
-        dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
-        pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
-
-        # grab the earliest seen timecode from either provided laps or channel (including GPS) data
-        lap_markers = [min(([ret[0].start_time] if ret else []) +
-                           [ch.timecodes[0] for ch in self.data.channels
-                            if len(ch.timecodes)])]
-        for idx in (np.nonzero(pick)[0] + 1):
-            if timecodes[idx] <= lap_markers[-1]:
-                continue
-            if not minspeed[idx]:
-                idx = np.argmax(minspeed[idx:]) + idx
-            lap_markers.append(timecodes[idx] + t[idx] * (timecodes[idx+1]-timecodes[idx]))
-        # add in the latest seen timecode
-        lap_markers.append(max(([ret[-1].end_time] if ret else []) +
-                               [ch.timecodes[-1] for ch in self.data.channels
-                                if len(ch.timecodes)]))
-
-        return [Lap(lap, start_time, end_time)
-                for lap, (start_time, end_time) in enumerate(zip(lap_markers[:-1],
-                                                                 lap_markers[1:]))]
-
-    def get_speed_channel(self):
-        return 'GPS Speed'
-
-    def get_filename(self):
-        return self.file_name
-
-    def get_metadata(self):
-        ret = {}
-        for msg, name in [('RCR', 'Driver'),
-                          ('VEH', 'Vehicle'),
-                          ('TMD', 'Log Date'),
-                          ('TMT', 'Log Time'),
-                          ('VTY', 'Session'),
-                          ('CMP', 'Series'),
-                          ('NTE', 'Long Comment'),
-                          ]:
-            if msg in self.msg_by_type:
-                ret[name] = self.msg_by_type[msg][-1].content
-        if 'TRK' in self.msg_by_type:
-            ret['Venue'] = self.msg_by_type['TRK'][-1].content['name']
-            # ignore the start/finish line?
-        if 'ODO' in self.msg_by_type:
-            for name, stats in self.msg_by_type['ODO'][-1].content.items():
-                ret['Odo/%s Distance (km)' % name] = stats['dist'] / 1000
-                ret['Odo/%s Time' % name] = '%d:%02d:%02d' % (stats['time'] // 3600,
-                                                              stats['time'] // 60 % 60,
-                                                              stats['time'] % 60)
         return ret
+    # otherwise, we do gps lap insert.
+
+    # gps lap insert.  We assume the start finish "line" is a
+    # plane containing the vector that goes through the GPS
+    # coordinates sf lat/long from altitude 0 to 1000.  The normal
+    # of the plane is generally in line with the direction of
+    # travel, given the above constraint.
+
+    # O, D = vehicle vector (O=origin, D=direction, [0]=O, [1]=O+D)
+    # SO, SD = start finish origin, direction (plane must contain SO and SO+SD poitns)
+    # SN = start finish plane normal
+
+    # D = a*SD + SN
+    # 0 = SD . SN
+    # combine to get:  0 = SD . (D - a*SD)
+    #                  a * (SD . SD) = SD . D
+    # plug back into first eq:
+    # SN = D - (SD . D) / (SD . SD) * SD
+    # or to avoid division, and because length doesn't matter:
+    # SN = (SD . SD) * D - (SD. D) * SD
+
+    # now determine intersection with plane SO,SN from vector O,O+D:
+    # SN . (O + tD - SO) = 0
+    # t * (D . SN) + SN . (O - SO) = 0
+    # t = -SN.(O-SO) / D.SN
+
+    track = msg_by_type['TRK'][-1].content
+    SO = np.array(gps.lla2ecef(track['sf_lat'], track['sf_long'], 0)).reshape((1, 3))
+    SD = np.array(gps.lla2ecef(track['sf_lat'], track['sf_long'], 1000)).reshape((1, 3)) - SO
+
+    O = np.concatenate([x.reshape((len(x), 1))
+                        for x in gps.lla2ecef(np.array(lat_ch.sampledata),
+                                              np.array(lon_ch.sampledata), 0)],
+                       axis=1) - SO
+    timecodes = np.array(lat_ch.timecodes)
+
+    D = O[1:] - O[:-1]
+    O = O[:-1]
+
+    # Precalculate in which time periods we were traveling at least 4 m/s (~10mph)
+    minspeed = np.sum(D*D, axis=1) > np.square((timecodes[1:] - timecodes[:-1]) * (4 / 1000))
+
+    SN = (np.sum(SD * SD, axis=1).reshape((len(SD), 1)) * D
+          - np.sum(SD * D, axis=1).reshape((len(D), 1)) * SD)
+    t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+    # This only works because the track is considered at altitude 0
+    dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
+    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+
+    # Now that we have a decent candidate selection of lap
+    # crossings, generate a single normal vector for the
+    # start/finish line to use for all lap crossings, to make the
+    # lap times more accurate/consistent.  Weight the crossings by
+    # velocity and add them together.  As it happens, SN is
+    # already weighted by velocity...
+    SN = np.sum(SN[1:][pick & minspeed[1:]], axis=0).reshape((1,3))
+    # recompute t, dist, pick
+    t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+    dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
+    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+
+    # grab the earliest seen timecode from either provided laps or channel (including GPS) data
+    lap_markers = [min(([ret[0].start_time] if ret else []) +
+                       [ch.timecodes[0] for ch in channels.values()
+                        if len(ch.timecodes)])]
+    for idx in (np.nonzero(pick)[0] + 1):
+        if timecodes[idx] <= lap_markers[-1]:
+            continue
+        if not minspeed[idx]:
+            idx = np.argmax(minspeed[idx:]) + idx
+        lap_markers.append(timecodes[idx] + t[idx] * (timecodes[idx+1]-timecodes[idx]))
+    # add in the latest seen timecode
+    lap_markers.append(max(([ret[-1].end_time] if ret else []) +
+                           [ch.timecodes[-1] for ch in channels.values()
+                            if len(ch.timecodes)]))
+
+    return [base.Lap(lap, start_time, end_time)
+            for lap, (start_time, end_time) in enumerate(zip(lap_markers[:-1],
+                                                             lap_markers[1:]))]
 
 
-    def get_channels(self):
-        return [ch.long_name for ch in self.data.channels]
+def AIMXRK(fname, progress):
+    with open(fname, 'rb') as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            data = _decode_sequence(m, progress)
+    msg_by_type = {}
+    for m in data.messages:
+        msg_by_type.setdefault(m.token, []).append(m)
+    #pprint({k: len(v) for k, v in self.msg_by_type.items()})
+    # determine time offset
+    time_offset = min([ch.timecodes[0] for ch in data.channels.values() if len(ch.timecodes)] +
+                      [lap.start_time for lap in _get_laps(data.channels, msg_by_type, 0)[:1]])
+    for ch in data.channels.values():
+        ch.timecodes = memoryview(np.subtract(ch.timecodes, time_offset))
 
-    def get_channel_units(self, name):
-        ch = [ch for ch in self.data.channels if ch.long_name == name]
-        if len(ch) != 1: return None
-        ch = ch[0]
-        if ch.size == 1: return ''
-        return ch.units
+    # decode GPS data.  Do this after determining time offset
+    # since we have to fudge the data to get higher resolution
+    _decode_gps(data.channels, msg_by_type, time_offset)
 
-    def get_channel_dec_points(self, name):
-        ch = [ch for ch in self.data.channels if ch.long_name == name]
-        if len(ch) != 1: return None
-        ch = ch[0]
-        return ch.dec_pts
+    return base.LogFile(
+        {ch.long_name: base.Channel(ch.timecodes,
+                                    ch.sampledata,
+                                    ch.dec_pts,
+                                    ch.long_name,
+                                    ch.units if ch.size != 1 else '')
+         for ch in data.channels.values()},
+        _get_laps(data.channels, msg_by_type, time_offset),
+        _get_metadata(msg_by_type),
+        ['GPS Speed', 'GPS Latitude', 'GPS Longitude', 'GPS Altitude'],
+        fname)
 
-    def get_channel_data(self, name):
-        ch = [ch for ch in self.data.channels if ch.long_name == name]
-        if len(ch) != 1: return None
-        ch = ch[0]
-        if ch.long_name in ('L_BATT_VOLT', 'External Voltage', 'DTA_BATTERY', 'M800_BATTERY', 'ECU_BATTERY'):
-            scale = 0.001
-        else:
-            scale = 1
-        tc = ch.timecodes # lets store it this way
-        samp = ch.sampledata
-        assert len(tc) == len(samp), "%s: %d vs %d (sz=%d, tp=%d)" % (name, len(tc), len(samp), ch.size, ch.unknown[20])
-        if scale != 1:
-            samp = array('d', [a * scale for a in samp])
-        return (tc, samp)
+#def _help_decode_channels(self, chmap):
+#    pprint(chmap)
+#    for i in range(len(self.data.channels[0].unknown)):
+#        d = sorted([(v.unknown[i], chmap.get(v.long_name, ''), v.long_name)
+#                    for v in self.data.channels
+#                    if len(v.unknown) > i])
+#        if len(set([x[0] for x in d])) == 1:
+#            continue
+#        pprint((i, d))
+#    d = sorted([(len(v.sampledata), chmap.get(v.long_name, ''), v.long_name)
+#                for v in self.data.channels])
+#    if len(set([x[0] for x in d])) != 1:
+#        pprint(('len', d))

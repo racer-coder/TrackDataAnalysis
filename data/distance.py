@@ -50,35 +50,32 @@ class ChannelData:
 class DistanceWrapper:
     def __init__(self, data):
         self.data = data
-        self.metadata = data.get_metadata()
         self.channel_cache = {}
 
         # in case we fail out
         self.dist_map_time = np.array([0.]).data
         self.dist_map_dist = self.dist_map_time
 
-        if not self.data.get_laps() or not data.get_speed_channel():
+        if not data.laps or not data.key_channel_map[0]:
             return
 
         self._update_time_dist()
 
     def _calc_time_dist(self, expected_len = None):
-        distdata = self.data.get_channel_data(self.data.get_speed_channel())
-        converted = unitconv.convert(distdata[1],
-                                     self.data.get_channel_units(self.data.get_speed_channel()),
-                                     'm/s')
+        distdata = self.data.channels[self.data.key_channel_map[0]]
+        converted = unitconv.convert(distdata.values, distdata.units, 'm/s')
         if len(converted) == 0:
             return np.array([0.]).data, np.array([0.]).data, 0
 
         # VALIDATED: AiM GPS Speed is just linear interpolation of raw
         # ECEF velocity between datapoints, modulo floating point
         # accuracy (they seem to use 32-bit floats).
-        tc = np.arange(0, self.data.get_laps()[-1].end_time,
+        tc = np.arange(0, self.data.laps[-1].end_time,
                        10, dtype=np.float64) # np.interp requires float64 arrays for performance
-        gs = np.interp(tc, distdata[0], converted)
+        gs = np.interp(tc, distdata.timecodes, converted)
 
         # adjust distances of each lap to match the median, if within a certain percentage
-        dividers = [int(round(l.start_time / 10)) for l in self.data.get_laps()]
+        dividers = [int(round(l.start_time / 10)) for l in self.data.laps]
         lap_len = np.add.reduceat(gs, dividers)[1:-1]  # ignore in/out laps
         if not expected_len:
             expected_len = np.median(lap_len)
@@ -100,21 +97,21 @@ class DistanceWrapper:
         return np.interp(time, self.dist_map_time, self.dist_map_dist)
 
     def get_filename(self):
-        return self.data.get_filename()
+        return self.data.file_name
 
     def get_laps(self):
-        return self.data.get_laps()
+        return self.data.laps
 
     def get_metadata(self):
-        return self.metadata
+        return self.data.metadata
 
     def get_channels(self):
-        return self.data.get_channels()
+        return self.data.channels.keys()
 
     # must include units, dec_pts
     def get_channel_metadata(self, name):
-        return {'units': self.data.get_channel_units(name),
-                'dec_pts': self.data.get_channel_dec_points(name)}
+        return {'units': self.data.channels[name].units,
+                'dec_pts': self.data.channels[name].dec_pts}
 
     def get_channel_data(self, *names, unit=None):
         for name in names:
@@ -125,13 +122,13 @@ class DistanceWrapper:
                     if not len(converted.values): continue
                     self.channel_cache[key] = converted
                 else:
-                    data = self.data.get_channel_data(name)
-                    if data is None: continue
-                    self.channel_cache[key] = ChannelData(data[0],
-                                                          self.outTime2Dist(data[0]),
-                                                          data[1],
-                                                          self.data.get_channel_units(name),
-                                                          self.data.get_channel_dec_points(name))
+                    if name not in self.data.channels: continue
+                    data = self.data.channels[name]
+                    self.channel_cache[key] = ChannelData(data.timecodes,
+                                                          self.outTime2Dist(data.timecodes),
+                                                          data.values,
+                                                          data.units,
+                                                          data.dec_pts)
             if len(self.channel_cache[key].values):
                 return self.channel_cache[key]
         return ChannelData([], [], [], '', 0)

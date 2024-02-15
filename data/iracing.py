@@ -3,7 +3,6 @@
 
 # Parts taken/reinterpreted from https://github.com/gmartsenkov/itelem (also MIT licensed)
 
-from dataclasses import dataclass
 import mmap
 import struct
 import time
@@ -11,20 +10,7 @@ import time
 import numpy as np
 import yaml
 
-
-@dataclass
-class Channel:
-    timecodes: memoryview
-    values: memoryview
-    name: str
-    units: str
-    dec_pts: int
-
-@dataclass
-class Lap:
-    num: int
-    start_time: int
-    end_time: int
+from .base import Channel, Lap, LogFile
 
 def _dec_str(s, offs, maxlen):
     s = bytes(s[offs:offs + maxlen])
@@ -53,7 +39,7 @@ def _decode_var(m, offs, timecodes, samples, nrecords, stride):
     data = np.ascontiguousarray(data).data.cast('B').cast(_types[rtype][1])
     if unit == '%': # encoded actually as a ratio, not a percentage
         data = (np.array(data) * 100).data
-    return Channel(timecodes, data, name, unit, 2 if rtype >= 4 else 0)
+    return Channel(timecodes, data, name=name, units=unit, dec_pts=2 if rtype >= 4 else 0)
 
 def _decode(m):
     (_version, _status, tick_rate, _session_info_update, session_info_length, session_info_offset,
@@ -83,80 +69,55 @@ def _decode(m):
              })
 
 
-class IRacing:
-    def __init__(self, fname, progress):
-        self.file_name = fname
-        with open(fname, 'rb') as f:
-            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
-                self.data, self.metadata = _decode(memoryview(m))
-        self._find_laps()
-        self._filter_gps()
+def _filter_gps(data):
+    # filter out lat/long of 0
+    lat = data['Lat']
+    lon = data['Lon']
+    alt = data['Alt']
+    pick = (np.array(lat.values) != 0) | (np.array(lon.values) != 0)
+    tc = np.array(lat.timecodes)[pick].data
+    lat.timecodes = tc
+    lat.values = np.array(lat.values)[pick].data
+    lon.timecodes = tc
+    lon.values = np.array(lon.values)[pick].data
+    alt.timecodes = tc
+    alt.values = np.array(alt.values)[pick].data
 
-    def _find_laps(self):
-        # LapCurrentLapTime doesn't actually reset on lap boundaries
-        # (it reacts about a half second later, but doesn't react at
-        # all on an out lap), so instead we rely on a combination of
-        # LapDist and Speed to determine exactly when the lap change
-        # occurred.
-        lap = np.array(self.data['Lap'].values)
-        lapdist = self.data['LapDist'].values
-        speed = self.data['Speed']
+def _find_laps(data):
+    # LapCurrentLapTime doesn't actually reset on lap boundaries
+    # (it reacts about a half second later, but doesn't react at
+    # all on an out lap), so instead we rely on a combination of
+    # LapDist and Speed to determine exactly when the lap change
+    # occurred.
+    lap = np.array(data['Lap'].values)
+    lapdist = data['LapDist'].values
+    speed = data['Speed']
 
-        assert self.data['LapDist'].units == 'm'
-        assert speed.units == 'm/s'
+    assert data['LapDist'].units == 'm'
+    assert speed.units == 'm/s'
 
-        lap_markers = [0]
-        add_end = True
-        for b in (np.nonzero(lap[1:] != lap[:-1])[0] + 1):
-            if lap[b] == 0: # probably no more useful data
-                lap_markers.append(speed.timecodes[b])
-                add_end = False
-                break
-            lap_markers.append(max(speed.timecodes[b-1],
-                                   speed.timecodes[b] - lapdist[b] / speed.values[b] * 1000))
-        if add_end:
-            lap_markers.append(speed.timecodes[-1])
+    lap_markers = [0]
+    add_end = True
+    for b in (np.nonzero(lap[1:] != lap[:-1])[0] + 1):
+        if lap[b] == 0: # probably no more useful data
+            lap_markers.append(speed.timecodes[b])
+            add_end = False
+            break
+        lap_markers.append(max(speed.timecodes[b-1],
+                               speed.timecodes[b] - lapdist[b] / speed.values[b] * 1000))
+    if add_end:
+        lap_markers.append(speed.timecodes[-1])
 
-        self.laps = [Lap(i, s, e)
-                     for i, (s, e) in enumerate(zip(lap_markers[:-1], lap_markers[1:]))]
+    return [Lap(i, s, e) for i, (s, e) in enumerate(zip(lap_markers[:-1], lap_markers[1:]))]
 
-    def _filter_gps(self):
-        # filter out lat/long of 0
-        lat = self.data['Lat']
-        lon = self.data['Lon']
-        alt = self.data['Alt']
-        pick = (np.array(lat.values) != 0) | (np.array(lon.values) != 0)
-        tc = np.array(lat.timecodes)[pick].data
-        lat.timecodes = tc
-        lat.values = np.array(lat.values)[pick].data
-        lon.timecodes = tc
-        lon.values = np.array(lon.values)[pick].data
-        alt.timecodes = tc
-        alt.values = np.array(alt.values)[pick].data
+def IRacing(fname, progress):
+    with open(fname, 'rb') as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            data, metadata = _decode(memoryview(m))
+    _filter_gps(data)
 
-    def get_filename(self):
-        return self.file_name
-
-    def get_metadata(self):
-        return self.metadata
-
-    def get_laps(self):
-        return self.laps
-
-    def get_speed_channel(self):
-        return 'Speed'
-
-    def get_channels(self):
-        return self.data.keys()
-
-    def get_channel_units(self, name):
-        return self.data[name].units if name in self.data else None
-
-    def get_channel_dec_points(self, name):
-        return self.data[name].dec_pts
-
-    def get_channel_data(self, name):
-        if name not in self.data:
-            return None
-        d = self.data[name]
-        return (d.timecodes, d.values)
+    return LogFile(data,
+                   _find_laps(data),
+                   metadata,
+                   ['Speed', 'Lat', 'Lon', 'Alt'],
+                   fname)
