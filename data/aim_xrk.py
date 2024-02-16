@@ -48,6 +48,7 @@ class Channel:
     group: Optional[GroupRef] = None
     timecodes: object = field(default=None, repr=False)
     sampledata: object = field(default=None, repr=False)
+    indices: array = field(default_factory=lambda: array('I'), repr=False)
     # used during building:
     add_helper: int = 0
 
@@ -171,8 +172,7 @@ def _decode_sequence(s, progress=None):
                     # print(hdr[1], ch)
                     pos += ch.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    ch.timecodes.append(tc)
-                    ch.sampledata += s[oldpos+8:pos]
+                    ch.indices.append(oldpos)
                     pos += 1
                 elif typ == ord_M:
                     cnt, = xH_decoder.unpack_from(s, pos)
@@ -328,8 +328,15 @@ def _decode_sequence(s, progress=None):
                                       shape=(len(s) - c.group.offset - c.size + 1,),
                                       strides=(1,))[grp.samples].data
         else:
-            tc = ndarray_from_mv(c.timecodes)
-            samp = ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
+            if c.indices:
+                assert len(c.timecodes) == 0, "Can't have both S and M records for channel %s" % c.long_name
+                tc = np.ndarray(buffer=memoryview(s)[2:], dtype=np.int32,
+                                shape=(len(s) - 2 - 3,), strides=(1,))[c.indices]
+                samp = np.ndarray(buffer=memoryview(s)[8:], dtype=d.stype,
+                                  shape=(len(s) - 8 - c.size + 1,), strides=(1,))[c.indices]
+            else:
+                tc = ndarray_from_mv(c.timecodes)
+                samp = ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
             pick = np.unique(np.maximum.accumulate(tc), return_index=True)[1]
             c.timecodes = tc[pick].data
             c.sampledata = samp[pick].data
