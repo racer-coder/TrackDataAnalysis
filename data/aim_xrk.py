@@ -142,8 +142,8 @@ def _decode_sequence(s, progress=None):
     next_progress = 1_000_000
     pos = 0
     badbytes = bytearray()
-    xIH_decoder = struct.Struct('<xIH')
-    xIHH_decoder = struct.Struct('<xIHH')
+    xBIH_decoder = struct.Struct('<xBIH')
+    xH_decoder = struct.Struct('<8xH')
     Mms = {
         32: 20,
         64: 40,
@@ -159,10 +159,8 @@ def _decode_sequence(s, progress=None):
         try:
             while s[pos] == ord_op:
                 oldpos = pos
-                pos += 1
-                if s[pos] == ord_G:
-                    # print('G of', hdr[1], 'at', '%x' % pos)
-                    tc, idx = xIH_decoder.unpack_from(s, pos)
+                typ, tc, idx = xBIH_decoder.unpack_from(s, pos)
+                if typ == ord_G:
                     g = groups[idx]
                     pos += g.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
@@ -170,8 +168,7 @@ def _decode_sequence(s, progress=None):
                         g.samples += s[pos - g.row_size:pos]
                         g.last_timecode = tc
                     pos += 1
-                elif s[pos] == ord_S:
-                    tc, idx = xIH_decoder.unpack_from(s, pos)
+                elif typ == ord_S:
                     ch = channels[idx]
                     # print(hdr[1], ch)
                     pos += ch.add_helper
@@ -179,10 +176,10 @@ def _decode_sequence(s, progress=None):
                     ch.timecodes.append(tc)
                     ch.sampledata += s[oldpos+8:pos]
                     pos += 1
-                elif s[pos] == ord_M:
-                    tc, idx, cnt = xIHH_decoder.unpack_from(s, pos)
+                elif typ == ord_M:
+                    cnt, = xH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
-                    pos += ch.size * cnt + 9
+                    pos += ch.size * cnt + 10
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     ms = Mms[ch.unknown[64]]
                     ch.timecodes += array('i', [tc + off for off in range(0, cnt*ms, ms)])
@@ -241,10 +238,10 @@ def _decode_sequence(s, progress=None):
 
                             align = max(4, max(channels[ch].size for ch in m.content.channels))
                             assert align == 4 or align == 8 # What else can we do?
-                            m.content.add_helper = 7 + sum(channels[ch].size
+                            m.content.add_helper = 8 + sum(channels[ch].size
                                                             for ch in m.content.channels)
-                            m.content.row_size = (m.content.add_helper + align - 2) & -align
-                            idx = m.content.row_size - (m.content.add_helper - 7)
+                            m.content.row_size = (m.content.add_helper + align - 3) & -align
+                            idx = m.content.row_size - (m.content.add_helper - 8)
                             for ch in m.content.channels:
                                 channels[ch].group = GroupRef(m.content, idx)
                                 idx += channels[ch].size
@@ -262,7 +259,7 @@ def _decode_sequence(s, progress=None):
                      data.long_name,
                      data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
                     data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
-                    data.add_helper = data.size + 7
+                    data.add_helper = data.size + 8
 
                     # [12] maybe type (lower bits) combined with scale or ??
                     # [13] decoder of some type?
@@ -325,7 +322,7 @@ def _decode_sequence(s, progress=None):
 
         if c.group:
             idx = c.group.group.channels.index(c.index)
-            tcidx = c.group.group.row_size - c.group.group.add_helper + 1
+            tcidx = c.group.group.row_size - c.group.group.add_helper + 2
             sidx = c.group.offset
             samp = c.group.group.samples
             c.timecodes = samp[tcidx:len(samp)-(-tcidx&3)].cast('i')[::c.group.group.row_size//4]
