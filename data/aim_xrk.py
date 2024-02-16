@@ -132,9 +132,13 @@ _unit_map = {
     33: ('%', 2),
 }
 
-def ndarray_from_mv(mv):
+def _ndarray_from_mv(mv):
     mv = memoryview(mv) # force it
     return np.ndarray(buffer=mv, shape=(len(mv),), dtype=np.dtype(mv.format))
+
+def _sliding_ndarray(buf, typ):
+    return np.ndarray(buffer=buf, dtype=typ,
+                      shape=(len(buf) - array(typ).itemsize + 1,), strides=(1,))
 
 def _decode_sequence(s, progress=None):
     groups = {}
@@ -169,7 +173,6 @@ def _decode_sequence(s, progress=None):
                     pos += 1
                 elif typ == ord_S:
                     ch = channels[idx]
-                    # print(hdr[1], ch)
                     pos += ch.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     ch.indices.append(oldpos)
@@ -306,8 +309,7 @@ def _decode_sequence(s, progress=None):
         for ch in g.channels:
             channels[ch].group = GroupRef(g, idx)
             idx += channels[ch].size
-        g.timecodes = np.ndarray(buffer=memoryview(s)[2:], dtype=np.int32,
-                                 shape=(len(s) - 2 - 3,), strides=(1,))[g.samples]
+        g.timecodes = _sliding_ndarray(memoryview(s)[2:], 'i')[g.samples]
         g.pick = np.unique(np.maximum.accumulate(g.timecodes), return_index=True)[1]
         g.timecodes = g.timecodes[g.pick].data
         g.samples = np.asarray(g.samples)[g.pick]
@@ -323,20 +325,16 @@ def _decode_sequence(s, progress=None):
         if c.group:
             grp = c.group.group
             c.timecodes = grp.timecodes
-            c.sampledata = np.ndarray(buffer=memoryview(s)[c.group.offset:],
-                                      dtype=np.dtype(d.stype),
-                                      shape=(len(s) - c.group.offset - c.size + 1,),
-                                      strides=(1,))[grp.samples].data
+            c.sampledata = _sliding_ndarray(memoryview(s)[c.group.offset:],
+                                            d.stype)[grp.samples].data
         else:
             if c.indices:
                 assert len(c.timecodes) == 0, "Can't have both S and M records for channel %s" % c.long_name
-                tc = np.ndarray(buffer=memoryview(s)[2:], dtype=np.int32,
-                                shape=(len(s) - 2 - 3,), strides=(1,))[c.indices]
-                samp = np.ndarray(buffer=memoryview(s)[8:], dtype=d.stype,
-                                  shape=(len(s) - 8 - c.size + 1,), strides=(1,))[c.indices]
+                tc = _sliding_ndarray(memoryview(s)[2:], 'i')[c.indices]
+                samp = _sliding_ndarray(memoryview(s)[8:], d.stype)[c.indices]
             else:
-                tc = ndarray_from_mv(c.timecodes)
-                samp = ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
+                tc = _ndarray_from_mv(c.timecodes)
+                samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
             pick = np.unique(np.maximum.accumulate(tc), return_index=True)[1]
             c.timecodes = tc[pick].data
             c.sampledata = samp[pick].data
