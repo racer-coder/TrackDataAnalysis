@@ -147,6 +147,8 @@ def _decode_sequence(s, progress=None):
     next_progress = 1_000_000
     pos = 0
     badbytes = bytearray()
+    badpos = 0
+    HIH_decoder = struct.Struct('<HIH')
     xBIH_decoder = struct.Struct('<xBIH')
     xH_decoder = struct.Struct('<8xH')
     Mms = {
@@ -155,29 +157,30 @@ def _decode_sequence(s, progress=None):
     }
     ord_op = ord('(')
     ord_cp = ord(')')
-    ord_G  = ord('G')
-    ord_S  = ord('S')
-    ord_M  = ord('M')
+    ord_op_G  = ord_op + 256 * ord('G')
+    ord_op_S  = ord_op + 256 * ord('S')
+    ord_op_M  = ord_op + 256 * ord('M')
     ord_lt = ord('<')
+    ord_lt_h  = ord_lt + 256 * ord('h')
     len_s  = len(s)
     while pos < len_s:
         try:
-            while s[pos] == ord_op:
+            while True:
                 oldpos = pos
-                typ, tc, idx = xBIH_decoder.unpack_from(s, pos)
-                if typ == ord_G:
+                typ, tc, idx = HIH_decoder.unpack_from(s, pos)
+                if typ == ord_op_G:
                     g = groups[idx]
                     pos += g.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     g.samples.append(oldpos)
                     pos += 1
-                elif typ == ord_S:
+                elif typ == ord_op_S:
                     ch = channels[idx]
                     pos += ch.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     ch.indices.append(oldpos)
                     pos += 1
-                elif typ == ord_M:
+                elif typ == ord_op_M:
                     cnt, = xH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
                     pos += ch.size * cnt + 10
@@ -186,123 +189,121 @@ def _decode_sequence(s, progress=None):
                     ch.timecodes += array('i', [tc + off for off in range(0, cnt*ms, ms)])
                     ch.sampledata += s[oldpos+10:pos]
                     pos += 1
+                elif typ == ord_lt_h:
+                    if pos > next_progress:
+                        next_progress += 1_000_000
+                        if progress:
+                            progress(pos, len(s))
+                    pos += 2
+                    tok = s[pos:pos + 4]
+                    pos += 4
+                    l = struct.unpack_from('<IB', s, pos)
+                    pos += 5
+                    assert s[pos] == ord('>'), "%c at %x" % (s[pos], pos)
+                    pos += 1
+
+                    data = s[pos:pos + l[0]]
+                    bytesum = sum(data) & 0xffff
+                    pos += l[0]
+
+                    assert s[pos] == ord('<'), "%s at %x" % (s[pos], pos)
+                    pos += 1
+                    assert s[pos:pos + 4] == tok, "%s vs %s at %x" % (s[pos:pos + 4],
+                                                                      tok, pos)
+                    pos += 4
+                    l2 = struct.unpack_from('<H', s, pos)
+                    pos += 2
+                    assert s[pos] == ord('>'), "%c at %x" % (s[pos], pos)
+                    pos += 1
+
+                    tok = tok.rstrip(b'\0 ').decode('ascii')
+
+                    if tok == 'CNF':
+                        data = _decode_sequence(data).messages
+                        #channels = {} # Replays don't necessarily contain all the original channels
+                        for m in data:
+                            if m.token == 'CHS':
+                                if m.content.index not in channels:
+                                    channels[m.content.index] = m.content
+                                else:
+                                    assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
+                                    assert channels[m.content.index].long_name == m.content.long_name
+                            #elif t == 'CDE':
+                            #    print(t, chunk)
+                            elif m.token == 'GRP':
+                                groups[m.content.index] = m.content
+                                #print('GROUP', m.content.index, len(m.content.channels),
+                                #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
+
+                                m.content.add_helper = 8 + sum(channels[ch].size
+                                                               for ch in m.content.channels)
+                    elif tok == 'GRP':
+                        data = [x[0] for x in struct.iter_unpack('<H', data)]
+                        assert data[1] == len(data[2:])
+                        data = Group(index = data[0], channels = data[2:])
+                    elif tok == 'CDE':
+                        data = ['%02x' % x for x in data]
+                    elif tok == 'CHS':
+                        dcopy = bytearray(data) # copy
+                        data = Channel()
+                        (data.index,
+                         data.short_name,
+                         data.long_name,
+                         data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
+                        data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
+                        data.add_helper = data.size + 8
+
+                        # [12] maybe type (lower bits) combined with scale or ??
+                        # [13] decoder of some type?
+                        # [20] possibly how to decode bytes
+                        # [64] data rate.  32=50Hz, 64=25Hz, 80=20Hz, 160=10Hz.  What about 5Hz, 2Hz, 1Hz?
+                        # [84] decoder of some type?
+                        dcopy[0:2] = [0] * 2 # reset index
+                        dcopy[24:32] = [0] * 8 # short name
+                        dcopy[32:56] = [0] * 24 # long name
+                        data.unknown = bytes(dcopy)
+                        data.short_name = _nullterm_string(data.short_name)
+                        data.long_name = _nullterm_string(data.long_name)
+                        data.timecodes = array('i')
+                        data.sampledata = bytearray()
+                    elif tok in ('RCR', 'VEH', 'CMP', 'VTY', 'NDV', 'TMD', 'TMT',
+                                 'DBUN', 'DBUT', 'DVER', 'MANL', 'MODL', 'MANI',
+                                 'MODI', 'HWNF', 'PDLT', 'NTE'):
+                        data = _nullterm_string(data)
+                    elif tok == 'ENF':
+                        data = _decode_sequence(data).messages
+                    elif tok == 'TRK':
+                        data = {'name': _nullterm_string(data[:32]),
+                                'sf_lat': memoryview(data).cast('i')[9] / 1e7,
+                                'sf_long': memoryview(data).cast('i')[10] / 1e7}
+                    elif tok == 'ODO':
+                        # not sure how to map fuel.
+                        # Fuel Used channel claims 8.56l used (2046.0-2037.4)
+                        # Fuel Used odo says 70689.
+                        data = {_nullterm_string(data[i:i+16]):
+                                {'time': memoryview(data[i+16:i+24]).cast('I')[0], # seconds
+                                 'dist': memoryview(data[i+16:i+24]).cast('I')[1]} # meters
+                                for i in range(0, len(data), 64)
+                                # not sure how to parse fuel, doesn't match any expected units
+                                if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
+
+                    assert l2[0] == bytesum, '%x vs %x at %x' % (l2[0], bytesum, pos)
+                    messages.append(Message(tok, l[1], data))
                 else:
-                    assert False, "%c at %x" % (s[pos], pos)
-            oldpos = pos
-            if s[pos] == ord_lt:
-                if pos > next_progress:
-                    next_progress += 1_000_000
-                    if progress:
-                        progress(pos, len(s))
-                pos += 1
-                assert s[pos] == ord('h'), "%s at %x" % (s[pos], pos)
-                pos += 1
-                tok = s[pos:pos + 4]
-                pos += 4
-                l = struct.unpack_from('<IB', s, pos)
-                pos += 5
-                assert s[pos] == ord('>'), "%c at %x" % (s[pos], pos)
-                pos += 1
-
-                data = s[pos:pos + l[0]]
-                bytesum = sum(data) & 0xffff
-                pos += l[0]
-
-                assert s[pos] == ord('<'), "%s at %x" % (s[pos], pos)
-                pos += 1
-                assert s[pos:pos + 4] == tok, "%s vs %s at %x" % (s[pos:pos + 4],
-                                                                  tok, pos)
-                pos += 4
-                l2 = struct.unpack_from('<H', s, pos)
-                pos += 2
-                assert s[pos] == ord('>'), "%c at %x" % (s[pos], pos)
-                pos += 1
-
-                tok = tok.rstrip(b'\0 ').decode('ascii')
-
-                if tok == 'CNF':
-                    data = _decode_sequence(data).messages
-                    #channels = {} # Replays don't necessarily contain all the original channels
-                    for m in data:
-                        if m.token == 'CHS':
-                            if m.content.index not in channels:
-                                channels[m.content.index] = m.content
-                            else:
-                                assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
-                                assert channels[m.content.index].long_name == m.content.long_name
-                        #elif t == 'CDE':
-                        #    print(t, chunk)
-                        elif m.token == 'GRP':
-                            groups[m.content.index] = m.content
-                            #print('GROUP', m.content.index, len(m.content.channels),
-                            #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
-
-                            m.content.add_helper = 8 + sum(channels[ch].size
-                                                           for ch in m.content.channels)
-                elif tok == 'GRP':
-                    data = [x[0] for x in struct.iter_unpack('<H', data)]
-                    assert data[1] == len(data[2:])
-                    data = Group(index = data[0], channels = data[2:])
-                elif tok == 'CDE':
-                    data = ['%02x' % x for x in data]
-                elif tok == 'CHS':
-                    dcopy = bytearray(data) # copy
-                    data = Channel()
-                    (data.index,
-                     data.short_name,
-                     data.long_name,
-                     data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
-                    data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
-                    data.add_helper = data.size + 8
-
-                    # [12] maybe type (lower bits) combined with scale or ??
-                    # [13] decoder of some type?
-                    # [20] possibly how to decode bytes
-                    # [64] data rate.  32=50Hz, 64=25Hz, 80=20Hz, 160=10Hz.  What about 5Hz, 2Hz, 1Hz?
-                    # [84] decoder of some type?
-                    dcopy[0:2] = [0] * 2 # reset index
-                    dcopy[24:32] = [0] * 8 # short name
-                    dcopy[32:56] = [0] * 24 # long name
-                    data.unknown = bytes(dcopy)
-                    data.short_name = _nullterm_string(data.short_name)
-                    data.long_name = _nullterm_string(data.long_name)
-                    data.timecodes = array('i')
-                    data.sampledata = bytearray()
-                elif tok in ('RCR', 'VEH', 'CMP', 'VTY', 'NDV', 'TMD', 'TMT',
-                             'DBUN', 'DBUT', 'DVER', 'MANL', 'MODL', 'MANI',
-                             'MODI', 'HWNF', 'PDLT', 'NTE'):
-                    data = _nullterm_string(data)
-                elif tok == 'ENF':
-                    data = _decode_sequence(data).messages
-                elif tok == 'TRK':
-                    data = {'name': _nullterm_string(data[:32]),
-                            'sf_lat': memoryview(data).cast('i')[9] / 1e7,
-                            'sf_long': memoryview(data).cast('i')[10] / 1e7}
-                elif tok == 'ODO':
-                    # not sure how to map fuel.
-                    # Fuel Used channel claims 8.56l used (2046.0-2037.4)
-                    # Fuel Used odo says 70689.
-                    data = {_nullterm_string(data[i:i+16]):
-                            {'time': memoryview(data[i+16:i+24]).cast('I')[0], # seconds
-                             'dist': memoryview(data[i+16:i+24]).cast('I')[1]} # meters
-                            for i in range(0, len(data), 64)
-                            # not sure how to parse fuel, doesn't match any expected units
-                            if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
-
-                assert l2[0] == bytesum, '%x vs %x at %x' % (l2[0], bytesum, pos)
-                messages.append(Message(tok, l[1], data))
-            else:
-                assert False, "%c at %x" % (s[pos], pos)
+                    assert False, "%c%c at %x" % (s[pos], s[pos+1], pos)
         except Exception as _err: # pylint: disable=broad-exception-caught
+            if oldpos != badpos + len(badbytes) and badbytes:
+                #print('Bad bytes(%d at %x):' % (len(badbytes), badpos), bytes(badbytes))
+                badbytes = bytearray()
             if not badbytes:
                 # traceback.print_exc()
                 badpos = oldpos # pylint: disable=unused-variable
-            badbytes.append(s[oldpos])
-            pos = oldpos + 1
-        else:
-            if badbytes:
-                #print('Bad bytes(%d at %x):' % (len(badbytes), badpos), bytes(badbytes))
-                badbytes = bytearray()
+            if oldpos < len_s:
+                badbytes.append(s[oldpos])
+                pos = oldpos + 1
+    if badbytes:
+        #print('Bad bytes(%d at %x):' % (len(badbytes), badpos), bytes(badbytes))
+        badbytes = bytearray()
     assert pos == len(s)
     for g in groups.values():
         idx = 8
