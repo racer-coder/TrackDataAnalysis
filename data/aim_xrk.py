@@ -26,9 +26,9 @@ class Group:
     index: int
     channels: List[int]
     samples: bytearray = field(default_factory=bytearray, repr=False)
+    timecodes: Optional[array] = None
     # used during building:
     add_helper: int = 0
-    row_size: int = 0
     last_timecode: int = -1
 
 @dataclass(**dc_slots)
@@ -165,7 +165,7 @@ def _decode_sequence(s, progress=None):
                     pos += g.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     if tc > g.last_timecode:
-                        g.samples += s[pos - g.row_size:pos]
+                        g.samples += s[oldpos:pos]
                         g.last_timecode = tc
                     pos += 1
                 elif typ == ord_S:
@@ -236,15 +236,8 @@ def _decode_sequence(s, progress=None):
                             #print('GROUP', m.content.index, len(m.content.channels),
                             #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
 
-                            align = max(4, max(channels[ch].size for ch in m.content.channels))
-                            assert align == 4 or align == 8 # What else can we do?
                             m.content.add_helper = 8 + sum(channels[ch].size
-                                                            for ch in m.content.channels)
-                            m.content.row_size = (m.content.add_helper + align - 3) & -align
-                            idx = m.content.row_size - (m.content.add_helper - 8)
-                            for ch in m.content.channels:
-                                channels[ch].group = GroupRef(m.content, idx)
-                                idx += channels[ch].size
+                                                           for ch in m.content.channels)
                 elif tok == 'GRP':
                     data = [x[0] for x in struct.iter_unpack('<H', data)]
                     assert data[1] == len(data[2:])
@@ -311,7 +304,14 @@ def _decode_sequence(s, progress=None):
                 badbytes = bytearray()
     assert pos == len(s)
     for g in groups.values():
-        g.samples = memoryview(g.samples) # For more efficient access later
+        idx = 8
+        for ch in g.channels:
+            channels[ch].group = GroupRef(g, idx)
+            idx += channels[ch].size
+        g.samples = memoryview(g.samples)
+        g.timecodes = np.ndarray(buffer=g.samples[2:], dtype=np.int32,
+                                 shape=(len(g.samples) // g.add_helper),
+                                 strides=(g.add_helper,)).copy().data
     for c in channels.values():
         if c.long_name in _manual_decoders:
             d = _manual_decoders[c.long_name]
@@ -321,14 +321,11 @@ def _decode_sequence(s, progress=None):
             continue
 
         if c.group:
-            idx = c.group.group.channels.index(c.index)
-            tcidx = c.group.group.row_size - c.group.group.add_helper + 2
-            sidx = c.group.offset
-            samp = c.group.group.samples
-            c.timecodes = samp[tcidx:len(samp)-(-tcidx&3)].cast('i')[::c.group.group.row_size//4]
-            samp = samp[sidx:len(samp)-(-sidx & (c.size - 1))]
-            c.sampledata = samp.cast(d.stype)[::c.group.group.row_size//c.size]
-            c.group = None # doesn't matter anymore, we've extracted our data
+            grp = c.group.group
+            c.timecodes = grp.timecodes
+            c.sampledata = np.ndarray(buffer=grp.samples[c.group.offset:], dtype=np.dtype(d.stype),
+                                      shape=(len(grp.timecodes),),
+                                      strides=(grp.add_helper,)).copy().data
         else:
             tc = ndarray_from_mv(c.timecodes)
             samp = ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
