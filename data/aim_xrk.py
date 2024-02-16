@@ -26,10 +26,10 @@ class Group:
     index: int
     channels: List[int]
     samples: bytearray = field(default_factory=bytearray, repr=False)
-    timecodes: Optional[array] = None
     # used during building:
     add_helper: int = 0
-    last_timecode: int = -1
+    timecodes: Optional[array] = None
+    pick: object = None
 
 @dataclass(**dc_slots)
 class GroupRef:
@@ -164,9 +164,7 @@ def _decode_sequence(s, progress=None):
                     g = groups[idx]
                     pos += g.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    if tc > g.last_timecode:
-                        g.samples += s[oldpos:pos]
-                        g.last_timecode = tc
+                    g.samples += s[oldpos:pos]
                     pos += 1
                 elif typ == ord_S:
                     ch = channels[idx]
@@ -311,7 +309,10 @@ def _decode_sequence(s, progress=None):
         g.samples = memoryview(g.samples)
         g.timecodes = np.ndarray(buffer=g.samples[2:], dtype=np.int32,
                                  shape=(len(g.samples) // g.add_helper),
-                                 strides=(g.add_helper,)).copy().data
+                                 strides=(g.add_helper,))
+        g.pick = np.unique(np.maximum.accumulate(g.timecodes), return_index=True)[1]
+        g.timecodes = g.timecodes[g.pick].data
+
     for c in channels.values():
         if c.long_name in _manual_decoders:
             d = _manual_decoders[c.long_name]
@@ -324,8 +325,8 @@ def _decode_sequence(s, progress=None):
             grp = c.group.group
             c.timecodes = grp.timecodes
             c.sampledata = np.ndarray(buffer=grp.samples[c.group.offset:], dtype=np.dtype(d.stype),
-                                      shape=(len(grp.timecodes),),
-                                      strides=(grp.add_helper,)).copy().data
+                                      shape=(len(grp.samples) // grp.add_helper),
+                                      strides=(grp.add_helper,))[grp.pick].data
         else:
             tc = ndarray_from_mv(c.timecodes)
             samp = ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
