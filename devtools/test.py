@@ -42,7 +42,7 @@ def test_aim():
         #print(t[0], t[-1], (t[-1] - t[0]) / (len(t) - 1), (len(t) - 1) / (t[-1] - t[0]))
 
 def test_xrk():
-    res = aim_xrk.AIMXRK(fname)
+    res = aim_xrk.AIMXRK(fname, lambda x,y: None)
 
 def test_xrk_and_ch():
     res = distance.DistanceWrapper(aim_xrk.AIMXRK(fname))
@@ -167,8 +167,8 @@ def gps_ch_compare():
 
 
 #test_aim()
-#test_xrk()
+test_xrk()
 #test_xrk_and_ch()
-ch_help()
+#ch_help()
 #ch_compare()
 #gps_ch_compare()

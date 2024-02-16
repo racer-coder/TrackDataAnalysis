@@ -49,7 +49,7 @@ class Channel:
     timecodes: object = field(default=None, repr=False)
     sampledata: object = field(default=None, repr=False)
     # used during building:
-    last_timecode: int = -1
+    add_helper: int = 0
 
 @dataclass(**dc_slots)
 class Message:
@@ -72,25 +72,6 @@ def _nullterm_string(s):
     if zero >= 0: s = s[:zero]
     return s.decode('ascii')
 
-_fast_f16 = (lambda
-             _f16_mult = [(s * (1 / 2**25) * 2**max(e, 1)) if e != 31 else math.nan
-                          for s in (1, -1)
-                          for e in range(32)],
-             _f16_adder = [((e != 0) - e - s) * 1024
-                           for s in (0, 32)
-                           for e in range(32)]:
-             array('f', [(i + _f16_adder[i >> 10]) * _f16_mult[i >> 10]
-                         for i in range(65536)]))()
-
-# A couple examples from wikipedia
-assert _fast_f16[0x0000] == 0
-assert _fast_f16[0x0001] == 2**-24
-assert _fast_f16[0x03ff] == 1023 * 2**-24
-assert _fast_f16[0x0400] == 2**-14
-assert _fast_f16[0x3c00] == 1
-assert _fast_f16[0xc000] == -2
-
-
 _manual_decoders = {
     'Calculated_Gear': Decoder('Q', fixup=lambda a: array('I', [0 if int(x) & 0x80000 else
                                                                 (int(x) >> 16) & 7 for x in a])),
@@ -110,7 +91,8 @@ _gear_table = {
 
 _decoders = {
     0:  Decoder('i'), # Master Clock on M4GT4?
-    1:  Decoder('H', fixup=lambda a: array('f', [_fast_f16[x] for x in a])),
+    1:  Decoder('H', fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
+                                                dtype=np.float16).astype(np.float32).data),
     3:  Decoder('i'), # Master Clock on ScottE46?
     4:  Decoder('h'),
     6:  Decoder('f'),
@@ -118,7 +100,8 @@ _decoders = {
     12: Decoder('i'), # Predictive Time?
     13: Decoder('B'), # status field?
     15: Decoder('Q', fixup=lambda a: array('i', [_gear_table.get(chr(int(x) & 0xffff), int(x) & 0xffff) for x in a])), # ?? NdscSwitch on M4GT4
-    20: Decoder('H', fixup=lambda a: array('f', [_fast_f16[x] for x in a])),
+    20: Decoder('H', fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
+                                                dtype=np.float16).astype(np.float32).data),
     24: Decoder('i'), # Best Run Diff?
 }
 
@@ -148,6 +131,10 @@ _unit_map = {
     33: ('%', 2),
 }
 
+def ndarray_from_mv(mv):
+    mv = memoryview(mv) # force it
+    return np.ndarray(buffer=mv, shape=(len(mv),), dtype=np.dtype(mv.format))
+
 def _decode_sequence(s, progress=None):
     groups = {}
     channels = {}
@@ -155,8 +142,8 @@ def _decode_sequence(s, progress=None):
     next_progress = 1_000_000
     pos = 0
     badbytes = bytearray()
-    IH_decoder = struct.Struct('<IH')
-    IHH_decoder = struct.Struct('<IHH')
+    xIH_decoder = struct.Struct('<xIH')
+    xIHH_decoder = struct.Struct('<xIHH')
     Mms = {
         32: 20,
         64: 40,
@@ -169,13 +156,13 @@ def _decode_sequence(s, progress=None):
     ord_lt = ord('<')
     len_s  = len(s)
     while pos < len_s:
-        oldpos = pos
         try:
-            if s[pos] == ord_op:
+            while s[pos] == ord_op:
+                oldpos = pos
                 pos += 1
                 if s[pos] == ord_G:
                     # print('G of', hdr[1], 'at', '%x' % pos)
-                    tc, idx = IH_decoder.unpack_from(s, pos + 1)
+                    tc, idx = xIH_decoder.unpack_from(s, pos)
                     g = groups[idx]
                     pos += g.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
@@ -184,35 +171,31 @@ def _decode_sequence(s, progress=None):
                         g.last_timecode = tc
                     pos += 1
                 elif s[pos] == ord_S:
-                    tc, idx = IH_decoder.unpack_from(s, pos + 1)
+                    tc, idx = xIH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
                     # print(hdr[1], ch)
-                    pos += 7 + ch.size
+                    pos += ch.add_helper
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    if tc > ch.last_timecode:
-                        ch.timecodes.append(tc)
-                        ch.sampledata += s[oldpos+8:pos]
-                        ch.last_timecode = tc
+                    ch.timecodes.append(tc)
+                    ch.sampledata += s[oldpos+8:pos]
                     pos += 1
                 elif s[pos] == ord_M:
-                    pos += 1
-                    tc, idx, cnt = IHH_decoder.unpack_from(s, pos)
-                    pos += 8
+                    tc, idx, cnt = xIHH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
-                    pos += ch.size * cnt
+                    pos += ch.size * cnt + 9
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     ms = Mms[ch.unknown[64]]
-                    assert tc > ch.last_timecode # Not sure how to handle
                     ch.timecodes += array('i', [tc + off for off in range(0, cnt*ms, ms)])
                     ch.sampledata += s[oldpos+10:pos]
-                    ch.last_timecode = tc + cnt * ms - ms
                     pos += 1
                 else:
                     assert False, "%c at %x" % (s[pos], pos)
-            elif s[pos] == ord_lt:
-                if pos > next_progress and progress:
-                    progress(pos, len(s))
+            oldpos = pos
+            if s[pos] == ord_lt:
+                if pos > next_progress:
                     next_progress += 1_000_000
+                    if progress:
+                        progress(pos, len(s))
                 pos += 1
                 assert s[pos] == ord('h'), "%s at %x" % (s[pos], pos)
                 pos += 1
@@ -279,6 +262,7 @@ def _decode_sequence(s, progress=None):
                      data.long_name,
                      data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
                     data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
+                    data.add_helper = data.size + 7
 
                     # [12] maybe type (lower bits) combined with scale or ??
                     # [13] decoder of some type?
@@ -349,7 +333,11 @@ def _decode_sequence(s, progress=None):
             c.sampledata = samp.cast(d.stype)[::c.group.group.row_size//c.size]
             c.group = None # doesn't matter anymore, we've extracted our data
         else:
-            c.sampledata = memoryview(c.sampledata).cast(d.stype)
+            tc = ndarray_from_mv(c.timecodes)
+            samp = ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
+            pick = np.unique(np.maximum.accumulate(tc), return_index=True)[1]
+            c.timecodes = tc[pick].data
+            c.sampledata = samp[pick].data
 
         if d.fixup:
             c.sampledata = memoryview(d.fixup(c.sampledata))
