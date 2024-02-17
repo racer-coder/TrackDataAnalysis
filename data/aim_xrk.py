@@ -47,7 +47,6 @@ class Channel:
     group: Optional[GroupRef] = None
     timecodes: object = field(default=None, repr=False)
     sampledata: object = field(default=None, repr=False)
-    indices: array = field(default_factory=lambda: array('I'), repr=False)
 
 @dataclass(**dc_slots)
 class Message:
@@ -162,7 +161,9 @@ def _decode_sequence(s, progress=None):
     ord_lt_h  = ord_lt + 256 * ord('h')
     ord_gt = ord('>')
     len_s  = len(s)
+    g_indices = []
     g_add_helper = []
+    ch_indices = []
     ch_add_helper = []
     while pos < len_s:
         try:
@@ -172,11 +173,11 @@ def _decode_sequence(s, progress=None):
                 if typ == ord_op_G:
                     pos += g_add_helper[idx]
                     assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
-                    groups[idx].samples.append(oldpos)
+                    g_indices[idx].append(oldpos)
                 elif typ == ord_op_S:
                     pos += ch_add_helper[idx]
                     assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
-                    channels[idx].indices.append(oldpos)
+                    ch_indices[idx].append(oldpos)
                 elif typ == ord_op_M:
                     tc, cnt = xIxH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
@@ -220,6 +221,8 @@ def _decode_sequence(s, progress=None):
                                 channels += [None] * (m.content.index - len(channels) + 1)
                                 if not channels[m.content.index]:
                                     channels[m.content.index] = m.content
+                                    ch_indices.extend([None] * (m.content.index - len(ch_indices) + 1))
+                                    ch_indices[m.content.index] = array('I')
                                     ch_add_helper.extend([1] * (m.content.index - len(ch_add_helper) + 1))
                                     ch_add_helper[m.content.index] = m.content.size + 9
 
@@ -234,6 +237,8 @@ def _decode_sequence(s, progress=None):
                                 #print('GROUP', m.content.index, len(m.content.channels),
                                 #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
 
+                                g_indices.extend([None] * (m.content.index - len(g_indices) + 1))
+                                g_indices[m.content.index] = array('I')
                                 g_add_helper.extend([1] * (m.content.index - len(g_add_helper) + 1))
                                 g_add_helper[m.content.index] = 9 + sum(channels[ch].size
                                                                         for ch in m.content.channels)
@@ -309,6 +314,7 @@ def _decode_sequence(s, progress=None):
         for ch in g.channels:
             channels[ch].group = GroupRef(g, idx)
             idx += channels[ch].size
+        g.samples = g_indices[g.index]
         g.timecodes = _sliding_ndarray(memoryview(s)[2:], 'i')[g.samples]
         g.pick = np.unique(np.maximum.accumulate(g.timecodes), return_index=True)[1]
         g.timecodes = g.timecodes[g.pick].data
@@ -329,10 +335,10 @@ def _decode_sequence(s, progress=None):
             c.sampledata = _sliding_ndarray(memoryview(s)[c.group.offset:],
                                             d.stype)[grp.samples].data
         else:
-            if c.indices:
+            if ch_indices[c.index]:
                 assert len(c.timecodes) == 0, "Can't have both S and M records for channel %s" % c.long_name
-                tc = _sliding_ndarray(memoryview(s)[2:], 'i')[c.indices]
-                samp = _sliding_ndarray(memoryview(s)[8:], d.stype)[c.indices]
+                tc = _sliding_ndarray(memoryview(s)[2:], 'i')[ch_indices[c.index]]
+                samp = _sliding_ndarray(memoryview(s)[8:], d.stype)[ch_indices[c.index]]
             else:
                 tc = _ndarray_from_mv(c.timecodes)
                 samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
