@@ -316,8 +316,8 @@ def _decode_sequence(s, progress=None):
             idx += channels[ch].size
         g.samples = g_indices[g.index]
         g.timecodes = _sliding_ndarray(memoryview(s)[2:], 'i')[g.samples]
-        g.pick = np.unique(np.maximum.accumulate(g.timecodes), return_index=True)[1]
-        g.timecodes = g.timecodes[g.pick].data
+        g.timecodes, g.pick = np.unique(np.maximum.accumulate(g.timecodes), return_index=True)
+        g.timecodes = g.timecodes.data
         g.samples = np.asarray(g.samples)[g.pick]
 
     for c in channels:
@@ -342,8 +342,8 @@ def _decode_sequence(s, progress=None):
             else:
                 tc = _ndarray_from_mv(c.timecodes)
                 samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
-            pick = np.unique(np.maximum.accumulate(tc), return_index=True)[1]
-            c.timecodes = tc[pick].data
+            tc, pick = np.unique(np.maximum.accumulate(tc), return_index=True)
+            c.timecodes = tc.data
             c.sampledata = samp[pick].data
 
         if d.fixup:
