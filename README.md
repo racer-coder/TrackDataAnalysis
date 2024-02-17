@@ -230,6 +230,9 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
+- 0.3.3
+  - Significantly (50%) faster AiM XRK file processing.
+  - Add handling for interpolated vs previous values in graphs
 - 0.3.2
   - Context menu for worksheet tabs (new/rename/delete/duplicate/etc)
   - Parse some metadata from iRacing files for use in db
