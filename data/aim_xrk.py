@@ -76,15 +76,14 @@ _manual_decoders = {
                                                                 (int(x) >> 16) & 7 for x in a])),
 }
 
-_gear_table = {
-    'N': 0,
-    '1': 1,
-    '2': 2,
-    '3': 3,
-    '4': 4,
-    '5': 5,
-    '6': 6,
-}
+_gear_table = np.arange(65536, dtype=np.uint16)
+_gear_table[ord('N')] = 0
+_gear_table[ord('1')] = 1
+_gear_table[ord('2')] = 2
+_gear_table[ord('3')] = 3
+_gear_table[ord('4')] = 4
+_gear_table[ord('5')] = 5
+_gear_table[ord('6')] = 6
 
 _decoders = {
     0:  Decoder('i'), # Master Clock on M4GT4?
@@ -96,7 +95,7 @@ _decoders = {
     11: Decoder('h'),
     12: Decoder('i'), # Predictive Time?
     13: Decoder('B'), # status field?
-    15: Decoder('Q', fixup=lambda a: array('i', [_gear_table.get(chr(int(x) & 0xffff), int(x) & 0xffff) for x in a])), # ?? NdscSwitch on M4GT4
+    15: Decoder('H', fixup=lambda a: _gear_table[a]), # ?? NdscSwitch on M4GT4.  Also actual size is 8 bytes
     20: Decoder('H', fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
                                                 dtype=np.float16).astype(np.float32).data),
     24: Decoder('i'), # Best Run Diff?
