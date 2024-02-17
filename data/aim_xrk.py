@@ -27,7 +27,6 @@ class Group:
     channels: List[int]
     samples: array = field(default_factory=lambda: array('I'), repr=False)
     # used during building:
-    add_helper: int = 0
     timecodes: Optional[array] = None
     pick: object = None
 
@@ -49,8 +48,6 @@ class Channel:
     timecodes: object = field(default=None, repr=False)
     sampledata: object = field(default=None, repr=False)
     indices: array = field(default_factory=lambda: array('I'), repr=False)
-    # used during building:
-    add_helper: int = 0
 
 @dataclass(**dc_slots)
 class Message:
@@ -165,22 +162,21 @@ def _decode_sequence(s, progress=None):
     ord_lt_h  = ord_lt + 256 * ord('h')
     ord_gt = ord('>')
     len_s  = len(s)
-    slow_path = 0
+    g_add_helper = []
+    ch_add_helper = []
     while pos < len_s:
         try:
             while True:
                 oldpos = pos
                 typ, idx = HxH_decoder.unpack_from(s, pos)
                 if typ == ord_op_G:
-                    g = groups[idx]
-                    pos += g.add_helper
+                    pos += g_add_helper[idx]
                     assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
-                    g.samples.append(oldpos)
+                    groups[idx].samples.append(oldpos)
                 elif typ == ord_op_S:
-                    ch = channels[idx]
-                    pos += ch.add_helper
+                    pos += ch_add_helper[idx]
                     assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
-                    ch.indices.append(oldpos)
+                    channels[idx].indices.append(oldpos)
                 elif typ == ord_op_M:
                     tc, cnt = xIxH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
@@ -224,6 +220,9 @@ def _decode_sequence(s, progress=None):
                                 channels += [None] * (m.content.index - len(channels) + 1)
                                 if not channels[m.content.index]:
                                     channels[m.content.index] = m.content
+                                    ch_add_helper.extend([1] * (m.content.index - len(ch_add_helper) + 1))
+                                    ch_add_helper[m.content.index] = m.content.size + 9
+
                                 else:
                                     assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
                                     assert channels[m.content.index].long_name == m.content.long_name
@@ -235,8 +234,9 @@ def _decode_sequence(s, progress=None):
                                 #print('GROUP', m.content.index, len(m.content.channels),
                                 #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
 
-                                m.content.add_helper = 9 + sum(channels[ch].size
-                                                               for ch in m.content.channels)
+                                g_add_helper.extend([1] * (m.content.index - len(g_add_helper) + 1))
+                                g_add_helper[m.content.index] = 9 + sum(channels[ch].size
+                                                                        for ch in m.content.channels)
                     elif tok == 'GRP':
                         data = memoryview(data).cast('H')
                         assert data[1] == len(data[2:])
@@ -251,7 +251,6 @@ def _decode_sequence(s, progress=None):
                          data.long_name,
                          data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
                         data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
-                        data.add_helper = data.size + 9
 
                         # [12] maybe type (lower bits) combined with scale or ??
                         # [13] decoder of some type?
