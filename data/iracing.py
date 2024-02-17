@@ -19,27 +19,27 @@ def _dec_str(s, offs, maxlen):
         s = s[:idx]
     return s.decode('ascii')
 
-_types = [(1, 'c'),
-          (1, '?'),
-          (4, 'i'),
-          (4, 'I'),
-          (4, 'f'),
-          (8, 'd')]
+_types = ['c',
+          '?',
+          'i',
+          'I',
+          'f',
+          'd']
 
 def _decode_var(m, offs, timecodes, samples, nrecords, stride):
     rtype, offset, _count, _count_as_time = struct.unpack_from('<3ib', m, offs)
     name = _dec_str(m, offs + 16, 32)
     #desc = _dec_str(m, offs + 48, 112 - 48)
     unit = _dec_str(m, offs + 112, 32)
-    data = np.concatenate([np.array(samples[offset + i::stride]).reshape((nrecords, 1))
-                           for i in range(_types[rtype][0])],
-                          axis=1)
+    data = np.ndarray(buffer=samples[offset:],
+                      dtype=_types[rtype],
+                      shape=(nrecords,),
+                      strides=(stride,)).copy()
     if rtype == 1:
         data = (data != 0)
-    data = np.ascontiguousarray(data).data.cast('B').cast(_types[rtype][1])
     if unit == '%': # encoded actually as a ratio, not a percentage
-        data = (np.array(data) * 100).data
-    return Channel(timecodes, data, name=name, units=unit,
+        data = data * 100
+    return Channel(timecodes, data.data, name=name, units=unit,
                    dec_pts=2 if rtype >= 4 else 0,
                    interpolate=True)
 
