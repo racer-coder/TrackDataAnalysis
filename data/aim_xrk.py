@@ -30,7 +30,6 @@ class Group:
     samples: array = field(default_factory=lambda: array('I'), repr=False)
     # used during building:
     timecodes: Optional[array] = None
-    pick: object = None
 
 @dataclass(**dc_slots)
 class GroupRef:
@@ -59,7 +58,9 @@ class Message:
 @dataclass(**dc_slots)
 class DataStream:
     channels: Dict[str, Channel]
-    messages: List[Message]
+    messages: Dict[str, List[Message]]
+    laps: List[base.Lap]
+    time_offset: int
 
 @dataclass(**dc_slots)
 class Decoder:
@@ -140,7 +141,7 @@ def _sliding_ndarray(buf, typ):
 def _decode_sequence(s, progress=None):
     groups = []
     channels = []
-    messages = []
+    messages = {}
     next_progress = 1_000_000
     pos = 0
     badbytes = bytearray()
@@ -166,6 +167,8 @@ def _decode_sequence(s, progress=None):
     g_add_helper = []
     ch_indices = []
     ch_add_helper = []
+    time_offset = None
+    last_time = None
     while pos < len_s:
         try:
             while True:
@@ -217,32 +220,33 @@ def _decode_sequence(s, progress=None):
                     elif tok == 'CNF':
                         data = _decode_sequence(data).messages
                         #channels = {} # Replays don't necessarily contain all the original channels
-                        for m in data:
-                            if m.token == 'CHS':
-                                channels += [None] * (m.content.index - len(channels) + 1)
-                                if not channels[m.content.index]:
-                                    channels[m.content.index] = m.content
-                                    ch_indices.extend([None] * (m.content.index - len(ch_indices) + 1))
-                                    ch_indices[m.content.index] = array('I')
-                                    ch_add_helper.extend([1] * (m.content.index - len(ch_add_helper) + 1))
-                                    ch_add_helper[m.content.index] = m.content.size + 9
+                        for m in data['CHS']:
+                            channels += [None] * (m.content.index - len(channels) + 1)
+                            if not channels[m.content.index]:
+                                channels[m.content.index] = m.content
+                                ch_indices.extend([None] * (m.content.index - len(ch_indices) + 1))
+                                ch_indices[m.content.index] = array('I')
+                                ch_add_helper.extend([1] * (m.content.index - len(ch_add_helper) + 1))
+                                ch_add_helper[m.content.index] = m.content.size + 9
 
-                                else:
-                                    assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
-                                    assert channels[m.content.index].long_name == m.content.long_name
-                            #elif t == 'CDE':
-                            #    print(t, chunk)
-                            elif m.token == 'GRP':
-                                groups += [None] * (m.content.index - len(groups) + 1)
-                                groups[m.content.index] = m.content
-                                #print('GROUP', m.content.index, len(m.content.channels),
-                                #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
+                            else:
+                                assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
+                                assert channels[m.content.index].long_name == m.content.long_name
+                        for m in data['GRP']:
+                            groups += [None] * (m.content.index - len(groups) + 1)
+                            groups[m.content.index] = m.content
+                            idx = 8
+                            for ch in m.content.channels:
+                                channels[ch].group = GroupRef(m.content, idx)
+                                idx += channels[ch].size
+                            #print('GROUP', m.content.index, len(m.content.channels),
+                            #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
 
-                                g_indices.extend([None] * (m.content.index - len(g_indices) + 1))
-                                g_indices[m.content.index] = array('I')
-                                g_add_helper.extend([1] * (m.content.index - len(g_add_helper) + 1))
-                                g_add_helper[m.content.index] = 9 + sum(channels[ch].size
-                                                                        for ch in m.content.channels)
+                            g_indices.extend([None] * (m.content.index - len(g_indices) + 1))
+                            g_indices[m.content.index] = array('I')
+                            g_add_helper.extend([1] * (m.content.index - len(g_add_helper) + 1))
+                            g_add_helper[m.content.index] = 9 + sum(channels[ch].size
+                                                                    for ch in m.content.channels)
                     elif tok == 'GRP':
                         data = memoryview(data).cast('H')
                         assert data[1] == len(data[2:])
@@ -271,6 +275,12 @@ def _decode_sequence(s, progress=None):
                         data.long_name = _nullterm_string(data.long_name)
                         data.timecodes = array('i')
                         data.sampledata = bytearray()
+                    elif tok == 'LAP':
+                        # cache first time offset for use later
+                        duration, end_time = struct.unpack('4xI8xI', data)
+                        if time_offset is None:
+                            time_offset = end_time - duration
+                        last_time = end_time
                     elif tok in ('RCR', 'VEH', 'CMP', 'VTY', 'NDV', 'TMD', 'TMT',
                                  'DBUN', 'DBUT', 'DVER', 'MANL', 'MODL', 'MANI',
                                  'MODI', 'HWNF', 'PDLT', 'NTE'):
@@ -292,7 +302,10 @@ def _decode_sequence(s, progress=None):
                                 # not sure how to parse fuel, doesn't match any expected units
                                 if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
 
-                    messages.append(Message(tok, typ, data))
+                    try:
+                        messages[tok].append(Message(tok, typ, data))
+                    except KeyError:
+                        messages[tok] = [Message(tok, typ, data)]
                 else:
                     assert False, "%c%c at %x" % (s[pos], s[pos+1], pos)
         except Exception as _err: # pylint: disable=broad-exception-caught
@@ -309,18 +322,24 @@ def _decode_sequence(s, progress=None):
         #print('Bad bytes(%d at %x):' % (len(badbytes), badpos), bytes(badbytes))
         badbytes = bytearray()
     assert pos == len(s)
+    # quick scan through all the groups/channels for the first used timecode
+    s2mv = _sliding_ndarray(memoryview(s)[2:], 'i')
+    if channels:
+        time_offset = int(min(time_offset,
+                              *[s2mv[l[0]] for l in g_indices + ch_indices if l],
+                              *[c.timecodes[0] for c in channels if c and len(c.timecodes)]))
+        last_time = int(max(last_time,
+                            *[s2mv[l[-1]] for l in g_indices + ch_indices if l],
+                            *[c.timecodes[-1] for c in channels if c and len(c.timecodes)]))
     def process_group(g):
-        idx = 8
-        for ch in g.channels:
-            channels[ch].group = GroupRef(g, idx)
-            idx += channels[ch].size
         g.samples = np.asarray(g_indices[g.index])
-        g.timecodes = _sliding_ndarray(memoryview(s)[2:], 'i')[g.samples]
+        g.timecodes = s2mv[g.samples]
         if len(g.timecodes):
             acc = np.maximum.accumulate(g.timecodes)
-            g.pick = np.concatenate([np.array([True]), acc[1:] > acc[:-1]])
-            g.timecodes = g.timecodes[g.pick].data
-            g.samples = g.samples[g.pick]
+            pick = np.concatenate([np.array([True]), acc[1:] > acc[:-1]])
+            g.timecodes = (g.timecodes[pick] - time_offset).data
+            g.samples = g.samples[pick]
+        return [channels[ch] for ch in g.channels]
 
     def process_channel(c):
         if c.long_name in _manual_decoders:
@@ -338,7 +357,7 @@ def _decode_sequence(s, progress=None):
         else:
             if ch_indices[c.index]:
                 assert len(c.timecodes) == 0, "Can't have both S and M records for channel %s" % c.long_name
-                tc = _sliding_ndarray(memoryview(s)[2:], 'i')[ch_indices[c.index]]
+                tc = s2mv[ch_indices[c.index]]
                 samp = _sliding_ndarray(memoryview(s)[8:], d.stype)[ch_indices[c.index]]
             else:
                 tc = _ndarray_from_mv(c.timecodes)
@@ -346,7 +365,7 @@ def _decode_sequence(s, progress=None):
             if len(tc):
                 acc = np.maximum.accumulate(tc)
                 pick = np.concatenate([np.array([True]), acc[1:] > acc[:-1]])
-                c.timecodes = tc[pick].data
+                c.timecodes = (tc[pick] - time_offset).data
                 c.sampledata = samp[pick].data
             else:
                 c.timecodes = tc.data
@@ -357,20 +376,36 @@ def _decode_sequence(s, progress=None):
         if c.units == 'V': # most are really encoded as mV, but one or two aren't....
             c.sampledata = np.divide(c.sampledata, 1000).data
 
-    if progress:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(3, os.cpu_count())) as worker:
-            for g in worker.map(process_group, [x for x in groups if x]): pass
-            for c in worker.map(process_channel, [x for x in channels if x]): pass
+    laps = None
+    if not channels:
+        pass # nothing to do
+    elif progress:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(6, os.cpu_count())) as worker:
+            bg_work = worker.submit(_bg_gps_laps, messages, time_offset, last_time)
+            group_work = worker.map(process_group, [x for x in groups if x])
+            channel_work = [worker.map(process_channel,
+                                       [x for x in channels if x and not x.group])]
+            for new_ch in group_work:
+                channel_work.append(worker.map(process_channel, new_ch))
+            for i in channel_work:
+                for j in i:
+                    pass
+            gps_ch, laps = bg_work.result()
+            channels.extend(gps_ch)
     else:
         for g in groups:
             if g: process_group(g)
         for c in channels:
             if c: process_channel(c)
+        gps_ch, laps = _bg_gps_laps(messages, time_offset, last_time)
+        channels.extend(gps_ch)
 
     return DataStream(
         channels={ch.long_name: ch for ch in channels
                   if channels and len(ch.sampledata) and ch.long_name not in ('StrtRec', 'MasterClk')},
-        messages=messages)
+        messages=messages,
+        laps=laps,
+        time_offset=time_offset)
 
 def _get_metadata(msg_by_type):
     ret = {}
@@ -395,10 +430,20 @@ def _get_metadata(msg_by_type):
                                                           stats['time'] % 60)
     return ret
 
-def _decode_gps(channels, msg_by_type, time_offset):
+def _bg_gps_laps(msg_by_type, time_offset, last_time):
+    channels = _decode_gps(msg_by_type, time_offset)
+    lat_ch = None
+    lon_ch = None
+    for ch in channels:
+        if ch.long_name == 'GPS Latitude': lat_ch = ch
+        if ch.long_name == 'GPS Longitude': lon_ch = ch
+    laps = _get_laps(lat_ch, lon_ch, msg_by_type, time_offset, last_time)
+    return channels, laps
+
+def _decode_gps(msg_by_type, time_offset):
     # look for either GPS or GPS1 messages
     gpsmsg = msg_by_type.get('GPS', msg_by_type.get('GPS1', None))
-    if not gpsmsg: return
+    if not gpsmsg: return []
     alldata = memoryview(b''.join(m.content for m in gpsmsg))
     assert len(alldata) % 56 == 0
     timecodes = alldata[0:].cast('i')[::56//4]
@@ -416,27 +461,26 @@ def _decode_gps(channels, msg_by_type, time_offset):
 
     timecodes = memoryview(np.subtract(timecodes, time_offset))
 
-    channels['GPS Speed'] = Channel(
+    gpsconv = gps.ecef2lla(np.divide(ecefX_cm, 100),
+                           np.divide(ecefY_cm, 100),
+                           np.divide(ecefZ_cm, 100))
+
+    return [Channel(
         long_name='GPS Speed',
         units='m/s',
         dec_pts=1,
         timecodes=timecodes,
         sampledata=memoryview(np.sqrt(np.square(ecefdX_cms) +
                                       np.square(ecefdY_cms) +
-                                      np.square(ecefdZ_cms)) / 100.))
+                                      np.square(ecefdZ_cms)) / 100.)),
+            Channel(long_name='GPS Latitude',  units='deg', dec_pts=4,
+                    timecodes=timecodes, sampledata=memoryview(gpsconv.lat)),
+            Channel(long_name='GPS Longitude', units='deg', dec_pts=4,
+                    timecodes=timecodes, sampledata=memoryview(gpsconv.long)),
+            Channel(long_name='GPS Altitude', units='m', dec_pts=1,
+                    timecodes=timecodes, sampledata=memoryview(gpsconv.alt))]
 
-    gpsconv = gps.ecef2lla(np.divide(ecefX_cm, 100),
-                           np.divide(ecefY_cm, 100),
-                           np.divide(ecefZ_cm, 100))
-
-    channels['GPS Latitude'] = Channel(long_name='GPS Latitude',  units='deg', dec_pts=4,
-                                       timecodes=timecodes, sampledata=memoryview(gpsconv.lat))
-    channels['GPS Longitude'] = Channel(long_name='GPS Longitude', units='deg', dec_pts=4,
-                                        timecodes=timecodes, sampledata=memoryview(gpsconv.long))
-    channels['GPS Altitude'] = Channel(long_name='GPS Altitude', units='m', dec_pts=1,
-                                       timecodes=timecodes, sampledata=memoryview(gpsconv.alt))
-
-def _get_laps(channels, msg_by_type, time_offset):
+def _get_laps(lat_ch, lon_ch, msg_by_type, time_offset, last_time):
     ret = []
     if 'LAP' in msg_by_type:
         for m in msg_by_type['LAP']:
@@ -446,10 +490,7 @@ def _get_laps(channels, msg_by_type, time_offset):
             if (not ret or ret[-1].num != lap) and segment == 0:
                 assert not ret or ret[-1].num + 1 == lap # deal with missing data later
                 ret.append(base.Lap(lap, end_time - duration, end_time))
-    try:
-        lat_ch = channels['GPS Latitude']
-        lon_ch = channels['GPS Longitude']
-    except KeyError:
+    if not lat_ch or not lon_ch:
         # If we don't have GPS data, just return whatever laps we found.
         return ret
     # otherwise, we do gps lap insert.
@@ -513,10 +554,7 @@ def _get_laps(channels, msg_by_type, time_offset):
     dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
     pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
 
-    # grab the earliest seen timecode from either provided laps or channel (including GPS) data
-    lap_markers = [min(([ret[0].start_time] if ret else []) +
-                       [ch.timecodes[0] for ch in channels.values()
-                        if len(ch.timecodes)])]
+    lap_markers = [0]
     for idx in (np.nonzero(pick)[0] + 1):
         if timecodes[idx] <= lap_markers[-1]:
             continue
@@ -524,9 +562,7 @@ def _get_laps(channels, msg_by_type, time_offset):
             idx = np.argmax(minspeed[idx:]) + idx
         lap_markers.append(timecodes[idx] + t[idx] * (timecodes[idx+1]-timecodes[idx]))
     # add in the latest seen timecode
-    lap_markers.append(max(([ret[-1].end_time] if ret else []) +
-                           [ch.timecodes[-1] for ch in channels.values()
-                            if len(ch.timecodes)]))
+    lap_markers.append(last_time - time_offset)
 
     return [base.Lap(lap, start_time, end_time)
             for lap, (start_time, end_time) in enumerate(zip(lap_markers[:-1],
@@ -537,19 +573,7 @@ def AIMXRK(fname, progress):
     with open(fname, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
             data = _decode_sequence(m, progress)
-    msg_by_type = {}
-    for m in data.messages:
-        msg_by_type.setdefault(m.token, []).append(m)
     #pprint({k: len(v) for k, v in self.msg_by_type.items()})
-    # determine time offset
-    time_offset = min([ch.timecodes[0] for ch in data.channels.values() if len(ch.timecodes)] +
-                      [lap.start_time for lap in _get_laps(data.channels, msg_by_type, 0)[:1]])
-    for ch in data.channels.values():
-        ch.timecodes = memoryview(np.subtract(ch.timecodes, time_offset))
-
-    # decode GPS data.  Do this after determining time offset
-    # since we have to fudge the data to get higher resolution
-    _decode_gps(data.channels, msg_by_type, time_offset)
 
     return base.LogFile(
         {ch.long_name: base.Channel(ch.timecodes,
@@ -559,8 +583,8 @@ def AIMXRK(fname, progress):
                                     ch.dec_pts,
                                     interpolate = ch.size != 1)
          for ch in data.channels.values()},
-        _get_laps(data.channels, msg_by_type, time_offset),
-        _get_metadata(msg_by_type),
+        data.laps,
+        _get_metadata(data.messages),
         ['GPS Speed', 'GPS Latitude', 'GPS Longitude', 'GPS Altitude'],
         fname)
 
