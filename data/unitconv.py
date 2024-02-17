@@ -104,12 +104,12 @@ def display_text(unit):
     try:
         entry = unit_map[unit.lower()][1]
         return entry.display or entry.symbol
-    except KeyError:
+    except (KeyError, AttributeError):
         return unit
 
 def comparable_units(unit):
     try:
         entry = unit_map[unit.lower()][0]
         return [(u.name, u.display or u.symbol) for u in entry.units]
-    except KeyError:
+    except (KeyError, AttributeError):
         return [(unit, unit)]

@@ -42,7 +42,7 @@ def AutosportLabs(fname, progress):
         f.readline() # skip header
         update_count = 0
         for l in f:
-            if (update_count & 4095) == 0:
+            if (update_count & 4095) == 0 and progress:
                 progress(update_count, total_len)
             update_count += 1
             l = l.rstrip().split(',')

@@ -258,7 +258,7 @@ class DataDockWidget(TempDockWidget):
 
             self.status_msg.emit('Reading ' + path)
             try:
-                obj = builder(path, lambda x, y: None).metadata
+                obj = builder(path, None).metadata # None means bg op
                 readable = True
             except: # pylint: disable=bare-except
                 obj = None
@@ -512,7 +512,6 @@ class DataDockWidget(TempDockWidget):
         self.data_view.log_files = []
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
-        print('close all')
 
     def close_one_log(self, log):
         self.data_view.log_files.remove(log)
