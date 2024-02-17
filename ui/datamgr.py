@@ -287,6 +287,7 @@ class DataDockWidget(TempDockWidget):
         search = QLineEdit()
         search.setClearButtonEnabled(True)
         search.setPlaceholderText('Search')
+        search.setText(self.config.get('main', 'open_search', fallback=''))
         layout.addWidget(search, 0, 1, 1, 1)
 
         active_filters = json.loads(self.config.get('main', 'open_filters', fallback='{}'))
@@ -422,6 +423,7 @@ class DataDockWidget(TempDockWidget):
             if selection:
                 self.open_file(selection[0].data(Qt.UserRole)['path'])
         self.config['main']['open_filters'] = json.dumps(active_filters)
+        self.config['main']['open_search'] = search.text()
 
     def open_from_file(self):
         file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
