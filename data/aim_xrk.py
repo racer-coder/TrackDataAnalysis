@@ -188,7 +188,7 @@ def _decode_sequence(s, progress=None):
                     pos += 1
                 elif typ == ord_lt_h:
                     if pos > next_progress:
-                        next_progress += 1_000_000
+                        next_progress += 2_500_000
                         if progress:
                             progress(pos, len(s))
                     pos += 2
