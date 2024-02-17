@@ -354,6 +354,8 @@ def _decode_sequence(s, progress=None):
 
         if d.fixup:
             c.sampledata = memoryview(d.fixup(c.sampledata))
+        if c.units == 'V': # most are really encoded as mV, but one or two aren't....
+            c.sampledata = np.divide(c.sampledata, 1000).data
 
     if progress:
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(3, os.cpu_count())) as worker:

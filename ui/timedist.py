@@ -825,7 +825,6 @@ class TimeDist(widgets.MouseHelperWidget):
             self.update()
 
     def dragLeaveEvent(self, e):
-        print('leave')
         self.drop_indicator = None
         self.update()
 
@@ -842,7 +841,6 @@ class TimeDist(widgets.MouseHelperWidget):
         if not dst_ch:
             grp = self.getEventMouseHelperData('graph_idx', e.posF())
             if grp is None:
-                print('what?', self.channelGroups)
                 return # Shouldn't happen
             if src_grp is not None:
                 src_grp.remove(channel)
