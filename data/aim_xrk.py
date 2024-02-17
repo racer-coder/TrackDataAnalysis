@@ -148,10 +148,9 @@ def _decode_sequence(s, progress=None):
     pos = 0
     badbytes = bytearray()
     badpos = 0
-    HIH_decoder = struct.Struct('<HIH')
-    xBIH_decoder = struct.Struct('<xBIH')
-    xH_decoder = struct.Struct('<8xH')
-    ltop_decoder = struct.Struct('<IBB')
+    HxH_decoder = struct.Struct('<H4xH')
+    xIxH_decoder = struct.Struct('<xxIxxH')
+    ltop_decoder = struct.Struct('<IIBB')
     ltcl_decoder = struct.Struct('<BIHB')
     Mms = {
         32: 20,
@@ -171,7 +170,7 @@ def _decode_sequence(s, progress=None):
         try:
             while True:
                 oldpos = pos
-                typ, tc, idx = HIH_decoder.unpack_from(s, pos)
+                typ, idx = HxH_decoder.unpack_from(s, pos)
                 if typ == ord_op_G:
                     g = groups[idx]
                     pos += g.add_helper
@@ -183,7 +182,7 @@ def _decode_sequence(s, progress=None):
                     assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
                     ch.indices.append(oldpos)
                 elif typ == ord_op_M:
-                    cnt, = xH_decoder.unpack_from(s, pos)
+                    tc, cnt = xIxH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
                     pos += ch.size * cnt + 10
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
@@ -196,10 +195,10 @@ def _decode_sequence(s, progress=None):
                         next_progress += 1_000_000
                         if progress:
                             progress(pos, len(s))
-                    pos += 6
-                    tok = s[pos-4:pos]
-                    l, typ, close = ltop_decoder.unpack_from(s, pos)
-                    pos += 6
+                    pos += 2
+                    tok = s[pos:pos+4]
+                    tc, l, typ, close = ltop_decoder.unpack_from(s, pos)
+                    pos += 10
                     assert close == ord_gt, "%c at %x" % (s[pos-1], pos-1)
 
                     data = s[pos:pos + l]
