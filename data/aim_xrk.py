@@ -141,8 +141,8 @@ def _sliding_ndarray(buf, typ):
                       shape=(len(buf) - array(typ).itemsize + 1,), strides=(1,))
 
 def _decode_sequence(s, progress=None):
-    groups = {}
-    channels = {}
+    groups = []
+    channels = []
     messages = []
     next_progress = 1_000_000
     pos = 0
@@ -221,7 +221,8 @@ def _decode_sequence(s, progress=None):
                         #channels = {} # Replays don't necessarily contain all the original channels
                         for m in data:
                             if m.token == 'CHS':
-                                if m.content.index not in channels:
+                                channels += [None] * (m.content.index - len(channels) + 1)
+                                if not channels[m.content.index]:
                                     channels[m.content.index] = m.content
                                 else:
                                     assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
@@ -229,6 +230,7 @@ def _decode_sequence(s, progress=None):
                             #elif t == 'CDE':
                             #    print(t, chunk)
                             elif m.token == 'GRP':
+                                groups += [None] * (m.content.index - len(groups) + 1)
                                 groups[m.content.index] = m.content
                                 #print('GROUP', m.content.index, len(m.content.channels),
                                 #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
@@ -302,7 +304,8 @@ def _decode_sequence(s, progress=None):
         #print('Bad bytes(%d at %x):' % (len(badbytes), badpos), bytes(badbytes))
         badbytes = bytearray()
     assert pos == len(s)
-    for g in groups.values():
+    for g in groups:
+        if not g: continue
         idx = 8
         for ch in g.channels:
             channels[ch].group = GroupRef(g, idx)
@@ -312,7 +315,8 @@ def _decode_sequence(s, progress=None):
         g.timecodes = g.timecodes[g.pick].data
         g.samples = np.asarray(g.samples)[g.pick]
 
-    for c in channels.values():
+    for c in channels:
+        if not c: continue
         if c.long_name in _manual_decoders:
             d = _manual_decoders[c.long_name]
         elif c.unknown[20] in _decoders:
@@ -341,8 +345,8 @@ def _decode_sequence(s, progress=None):
             c.sampledata = memoryview(d.fixup(c.sampledata))
 
     return DataStream(
-        channels={ch.long_name: ch for ch in channels.values()
-                  if len(ch.sampledata) and ch.long_name not in ('StrtRec', 'MasterClk')},
+        channels={ch.long_name: ch for ch in channels
+                  if channels and len(ch.sampledata) and ch.long_name not in ('StrtRec', 'MasterClk')},
         messages=messages)
 
 def _get_metadata(msg_by_type):
