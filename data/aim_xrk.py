@@ -151,6 +151,8 @@ def _decode_sequence(s, progress=None):
     HIH_decoder = struct.Struct('<HIH')
     xBIH_decoder = struct.Struct('<xBIH')
     xH_decoder = struct.Struct('<8xH')
+    ltop_decoder = struct.Struct('<IBB')
+    ltcl_decoder = struct.Struct('<BIHB')
     Mms = {
         32: 20,
         64: 40,
@@ -162,7 +164,9 @@ def _decode_sequence(s, progress=None):
     ord_op_M  = ord_op + 256 * ord('M')
     ord_lt = ord('<')
     ord_lt_h  = ord_lt + 256 * ord('h')
+    ord_gt = ord('>')
     len_s  = len(s)
+    slow_path = 0
     while pos < len_s:
         try:
             while True:
@@ -194,31 +198,28 @@ def _decode_sequence(s, progress=None):
                         next_progress += 1_000_000
                         if progress:
                             progress(pos, len(s))
-                    pos += 2
-                    tok = s[pos:pos + 4]
-                    pos += 4
-                    l = struct.unpack_from('<IB', s, pos)
-                    pos += 5
-                    assert s[pos] == ord('>'), "%c at %x" % (s[pos], pos)
-                    pos += 1
+                    pos += 6
+                    tok = s[pos-4:pos]
+                    l, typ, close = ltop_decoder.unpack_from(s, pos)
+                    pos += 6
+                    assert close == ord_gt, "%c at %x" % (s[pos-1], pos-1)
 
-                    data = s[pos:pos + l[0]]
+                    data = s[pos:pos + l]
                     bytesum = sum(data) & 0xffff
-                    pos += l[0]
+                    pos += l
 
-                    assert s[pos] == ord('<'), "%s at %x" % (s[pos], pos)
-                    pos += 1
-                    assert s[pos:pos + 4] == tok, "%s vs %s at %x" % (s[pos:pos + 4],
-                                                                      tok, pos)
-                    pos += 4
-                    l2 = struct.unpack_from('<H', s, pos)
-                    pos += 2
-                    assert s[pos] == ord('>'), "%c at %x" % (s[pos], pos)
-                    pos += 1
+                    op, tok2, checksum, cl = ltcl_decoder.unpack_from(s, pos)
+                    assert op == ord_lt, "%s at %x" % (s[pos], pos)
+                    assert tok2 == tc, "%s vs %s at %x" % (s[pos+1:pos+5], tok, pos)
+                    assert checksum == bytesum, '%x vs %x at %x' % (checksum, bytesum, pos)
+                    assert cl == ord_gt, "%c at %x" % (s[pos+7], pos+7)
+                    pos += 8
 
                     tok = tok.rstrip(b'\0 ').decode('ascii')
 
-                    if tok == 'CNF':
+                    if tok == 'GPS' or tok == 'GPS1':
+                        pass # fast path common case
+                    elif tok == 'CNF':
                         data = _decode_sequence(data).messages
                         #channels = {} # Replays don't necessarily contain all the original channels
                         for m in data:
@@ -238,7 +239,7 @@ def _decode_sequence(s, progress=None):
                                 m.content.add_helper = 8 + sum(channels[ch].size
                                                                for ch in m.content.channels)
                     elif tok == 'GRP':
-                        data = [x[0] for x in struct.iter_unpack('<H', data)]
+                        data = memoryview(data).cast('H')
                         assert data[1] == len(data[2:])
                         data = Group(index = data[0], channels = data[2:])
                     elif tok == 'CDE':
@@ -287,8 +288,7 @@ def _decode_sequence(s, progress=None):
                                 # not sure how to parse fuel, doesn't match any expected units
                                 if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
 
-                    assert l2[0] == bytesum, '%x vs %x at %x' % (l2[0], bytesum, pos)
-                    messages.append(Message(tok, l[1], data))
+                    messages.append(Message(tok, typ, data))
                 else:
                     assert False, "%c%c at %x" % (s[pos], s[pos+1], pos)
         except Exception as _err: # pylint: disable=broad-exception-caught
