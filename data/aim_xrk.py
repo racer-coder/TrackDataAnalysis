@@ -183,7 +183,7 @@ def _decode_sequence(s, progress=None):
                     pos += ch.size * cnt + 10
                     assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
                     ms = Mms[ch.unknown[64]]
-                    ch.timecodes += array('i', [tc + off for off in range(0, cnt*ms, ms)])
+                    ch.timecodes += array('i', range(tc, tc + cnt*ms, ms))
                     ch.sampledata += s[oldpos+10:pos]
                     pos += 1
                 elif typ == ord_lt_h:
