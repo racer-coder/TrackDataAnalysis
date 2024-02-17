@@ -175,15 +175,13 @@ def _decode_sequence(s, progress=None):
                 if typ == ord_op_G:
                     g = groups[idx]
                     pos += g.add_helper
-                    assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
+                    assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
                     g.samples.append(oldpos)
-                    pos += 1
                 elif typ == ord_op_S:
                     ch = channels[idx]
                     pos += ch.add_helper
-                    assert s[pos] == ord_cp, "%c at %x" % (s[pos], pos)
+                    assert s[pos-1] == ord_cp, "%c at %x" % (s[pos-1], pos-1)
                     ch.indices.append(oldpos)
-                    pos += 1
                 elif typ == ord_op_M:
                     cnt, = xH_decoder.unpack_from(s, pos)
                     ch = channels[idx]
@@ -210,8 +208,8 @@ def _decode_sequence(s, progress=None):
 
                     op, tok2, checksum, cl = ltcl_decoder.unpack_from(s, pos)
                     assert op == ord_lt, "%s at %x" % (s[pos], pos)
-                    assert tok2 == tc, "%s vs %s at %x" % (s[pos+1:pos+5], tok, pos)
-                    assert checksum == bytesum, '%x vs %x at %x' % (checksum, bytesum, pos)
+                    assert tok2 == tc, "%s vs %s at %x" % (s[pos+1:pos+5], tok, pos+1)
+                    assert checksum == bytesum, '%x vs %x at %x' % (checksum, bytesum, pos+5)
                     assert cl == ord_gt, "%c at %x" % (s[pos+7], pos+7)
                     pos += 8
 
@@ -236,7 +234,7 @@ def _decode_sequence(s, progress=None):
                                 #print('GROUP', m.content.index, len(m.content.channels),
                                 #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
 
-                                m.content.add_helper = 8 + sum(channels[ch].size
+                                m.content.add_helper = 9 + sum(channels[ch].size
                                                                for ch in m.content.channels)
                     elif tok == 'GRP':
                         data = memoryview(data).cast('H')
@@ -252,7 +250,7 @@ def _decode_sequence(s, progress=None):
                          data.long_name,
                          data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
                         data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
-                        data.add_helper = data.size + 8
+                        data.add_helper = data.size + 9
 
                         # [12] maybe type (lower bits) combined with scale or ??
                         # [13] decoder of some type?
