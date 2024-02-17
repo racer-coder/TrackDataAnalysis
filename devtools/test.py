@@ -42,7 +42,7 @@ def test_aim():
         #print(t[0], t[-1], (t[-1] - t[0]) / (len(t) - 1), (len(t) - 1) / (t[-1] - t[0]))
 
 def test_xrk():
-    res = aim_xrk.AIMXRK(fname, lambda x,y: None)
+    res = aim_xrk.AIMXRK(fname, lambda x,y: None) # dummy progress func to test parallelism
 
 def test_xrk_and_ch():
     res = distance.DistanceWrapper(aim_xrk.AIMXRK(fname))

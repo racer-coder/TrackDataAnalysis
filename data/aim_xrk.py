@@ -2,10 +2,12 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 from array import array
+import concurrent.futures
 from dataclasses import dataclass, field
 import math
 import mmap
 import numpy as np
+import os
 from pprint import pprint # pylint: disable=unused-import
 import struct
 import sys
@@ -307,8 +309,7 @@ def _decode_sequence(s, progress=None):
         #print('Bad bytes(%d at %x):' % (len(badbytes), badpos), bytes(badbytes))
         badbytes = bytearray()
     assert pos == len(s)
-    for g in groups:
-        if not g: continue
+    def process_group(g):
         idx = 8
         for ch in g.channels:
             channels[ch].group = GroupRef(g, idx)
@@ -321,14 +322,13 @@ def _decode_sequence(s, progress=None):
             g.timecodes = g.timecodes[g.pick].data
             g.samples = g.samples[g.pick]
 
-    for c in channels:
-        if not c: continue
+    def process_channel(c):
         if c.long_name in _manual_decoders:
             d = _manual_decoders[c.long_name]
         elif c.unknown[20] in _decoders:
             d = _decoders[c.unknown[20]]
         else:
-            continue
+            return
 
         if c.group:
             grp = c.group.group
@@ -354,6 +354,16 @@ def _decode_sequence(s, progress=None):
 
         if d.fixup:
             c.sampledata = memoryview(d.fixup(c.sampledata))
+
+    if progress:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(3, os.cpu_count())) as worker:
+            for g in worker.map(process_group, [x for x in groups if x]): pass
+            for c in worker.map(process_channel, [x for x in channels if x]): pass
+    else:
+        for g in groups:
+            if g: process_group(g)
+        for c in channels:
+            if c: process_channel(c)
 
     return DataStream(
         channels={ch.long_name: ch for ch in channels
