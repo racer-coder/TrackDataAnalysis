@@ -313,11 +313,13 @@ def _decode_sequence(s, progress=None):
         for ch in g.channels:
             channels[ch].group = GroupRef(g, idx)
             idx += channels[ch].size
-        g.samples = g_indices[g.index]
+        g.samples = np.asarray(g_indices[g.index])
         g.timecodes = _sliding_ndarray(memoryview(s)[2:], 'i')[g.samples]
-        g.timecodes, g.pick = np.unique(np.maximum.accumulate(g.timecodes), return_index=True)
-        g.timecodes = g.timecodes.data
-        g.samples = np.asarray(g.samples)[g.pick]
+        if len(g.timecodes):
+            acc = np.maximum.accumulate(g.timecodes)
+            g.pick = np.concatenate([np.array([True]), acc[1:] > acc[:-1]])
+            g.timecodes = g.timecodes[g.pick].data
+            g.samples = g.samples[g.pick]
 
     for c in channels:
         if not c: continue
@@ -341,9 +343,14 @@ def _decode_sequence(s, progress=None):
             else:
                 tc = _ndarray_from_mv(c.timecodes)
                 samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
-            tc, pick = np.unique(np.maximum.accumulate(tc), return_index=True)
-            c.timecodes = tc.data
-            c.sampledata = samp[pick].data
+            if len(tc):
+                acc = np.maximum.accumulate(tc)
+                pick = np.concatenate([np.array([True]), acc[1:] > acc[:-1]])
+                c.timecodes = tc[pick].data
+                c.sampledata = samp[pick].data
+            else:
+                c.timecodes = tc.data
+                c.sampledata = samp.data
 
         if d.fixup:
             c.sampledata = memoryview(d.fixup(c.sampledata))
