@@ -27,14 +27,12 @@ def roundUpHumanNumber(num):
     if num <= 0: return 1
     l10 = math.log10(num)
     w = math.ceil(l10)
-    m = 1
-    if 10 ** (l10 - w + 1) < 2:
-        m = 1/5
-    elif 10 ** (l10 - w + 1) < 5:
-        m = 1/2
-    num = m * 10 ** w
-    if num >= 1: num = int(num)
-    return num
+    d = 1
+    if 10. ** (l10 - w + 1) < 2:
+        d = 5
+    elif 10. ** (l10 - w + 1) < 5:
+        d = 2
+    return 10. ** w / d
 
 @dataclass()
 class AxisGrid:
