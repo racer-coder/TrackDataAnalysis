@@ -3,6 +3,8 @@
 from cx_Freeze import setup, Executable
 import sys
 from version import version
+from Cython.Build import cythonize
+
 
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
@@ -33,4 +35,5 @@ setup(
                               shortcut_name='Track Data Analysis',
                               shortcut_dir='StartMenuFolder',
                               )],
+    ext_modules=cythonize('data/aim_xrk.pyx', language='c++'),
 )
