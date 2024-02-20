@@ -301,7 +301,7 @@ class DataDockWidget(TempDockWidget):
 
         files = QTableWidget()
         files.setSortingEnabled(True)
-        files.setSelectionMode(files.SingleSelection)
+        files.setSelectionMode(files.ExtendedSelection)
         files.setSelectionBehavior(files.SelectRows)
         files.horizontalHeader().setHighlightSections(False)
         files.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
@@ -396,13 +396,13 @@ class DataDockWidget(TempDockWidget):
             button.clicked.connect(closure(update_filter, text))
 
         def cell_selected():
-            f = files.selectedItems()[0].data(Qt.UserRole)['metadata']
+            f = files.currentItem().data(Qt.UserRole)['metadata']
             metadata.setRowCount(len(f))
             metadata.setColumnCount(2)
             for i, (k, v) in enumerate(sorted(f.items())):
                 metadata.setItem(i, 0, QTableWidgetItem(k))
                 metadata.setItem(i, 1, QTableWidgetItem(str(v)))
-        files.itemSelectionChanged.connect(cell_selected)
+        files.currentItemChanged.connect(cell_selected)
 
         bbox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         layout.addWidget(bbox, 2, 0, 1, 3)
@@ -420,18 +420,20 @@ class DataDockWidget(TempDockWidget):
 
         if dia.exec_():
             selection = files.selectedItems()
-            if selection:
-                self.open_file(selection[0].data(Qt.UserRole)['path'])
+            for item in selection:
+                if item.column() == 0: # only look at each row once
+                    self.open_file(item.data(Qt.UserRole)['path'])
         self.config['main']['open_filters'] = json.dumps(active_filters)
         self.config['main']['open_search'] = search.text()
 
     def open_from_file(self):
-        file_name = QFileDialog.getOpenFileName(self, 'Open data file for analysis',
-                                                self.config.get('main', 'last_open_dir',
-                                                                fallback=os.getcwd()),
-                                                'Data files (*.ibt *.ld *.log *.xrk)')[0]
-        if file_name:
-            self.open_file(file_name)
+        file_names = QFileDialog.getOpenFileNames(self, 'Open data file for analysis',
+                                                 self.config.get('main', 'last_open_dir',
+                                                                 fallback=os.getcwd()),
+                                                 'Data files (*.ibt *.ld *.log *.xrk)')[0]
+        for file_name in file_names:
+            if self.open_file(file_name):
+                self.config['main']['last_open_dir'] = os.path.dirname(file_name)
 
     def get_builder(self, file_name):
         if file_name.lower().endswith('.xrk'):
@@ -449,9 +451,9 @@ class DataDockWidget(TempDockWidget):
         builder = self.get_builder(file_name)
         if not builder:
             QMessageBox.critical(self, 'Unknown extension',
-                                 'Unable to determine format for file.',
+                                 'Unable to determine format for file "%s"' % file_name,
                                  QMessageBox.Ok)
-            return
+            return False
 
         progress = QProgressDialog('Processing file', 'Cancel', 0, 100, self)
         progress.setWindowModality(Qt.WindowModal)
@@ -467,11 +469,13 @@ class DataDockWidget(TempDockWidget):
         except KeyboardInterrupt:
             return # abort load
         except: # pylint: disable=bare-except
+            progress.reset()
             QMessageBox.critical(self, 'Unable to parse',
-                                 'Unable to read file.  Please file a bug.',
+                                 'Unable to read file "%s".  Please file a bug.' % file_name,
                                  QMessageBox.Ok)
-            return
+            return False
         finally:
+            progress.reset()
             progress.deleteLater()
 
         logref = state.LogRef(data.distance.DistanceWrapper(obj))
@@ -499,7 +503,7 @@ class DataDockWidget(TempDockWidget):
 
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
-        self.config['main']['last_open_dir'] = os.path.dirname(file_name)
+        return True
 
     def update_lap_ref(self, lap):
         return [l for l in lap.log.laps if l.num == lap.num][0] if lap else None
