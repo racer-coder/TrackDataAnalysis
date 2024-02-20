@@ -83,6 +83,9 @@ unit_map = {name.lower(): (prop, unit)
             for name in [unit.name, unit.symbol] + unit.aliases}
 
 def convert(values, from_unit, to_unit):
+    # Do this check before looking up in unit_map in case we don't know these units
+    if to_unit.lower() == from_unit.lower():
+        return values
     try:
         old_unit = unit_map[from_unit.lower()]
         new_unit = unit_map[to_unit.lower()]
@@ -90,8 +93,8 @@ def convert(values, from_unit, to_unit):
         return None
     if old_unit[0] != new_unit[0]: # Are they the same property
         return None
-    if old_unit[1] == new_unit[1]:
-        return values # don't waste memory on a name change
+    if old_unit[1] == new_unit[1]: # maybe they're aliases, but not the same text string
+        return values
     return (np.subtract(values, old_unit[1].offset) * (new_unit[1].scale / old_unit[1].scale)
             + new_unit[1].offset)
 

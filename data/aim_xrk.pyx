@@ -299,8 +299,10 @@ def _decode_sequence(s, progress=None):
                             for ch in m.content.channels:
                                 channels[ch].group = GroupRef(m.content, idx)
                                 idx += channels[ch].size
-                            #print('GROUP', m.content.index, len(m.content.channels),
-                            #      [(channels[ch].long_name, channels[ch].size) for ch in m.content.channels])
+                            if show_all:
+                                print('GROUP', m.content.index,
+                                      [(ch, channels[ch].long_name, channels[ch].size)
+                                       for ch in m.content.channels])
 
                             if m.content.index >= gc_data[0].size():
                                 old_len = gc_data[0].size()
@@ -476,7 +478,7 @@ def _decode_sequence(s, progress=None):
 
     t3 = time.perf_counter()
     if t3-t1 > 0.1:
-        print('division: scan=%f (slowtime=%f), gps=%f, group/ch=%f more, slow' % (t2-t1, slow_time, t4-t2, t3-t4))
+        print('division: scan=%f (slowtime=%f), gps=%f, group/ch=%f more' % (t2-t1, slow_time, t4-t2, t3-t4))
 
     return DataStream(
         channels={ch.long_name: ch for ch in channels
