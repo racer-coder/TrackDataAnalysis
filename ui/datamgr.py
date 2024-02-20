@@ -617,9 +617,9 @@ class DataDockWidget(TempDockWidget):
         self.deleg.metrics = metrics
         self.table.setColumnWidth(0, self.margin * 2 + metrics.horizontalAdvance('Lap 888'))
         self.table.setColumnWidth(1, self.margin * 2 + metrics.horizontalAdvance('88:88.888'))
-        self.table.setColumnWidth(2, self.margin * 2 + metrics.horizontalAdvance('M'))
-        self.table.setColumnWidth(3, self.margin * 2 + metrics.horizontalAdvance('M'))
-        self.table.setColumnWidth(4, self.margin * 2 + metrics.horizontalAdvance('M'))
+        self.table.setColumnWidth(2, self.margin * 2 + metrics.horizontalAdvance('\u278a'))
+        self.table.setColumnWidth(3, self.margin * 2 + metrics.horizontalAdvance('\u278a'))
+        self.table.setColumnWidth(4, self.margin * 2 + metrics.horizontalAdvance('\u278a'))
         self.table.setColumnWidth(5, self.margin * 2 + metrics.horizontalAdvance('+88:88.888'))
         self.table.setColumnWidth(6, self.margin * 2 + metrics.horizontalAdvance('88:88.888'))
         self.table.setColumnWidth(7, self.margin * 2 + metrics.horizontalAdvance('+88888'))
