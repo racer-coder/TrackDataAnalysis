@@ -243,6 +243,7 @@ class TimeDist(widgets.MouseHelperWidget):
         return font
 
     def calc_time_slip(self, laps, var):
+        if not laps: return
         target_window = self.dataView.lapTime2Mode(self.dataView.ref_lap,
                                                    self.dataView.ref_lap.duration())
         for lapref, _color, _ in laps:
@@ -272,12 +273,10 @@ class TimeDist(widgets.MouseHelperWidget):
         laps = self.dataView.get_laps()
         laps[0] = (self.dataView.ref_lap, None, 0) # special color to mean use channel color
         # get data
-        var = []
-        if 'Time Slip' in channel_list:
-            self.calc_time_slip(laps, var)
-        data = [
-            self.dataView.get_channel_data(self.dataView.ref_lap, ch)
-            for ch in channel_list if ch != 'Time Slip'] + var
+        data = [d
+                for ch in channel_list
+                for d in (self.time_slip_data if ch == 'Time Slip' else
+                          [self.dataView.get_channel_data(self.dataView.ref_lap, ch)])]
         # calc min/max data
         dmin = min([d.min for d in data if d.min is not None], default=0)
         dmax = max([d.max for d in data if d.max is not None], default=0)
@@ -317,7 +316,7 @@ class TimeDist(widgets.MouseHelperWidget):
         for lidx, (lap, color, _) in list(enumerate(laps if self.lapView else laps[:1]))[::-1]:
             for ch in draw_channels:
                 if ch == 'Time Slip':
-                    d = var[lidx]
+                    d = self.time_slip_data[lidx]
                 else:
                     d = self.dataView.get_channel_data(lap, ch)
                 if not len(d.values): continue
@@ -371,11 +370,18 @@ class TimeDist(widgets.MouseHelperWidget):
         pen2.setStyle(Qt.SolidLine)
         next_y = y_offset
         for (color, ch, lap), d in zip(
-                [(channels.colors[self.dataView.get_channel_prop(ch).color], ch,
-                  self.dataView.ref_lap) for ch in channel_list if ch != 'Time Slip'] +
-                 [(c, 'Time Slip', l) for l, c, _ in laps],
-                data + var):
-            if color is None: continue # need to do this here because of what we're zipping together
+                [trip
+                 for ch in channel_list
+                 for trip in ([(c, 'Time Slip', l) for l, c, _ in laps] if ch == 'Time Slip' else
+                              [(channels.colors[self.dataView.get_channel_prop(ch).color], ch,
+                                self.dataView.ref_lap)])],
+                data):
+            first_timeslip = ch == 'Time Slip' and (len(self.time_slip_data) <= 1 or
+                                                    d == self.time_slip_data[1])
+            if color is None:
+                if not first_timeslip:
+                    continue
+                color = state.lap_colors[0] # We don't have any alternate laps, but we still want to show an entry for Time Slip
             # set pen for data
             y = next_y
             next_y += fontMetrics.height()
@@ -392,11 +398,12 @@ class TimeDist(widgets.MouseHelperWidget):
                                 self.channel_name_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 self.channelName(ch, d.units))
-            if ch != 'Time Slip':
+            if ch != 'Time Slip' or first_timeslip:
+                chh = max(len(self.time_slip_data) - 1, 1) if ch == 'Time Slip' else 1
                 self.channel_mouse_helpers.append(
                     widgets.MouseHelperItem(
                         geometry=QRectF(self.graph_x + 6 + self.channel_ind_width, y,
-                                        self.channel_name_width, fontMetrics.height()),
+                                        self.channel_name_width, chh * fontMetrics.height()),
                         clicks=[widgets.MouseHelperClick(button_type=Qt.LeftButton,
                                                          state_capture=self.selectChannel,
                                                          move=self.moveChannel)],
@@ -545,9 +552,10 @@ class TimeDist(widgets.MouseHelperWidget):
                                 x, y_offset + (2 if i % 5 else 4))
 
     def minmax_width(self, channel_font_metrics, d):
-        if not len(d.values): return 0
-        return max(channel_font_metrics.horizontalAdvance('%.*f' % (d.dec_pts, d.min)),
-                   channel_font_metrics.horizontalAdvance('%.*f' % (d.dec_pts, d.max)))
+        if isinstance(d, list):
+            return max(self.minmax_width(channel_font_metrics, x) for x in d)
+        return max(channel_font_metrics.horizontalAdvance('%.*f' % (d.dec_pts, d.min or 0)),
+                   channel_font_metrics.horizontalAdvance('%.*f' % (d.dec_pts, d.max or 0)))
 
     def paintEvent(self, event):
         ph = widgets.makePaintHelper(self, event)
@@ -556,6 +564,11 @@ class TimeDist(widgets.MouseHelperWidget):
 
         self.graph_x = 50 * ph.scale
         self.graph_max = ph.size.width()
+
+        self.time_slip_data = []
+        if self.time_slip.isChecked():
+            self.calc_time_slip(self.dataView.get_laps(), self.time_slip_data)
+
         channel_font_metrics = QtGui.QFontMetrics(self.selectFont('channel'))
         M_space = channel_font_metrics.horizontalAdvance('\u25bc ')
         self.channel_name_width = max(
@@ -565,10 +578,11 @@ class TimeDist(widgets.MouseHelperWidget):
         self.channel_ind_width = M_space if self.channel_name_width else 0
         self.channel_value_width = M_space + max([
             self.minmax_width(channel_font_metrics,
+                              self.time_slip_data if ch == 'Time Slip' else
                               self.dataView.get_channel_data(self.dataView.ref_lap, ch))
             for grp in self.channelGroups
             for ch in grp
-            if ch != 'Time Slip' and self.dataView.ref_lap], default=0)
+            if self.dataView.ref_lap], default=0)
         self.channel_opt_width = 2 * (self.channel_value_width
                                       if self.channel_name_width and self.dataView.alt_lap
                                       and self.lapView else 0)
@@ -762,6 +776,7 @@ class TimeDist(widgets.MouseHelperWidget):
                 grp.remove(ch)
                 if not grp:
                     self.channelGroups.remove(grp)
+                self.update_time_slip_check()
                 return True
         return False
 
@@ -812,8 +827,12 @@ class TimeDist(widgets.MouseHelperWidget):
         if delta_pos.manhattanLength() < QApplication.startDragDistance(): return
         channels.initiate_drag(self, self.dataView, self.current_channel[1])
 
+    def acceptable_drop(self, e):
+        return e.source() == self or (e.mimeData().hasText() and
+                                      (e.mimeData().text() != 'Time Slip' or self.lapView))
+
     def dragEnterEvent(self, e):
-        if e.source() == self or e.mimeData().hasText():
+        if self.acceptable_drop(e):
             e.accept()
 
     def dragMoveEvent(self, e):
@@ -828,7 +847,7 @@ class TimeDist(widgets.MouseHelperWidget):
 
     def dropEvent(self, e):
         self.drop_indicator = None
-        if e.source() != self and not e.mimeData().hasText(): return
+        if not self.acceptable_drop(e): return
         dst_ch = self.getEventMouseHelperData('channel', e.posF())
         if e.source() == self:
             src_grp = self.channelGroups[self.current_channel[0]]
@@ -873,8 +892,14 @@ class TimeDist(widgets.MouseHelperWidget):
             if g is grp:
                 self.current_channel = (idx, channel)
         e.accept()
+        self.update_time_slip_check()
         self.dataView.data_change.emit()
         self.update()
+
+    def update_time_slip_check(self):
+        if self.time_slip.isChecked() != any('Time Slip' in chlist
+                                             for chlist in self.channelGroups):
+            self.time_slip.toggle()
 
     def channelMenuRemove(self, ch):
         self.tryRemoveChannel(ch[1])

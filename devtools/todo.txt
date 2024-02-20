@@ -9,6 +9,7 @@ Later Milestones:
 * MATHS
 . add notion of interpolate vs last value
 .. add notion to each parser
+.. don't interpolate integer fields (aim, motec, autosport, iracing)
 
 * KEYBOARD SHORTCUTS
 
@@ -28,6 +29,7 @@ Later Milestones:
 . tech debt - better error handling - wrap many paint events and load/save actions in try/except that log errors somewhere and then hopefully continue without crashing
 . tech debt - commit to using np.array for channel timecodes/values/etc to avoid rewrapping all the time
 . open from db - ability to choose columns to display in results
+. open - select fastest realistic lap, ignore abnormal laps
 . file format - megalogviewer
 . file format - vbox
 . file format - link g4+
