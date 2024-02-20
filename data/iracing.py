@@ -41,7 +41,7 @@ def _decode_var(m, offs, timecodes, samples, nrecords, stride):
         data = data * 100
     return Channel(timecodes, data.data, name=name, units=unit,
                    dec_pts=2 if rtype >= 4 else 0,
-                   interpolate=True)
+                   interpolate=rtype >= 4)
 
 def _decode(m):
     (_version, _status, tick_rate, _session_info_update, session_info_length, session_info_offset,

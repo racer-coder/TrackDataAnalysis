@@ -7,9 +7,6 @@
 Later Milestones:
 
 * MATHS
-. add notion of interpolate vs last value
-.. add notion to each parser
-.. don't interpolate integer fields (aim, motec, autosport, iracing)
 
 * KEYBOARD SHORTCUTS
 

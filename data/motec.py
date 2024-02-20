@@ -40,13 +40,15 @@ def _decode_channel(s, addr):
         else: raise TypeError
     else: raise TypeError
 
+    units = _dec_str(s, addr+72, 12)
+
     return base.Channel((np.arange(0, data_count) * (1000 / sample_rate)).data,
                         ((np.multiply(data, 1 / (scale * 10 ** dec_pts)) + offset) * mul).data,
                         dec_pts=max(dec_pts, 0),
                         name=_dec_str(s, addr+32, 32),
                         #_dec_str(s, addr+64, 8),
-                        units=_dec_str(s, addr+72, 12),
-                        interpolate=True) # XXX decode
+                        units=units,
+                        interpolate=units not in ('s', '')) # best guess
 
 def _decode(s):
     metadata = {}

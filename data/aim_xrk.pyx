@@ -50,6 +50,7 @@ class Channel:
     size: int = 0
     units: str = ""
     dec_pts: int = 0
+    interpolate: bool = False
     unknown: bytes = b""
     group: Optional[GroupRef] = None
     timecodes: object = field(default=None, repr=False)
@@ -71,6 +72,7 @@ class DataStream:
 @dataclass(**dc_slots)
 class Decoder:
     stype: str
+    interpolate: bool = False
     fixup: object = None
 
 def _nullterm_string(s):
@@ -96,17 +98,19 @@ _gear_table[ord('6')] = 6
 
 _decoders = {
     0:  Decoder('i'), # Master Clock on M4GT4?
-    1:  Decoder('H', fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
-                                                dtype=np.float16).astype(np.float32).data),
+    1:  Decoder('H', interpolate=True,
+                fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
+                                           dtype=np.float16).astype(np.float32).data),
     3:  Decoder('i'), # Master Clock on ScottE46?
     4:  Decoder('h'),
-    6:  Decoder('f'),
+    6:  Decoder('f', interpolate=True),
     11: Decoder('h'),
     12: Decoder('i'), # Predictive Time?
     13: Decoder('B'), # status field?
     15: Decoder('H', fixup=lambda a: _gear_table[a]), # ?? NdscSwitch on M4GT4.  Also actual size is 8 bytes
-    20: Decoder('H', fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
-                                                dtype=np.float16).astype(np.float32).data),
+    20: Decoder('H', interpolate=True,
+                fixup=lambda a: np.ndarray(buffer=a, shape=(len(a),),
+                                           dtype=np.float16).astype(np.float32).data),
     24: Decoder('i'), # Best Run Diff?
 }
 
@@ -420,6 +424,7 @@ def _decode_sequence(s, progress=None):
         else:
             return
 
+        c.interpolate = d.interpolate
         if c.group:
             grp = c.group.group
             c.timecodes = grp.timecodes
@@ -482,7 +487,8 @@ def _decode_sequence(s, progress=None):
 
     return DataStream(
         channels={ch.long_name: ch for ch in channels
-                  if channels and len(ch.sampledata) and ch.long_name not in ('StrtRec', 'MasterClk')},
+                  if channels and len(ch.sampledata)
+                  and ch.long_name not in ('StrtRec', 'Master Clk')},
         messages=messages,
         laps=laps,
         time_offset=time_offset)
@@ -549,15 +555,16 @@ def _decode_gps(msg_by_type, time_offset):
         long_name='GPS Speed',
         units='m/s',
         dec_pts=1,
+        interpolate=True,
         timecodes=timecodes,
         sampledata=memoryview(np.sqrt(np.square(ecefdX_cms) +
                                       np.square(ecefdY_cms) +
                                       np.square(ecefdZ_cms)) / 100.)),
-            Channel(long_name='GPS Latitude',  units='deg', dec_pts=4,
+            Channel(long_name='GPS Latitude',  units='deg', dec_pts=4, interpolate=True,
                     timecodes=timecodes, sampledata=memoryview(gpsconv.lat)),
-            Channel(long_name='GPS Longitude', units='deg', dec_pts=4,
+            Channel(long_name='GPS Longitude', units='deg', dec_pts=4, interpolate=True,
                     timecodes=timecodes, sampledata=memoryview(gpsconv.long)),
-            Channel(long_name='GPS Altitude', units='m', dec_pts=1,
+            Channel(long_name='GPS Altitude', units='m', dec_pts=1, interpolate=True,
                     timecodes=timecodes, sampledata=memoryview(gpsconv.alt))]
 
 def _get_laps(lat_ch, lon_ch, msg_by_type, time_offset, last_time):
@@ -661,7 +668,7 @@ def AIMXRK(fname, progress):
                                     ch.long_name,
                                     ch.units if ch.size != 1 else '',
                                     ch.dec_pts,
-                                    interpolate = ch.size != 1)
+                                    interpolate = ch.interpolate)
          for ch in data.channels.values()},
         data.laps,
         _get_metadata(data.messages),
