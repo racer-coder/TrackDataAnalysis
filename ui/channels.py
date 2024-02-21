@@ -59,8 +59,29 @@ def update_channel_properties(data_view):
             p.color = override.get('color', p.color)
             props[ch] = p
 
+    # apply math channels
+    for name, (expr, _) in data_view.maths.channel_map.items():
+        if name not in props:
+            props[name] = state.ChannelProperties('', 0, False, 0)
+        props[name].units = expr.unit
+        props[name].dec_pts = expr.dec_pts
+        props[name].interpolate = expr.interpolate
+        props[name].color = expr.color
+
     # set this at the end in case we fail along the way
     data_view.channel_properties = props
+
+def channel_color_icon(color_idx):
+    pix = QPixmap(60, 6)
+    painter = QPainter(pix)
+    painter.fillRect(pix.rect(), colors[color_idx])
+    del painter
+    return QIcon(pix)
+
+def add_channel_colors(combo_box):
+    combo_box.setIconSize(QSize(60, 6))
+    for idx in range(len(colors)):
+        combo_box.addItem(channel_color_icon(idx), '', idx)
 
 def channel_editor(_parent, data_view, channel):
     try:
@@ -102,20 +123,8 @@ def channel_editor(_parent, data_view, channel):
     adder('Upsampling', interp_combo)
 
     color_combo = QComboBox()
-    color_combo.setIconSize(QSize(60, 6))
-    pix = QPixmap(60, 6)
-    painter = QPainter(pix)
-    painter.fillRect(pix.rect(), colors[defaults.color])
-    del painter
-    ico = QIcon(pix)
-    color_combo.addItem(ico, '<default>', None)
-    for idx, color in enumerate(colors):
-        pix = QPixmap(60, 6)
-        painter = QPainter(pix)
-        painter.fillRect(pix.rect(), color)
-        del painter
-        ico = QIcon(pix)
-        color_combo.addItem(ico, '', idx)
+    color_combo.addItem(channel_color_icon(defaults.color), '<default>', None)
+    add_channel_colors(color_combo)
     color_combo.setCurrentIndex(overrides.get('color', -1) + 1)
     adder('Color', color_combo)
 

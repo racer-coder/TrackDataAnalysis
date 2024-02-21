@@ -67,14 +67,15 @@ Every data acquisition tool comes with their own software, so why make another t
 
 - Configurable workspace layout, with cut/copy/paste.
 
+- Math channels.
+
+- Database that caches metadata from your sessions for easy lookup.
+
 ### Future (aka missing) features
 
-- Cached database of your files so it's easy to find them (other than walking directories).
-- Channel editor for setting preferred units, decimal places, colors, etc.
 - Track editor for defining sections
 - Various channel graphs (bar, steering, histogram, etc)
 - Various reports (channel min/max/average, sector comparison, etc)
-- Math channels
 
 ## Installation (from binary)
 
@@ -103,7 +104,7 @@ you'll want to stick to `python3.10` or older.
 Ubuntu 22.04:
 ```
 sudo apt install python3-pyside2.qtwidgets python3-numpy libmpv1
-pip3 install pyyaml glfw # Ubuntu 23.04+ has apt package python3-pyglfw
+pip3 install dacite glfw pyyaml # Ubuntu 23.04+ has apt package python3-pyglfw
 ```
 
 You should then be able to run the program using either of the following:
@@ -149,7 +150,7 @@ running various commands.
 brew install pyside@2
 brew link pyside@2
 brew install mpv
-pip3.10 install glfw numpy pyyaml
+pip3.10 install dacite glfw numpy pyyaml
 ```
 
 Then you should be able to run the program with either:

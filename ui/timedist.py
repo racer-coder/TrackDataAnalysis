@@ -18,6 +18,7 @@ from PySide2.QtWidgets import (
 from data import unitconv
 from data.distance import ChannelData
 from . import channels
+from .math import channel_editor
 from . import state
 from . import widgets
 
@@ -915,7 +916,7 @@ class TimeDist(widgets.MouseHelperWidget):
             menu.addAction(ch[1]) # dummy entry so the user knows exactly what we're operating on
             menu.addSeparator()
             menu.addAction('Edit channel...').triggered.connect(
-                lambda: channels.channel_editor(self, self.dataView, ch[1]))
+                lambda: channel_editor(self, self.dataView, ch[1]))
             menu.addSeparator()
             menu.addAction('Remove channel').triggered.connect(lambda: self.channelMenuRemove(ch))
             menu.exec_(event.globalPos())

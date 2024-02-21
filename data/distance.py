@@ -38,8 +38,16 @@ class ChannelData:
         if span == 0: return self.values[i]
         return self.values[i-1] + (self.values[i] - self.values[i-1]) * (tc - index[i-1]) / span
 
+    def interp_many(self, tc):
+        index = self.timecodes
+        if self.interpolate:
+            return np.interp(tc, index, self.values)
+        else:
+            return self.values[np.minimum(np.searchsorted(index, tc, side='right'),
+                                          len(index) - 1)]
+
     def change_units(self, units):
-        converted = unitconv.convert(self.values,self.units, units)
+        converted = unitconv.convert(self.values, self.units, units)
         if converted is None:
             return ChannelData.from_data([], [], [], '', 0, True)
         return ChannelData.from_data(self.timecodes, self.distances, converted, units,

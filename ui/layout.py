@@ -300,6 +300,7 @@ class LayoutManager(QWidget):
         self.saveCurrentTab()
         dlg = LayoutEditor(self)
         dlg.exec_()
+        dlg.deleteLater()
         # XXX cancel button for dialog to revert to previous design
 
     def tabMoved(self, t, f):

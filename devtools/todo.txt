@@ -7,6 +7,15 @@
 Later Milestones:
 
 * MATHS
+. math - proper dialog sizing for math groups/expressions
+. math edit - UNITS
+. math expression help - search for channels
+. math expression help - search/help for functions
+. math expression help - list possible units
+. channels dock should show heirarchy for math/groups/etc separately from logged channels
+. math - per-file expressions
+. math - 2d/3d tables
+. math - conditions on groups?
 
 * KEYBOARD SHORTCUTS
 
@@ -19,6 +28,8 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. values widget - sort should be case insensitive
+. channels widget - sort should be case insensitive
 . documentation - split among multiple files, add some pictures, quick start up front
 . data widget - less forceful column resizing
 . values widget - less forceful column resizing
@@ -27,10 +38,10 @@ Later Milestones:
 . tech debt - commit to using np.array for channel timecodes/values/etc to avoid rewrapping all the time
 . open from db - ability to choose columns to display in results
 . open - select fastest realistic lap, ignore abnormal laps
+. open - when opening multiple files/db, use status line to indicate what is being loaded
 . file format - megalogviewer
 . file format - vbox
 . file format - link g4+
-. cython or mypyc for aim_xrk?
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
 . widgets - consider qpixmap cache for timedist graph and maps widget

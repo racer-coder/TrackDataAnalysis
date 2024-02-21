@@ -24,6 +24,7 @@ from PySide2.QtWidgets import (
 from data import unitconv
 from . import channels
 from . import map # pylint: disable=redefined-builtin
+from .math import channel_editor
 from . import state
 from . import widgets
 
@@ -188,7 +189,7 @@ class ChannelsDockWidget(TempDockWidget):
         menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
         menu.addSeparator()
         menu.addAction('Edit channel...').triggered.connect(
-            lambda: channels.channel_editor(self, self.mainwindow.data_view, ch))
+            lambda: channel_editor(self, self.mainwindow.data_view, ch))
         ac = self.mainwindow.data_view.active_component
         if ac:
             menu.addSeparator()
@@ -428,7 +429,7 @@ class ValuesDockWidget(TempDockWidget):
             menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
             menu.addSeparator()
             menu.addAction('Edit channel...').triggered.connect(
-                lambda: channels.channel_editor(self, self.mainwindow.data_view, ch))
+                lambda: channel_editor(self, self.mainwindow.data_view, ch))
             ac = self.mainwindow.data_view.active_component
             if ac:
                 menu.addSeparator()
@@ -492,9 +493,7 @@ class ValuesDockWidget(TempDockWidget):
         ac = self.mainwindow.data_view.active_component
         acset = set(ac.channels()) if ac else set()
 
-        allch = list({ch
-                      for logfile in self.mainwindow.data_view.log_files
-                      for ch in logfile.log.get_channels()})
+        allch = list(self.mainwindow.data_view.channel_properties.keys())
         allch.sort()
 
         rows = []

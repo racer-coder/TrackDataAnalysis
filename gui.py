@@ -3,6 +3,7 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 import configparser
+import dataclasses
 import json
 import os
 import sys
@@ -30,11 +31,14 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+import dacite
+
 import ui.channels
 import ui.components
 import ui.datamgr
 import ui.dockers
 import ui.layout
+import ui.math
 import ui.state
 import ui.timedist
 import ui.widgets
@@ -77,8 +81,6 @@ class MainWindow(QMainWindow):
                 [d for d in ('C:\\MoTeC\\Logged Data',
                              'C:\\AIM_SPORT\\RaceStudio3\\user\\data')
                  if sys.platform == 'win32' and os.path.exists(d)])
-                 
-
 
         self.data_view = ui.state.DataView(ref_lap=None,
                                            alt_lap=None,
@@ -96,6 +98,8 @@ class MainWindow(QMainWindow):
                                            channel_overrides={},
                                            channel_properties={},
                                            channel_defaults={},
+
+                                           maths=ui.state.Maths(groups={}),
 
                                            cursor_change=self.cursor_change,
                                            values_change=self.values_change,
@@ -116,6 +120,7 @@ class MainWindow(QMainWindow):
         add_menu = menu.addMenu('Add')
         data_menu = menu.addMenu('Data')
         self.comp_menu = menu.addMenu('Component')
+        tools_menu = menu.addMenu('Tools')
 
         self.statusBar().addWidget(TimeDistStatus(self.data_view))
 
@@ -172,6 +177,8 @@ class MainWindow(QMainWindow):
         data_menu.addAction('Swap Ref/Alt Laps').triggered.connect(self.swap_ref_alt)
         data_menu.addSeparator()
         data_menu.addAction('Zoom to default').triggered.connect(self.zoom_default)
+
+        tools_menu.addAction('Math channels...').triggered.connect(self.math_editor)
 
         try:
             self.restoreGeometry(bytes.fromhex(self.config.get('main', 'geometry')))
@@ -255,6 +262,9 @@ class MainWindow(QMainWindow):
         self.data_view.zoom_window=(ui.state.TimeDistRef(0., 0.),
                                     ui.state.TimeDistRef(0., 0.))
         self.data_view.values_change.emit()
+
+    def math_editor(self):
+        ui.math.math_editor(self, self.data_view)
 
     def toggle_data_offsets(self, flag):
         if flag:
@@ -355,7 +365,11 @@ class MainWindow(QMainWindow):
         self.data_view.video_alignment = ws_data['videos']
         self.data_view.maps_key = ws_data['maps_key']
         self.data_view.channel_overrides = ws_data.get('channels', {})
+        self.data_view.maths.groups = {k: dacite.from_dict(data_class=ui.state.MathGroup, data=v)
+                                       for k, v in ws_data.get('math_groups', {}).items()}
+        self.data_view.math_invalidate()
         ui.channels.update_channel_properties(self.data_view)
+        self.data_view.values_change.emit()
         self.data_view.data_change.emit() # XXX make a new signal for log file / workspace changes
 
     def save_workspace(self):
@@ -366,6 +380,8 @@ class MainWindow(QMainWindow):
                        'videos': self.data_view.video_alignment,
                        'maps_key': self.data_view.maps_key,
                        'channels': self.data_view.channel_overrides,
+                       'math_groups': {k: dataclasses.asdict(v)
+                                       for k, v in self.data_view.maths.groups.items()},
                        }, f, indent=4)
             f.flush()
             os.fsync(f.fileno())

@@ -9,7 +9,10 @@ from PySide2.QtCore import Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import QWidget
 
+import numpy as np
+
 from data import distance
+from data import math_eval
 
 # belongs in a theme file, but ...
 lap_colors = (
@@ -23,6 +26,105 @@ lap_colors = (
     QtGui.QColor(244, 244, 0),
     QtGui.QColor(255, 160, 32),
     )
+
+@dataclass(eq=False)
+class ChannelProperties:
+    units : str
+    dec_pts : int
+    interpolate: bool
+    color : int # index into color array
+
+@dataclass(eq=False)
+class ChannelData(distance.ChannelData):
+    color: int
+
+    @classmethod
+    def derive(cls, parent, prop):
+        return cls(parent.timecodes,
+                   parent.distances,
+                   parent.values,
+                   parent.units,
+                   prop.dec_pts,
+                   prop.interpolate,
+                   parent.min,
+                   parent.max,
+                   prop.color)
+
+@dataclass(eq=False)
+class MathExpr:
+    name: str
+    enabled: bool
+    unit: str
+    dec_pts: int
+    interpolate: bool
+    color: int
+    expr_unit: str
+    expression: str
+    comment: str
+
+@dataclass(eq=False)
+class MathGroup:
+    enabled: bool
+    # condition?
+    expressions: list[MathExpr] # in the future this can include other types too
+    comment: str
+
+@dataclass(eq=False)
+class Maths:
+    groups: dict[str, MathGroup] = field(default_factory=dict)
+    channel_map: dict[str, tuple[MathExpr, object]] = field(default_factory=dict) # computed from groups
+
+    def update_channel_map(self):
+        cmap = {}
+        for group in self.groups.values():
+            if not group.enabled:
+                continue
+            for expr in group.expressions:
+                if expr.enabled and expr.name not in cmap:
+                    try:
+                        cmap[expr.name] = (expr, math_eval.compile(expr.expression))
+                    except (math_eval.LexError, math_eval.ParseError):
+                        cmap[expr.name] = (expr, None) # placeholder, no-worky
+        self.channel_map = cmap
+
+    def get_channel_data(self, log, name, unit):
+        if name not in self.channel_map:
+            return None
+        dummy = ChannelData([], [], [], unit, 0, False, 0, 0, 0)
+        expr, eval_ = self.channel_map[name]
+        if not eval_:
+            return dummy # had parse issues
+
+        # gather dependency set, bail if we find a cycle
+        # XXX we should support having our own expr refer to ourselves
+        seen = set()
+        walk = list(eval_.depends)
+        while walk:
+            n = walk.pop()
+            if n not in seen:
+                if n == name:
+                    return dummy
+                seen.add(n)
+                if n in self.channel_map and self.channel_map[n][1]:
+                    for d in self.channel_map[n][1].depends:
+                        walk.append(d)
+
+        try:
+            timecodes = eval_.timecodes(log)
+            values = eval_.values(log, timecodes)
+            distances = log.log.outTime2Dist(timecodes)
+        except (KeyError, ValueError):
+            return dummy
+
+        return ChannelData(timecodes,
+                           distances,
+                           values,
+                           expr.unit,
+                           expr.dec_pts,
+                           expr.interpolate,
+                           np.min(values),
+                           np.max(values),
+                           expr.color)
 
 # Cursor time/dist: Offset time/dist for the reference lap
 # Offset time/dist: relative to start of zoom_window
@@ -39,9 +141,18 @@ class LogRef:
     video_file: typing.Optional[str] = None
     video_alignment: typing.Optional[int] = None
     laps: typing.List['LapRef'] = field(default_factory=list)
+    math_cache: typing.Dict[str, ChannelData] = field(default_factory=dict)
 
-    def get_channel_data(self, *args, **kwargs):
-        return self.log.get_channel_data(*args, **kwargs)
+    def get_channel_data(self, name, unit, maths=None):
+        k = (name, unit)
+        if k in self.math_cache:
+            return self.math_cache[k]
+        if maths:
+            ret = maths.get_channel_data(self, name, unit)
+            if ret:
+                self.math_cache[k] = ret
+                return ret
+        return self.log.get_channel_data(name, unit)
 
     def update_laps(self):
         self.laps = [
@@ -51,6 +162,9 @@ class LogRef:
                    TimeDistRef(lap.end_time, self.log.outTime2Dist(lap.end_time)),
                    TimeDistRef(0., 0.))
             for lap in self.log.get_laps()]
+
+    def math_invalidate(self):
+        self.math_cache = {}
 
 @dataclass(eq=False)
 class LapRef:
@@ -72,30 +186,8 @@ class LapRef:
     def duration(self):
         return self.end.time - self.start.time
 
-    def get_channel_data(self, *args, **kwargs):
-        return self.log.get_channel_data(*args, **kwargs)
-
-@dataclass(eq=False)
-class ChannelProperties:
-    units : str
-    dec_pts : int
-    interpolate: bool
-    color : int # index into color array
-
-@dataclass(eq=False)
-class ChannelData(distance.ChannelData):
-    color: int
-
-    def __init__(self, parent, prop):
-        super().__init__(parent.timecodes,
-                         parent.distances,
-                         parent.values,
-                         parent.units,
-                         prop.dec_pts,
-                         prop.interpolate,
-                         parent.min,
-                         parent.max)
-        self.color = prop.color
+    def get_channel_data(self, name, unit, maths=None):
+        return self.log.get_channel_data(name, unit, maths)
 
 @dataclass(eq=False)
 class DataView:
@@ -119,6 +211,8 @@ class DataView:
     channel_properties: typing.Dict[str, ChannelProperties] # [name]
     # channel_defaults should be fully populated from open log files.
     channel_defaults: typing.Dict[str, ChannelProperties] # [name]
+
+    maths: Maths
 
     cursor_change: Signal # (old_cursor) when cursor position changed.  Lightest weight update
     values_change: Signal # () lap selection, lap shift, zoom window, time/dist mode.  Redraw all components, maybe more
@@ -212,7 +306,13 @@ class DataView:
 
     def get_channel_data(self, ref, ch): # ref is LogRef or LapRef
         props = self.get_channel_prop(ch)
-        return ChannelData(ref.get_channel_data(ch, unit=props.units), props)
+        return ChannelData.derive(ref.get_channel_data(ch, unit=props.units, maths=self.maths),
+                                  props)
+
+    def math_invalidate(self):
+        self.maths.update_channel_map()
+        for log in self.log_files:
+            log.math_invalidate()
 
 
 # doesn't really belong here, but ....
