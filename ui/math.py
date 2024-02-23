@@ -14,6 +14,7 @@ from PySide2.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QInputDialog,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
@@ -21,13 +22,17 @@ from PySide2.QtWidgets import (
     QTreeView,
 )
 
-from data import math_eval
+import numpy as np
+
+from data import math_eval, unitconv
 from . import channels
 from . import state
 
 class Highlighter(QSyntaxHighlighter):
-    def __init__(self, doc):
+    def __init__(self, doc, data_view, error_label):
         super().__init__(doc)
+        self.data_view = data_view
+        self.error_label = error_label
         self.lex = math_eval.ExprLex()
         self.parse = math_eval.ExprParse()
 
@@ -43,25 +48,51 @@ class Highlighter(QSyntaxHighlighter):
         err_format = QTextCharFormat()
         err_format.setBackground(QColor(255, 160, 160))
         error_before_end = False
+        err_status = 'Ok'
         try:
             all_text = self.document().toPlainText()
-            self.parse.parse(self.lex.tokenize(all_text))
+            # does it parse?  if not, we'll error out and highlight
+            p = self.parse.parse(self.lex.tokenize(all_text))
+            # great it parses.  but do we know all the variables?  Not fatal, but alert the user...
+            for tok in self.lex.tokenize(all_text):
+                if tok.type == 'VAR':
+                    if tok.value[1:-1] not in self.data_view.channel_properties:
+                        self.maybe_format(err_format, tok.index, tok.end)
+                        err_status = 'Unknown variable(s) (maybe not available in these log files?)'
+            if err_status == 'Ok':
+                # look for improper units
+                for tok in self.lex.tokenize(all_text):
+                    if tok.type == 'UNIT':
+                        if tok.value[1:-1] not in unitconv.unit_map:
+                            self.maybe_format(err_format, tok.index, tok.end)
+                            err_status = 'Unknown units'
+            if err_status == 'Ok' and self.data_view.ref_lap:
+                try:
+                    err_status = 'Ok.  Value at cursor: %f' % (
+                        p.values(self.data_view.ref_lap.log,
+                                 np.array([self.data_view.cursor2outTime(self.data_view.ref_lap)],
+                                          dtype=np.int32))[0])
+                except BaseException as err:
+                    err_status = 'Parses correctly, but unable to evaluate (%s).' % err
         except math_eval.LexError as err:
             self.maybe_format(err_format, err.error_index, len(all_text))
             if err.error_index - block.position() < block.length():
                 error_before_end = True
+            err_status = err.args[0]
         except math_eval.ParseError as err:
             if err.token:
                 self.maybe_format(err_format, err.token.index, err.token.end)
                 if err.token.index - block.position() < block.length():
                     error_before_end = True
+            err_status = err.args[0]
+        self.error_label.setText(err_status)
         self.setCurrentBlockState(error_before_end)
 
 class ExpressionEditor(QDialog):
-    def __init__(self, parent, config, base=None):
+    def __init__(self, parent, data_view, base=None):
         super().__init__(parent)
         self.setWindowTitle('Expression Editor')
-        self.config = config
+        self.config = data_view.config
         self.old_expr = base
 
         grid = QGridLayout()
@@ -101,16 +132,20 @@ class ExpressionEditor(QDialog):
         self.expr_unit_edit = QLineEdit(base.expr_unit if base else '') # XXX another dropdown
         layout.addRow('Expression units', self.expr_unit_edit)
 
-        grid.addLayout(layout, 0, 0, 1, 1)
+        grid.addLayout(layout, 0, 0, 2, 1)
+
+        error_label = QLabel()
+        error_label.setWordWrap(True)
+        grid.addWidget(error_label, 1, 1, 1, 1)
 
         self.expression_edit = QPlainTextEdit(base.expression if base else '')
-        self.highlighter = Highlighter(self.expression_edit.document())
+        self.highlighter = Highlighter(self.expression_edit.document(), data_view, error_label)
         grid.addWidget(self.expression_edit, 0, 1, 1, 1)
 
         dlgbutton = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         dlgbutton.accepted.connect(self.validate)
         dlgbutton.rejected.connect(self.reject)
-        grid.addWidget(dlgbutton, 1, 0, 1, 2)
+        grid.addWidget(dlgbutton, 2, 0, 2, 2)
 
         grid.setColumnStretch(0, 0)
         grid.setColumnStretch(1, 1)
@@ -441,7 +476,7 @@ class MathEditor(QDialog):
                     child.src_obj[new_name] = child.obj
                     self.tree_model.layoutChanged.emit()
         else:
-            dlg = ExpressionEditor(self, self.data_view.config, child.obj)
+            dlg = ExpressionEditor(self, self.data_view, child.obj)
             try:
                 if dlg.exec_():
                     self.tree_model.layoutAboutToBeChanged.emit()
@@ -481,7 +516,7 @@ class MathEditor(QDialog):
             group = child.parent
         else:
             return # ??
-        dlg = ExpressionEditor(self, self.data_view.config)
+        dlg = ExpressionEditor(self, self.data_view)
         try:
             if dlg.exec_():
                 self.tree_model.layoutAboutToBeChanged.emit()
@@ -506,7 +541,7 @@ def redo_math(data_view):
 
 def channel_editor(parent, data_view, channel):
     if channel in data_view.maths.channel_map:
-        dlg = ExpressionEditor(parent, data_view.config, data_view.maths.channel_map[channel][0])
+        dlg = ExpressionEditor(parent, data_view, data_view.maths.channel_map[channel][0])
         try:
             if dlg.exec_():
                 redo_math(data_view)

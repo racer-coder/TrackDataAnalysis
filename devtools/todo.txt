@@ -5,7 +5,6 @@
 Later Milestones:
 
 * MATHS
-. math - better status when editing expression - any missing channels, bad units, etc
 . math edit - UNITS
 . math expression help - search for channels
 . math expression help - search/help for functions
@@ -41,6 +40,7 @@ Later Milestones:
 . open - when opening multiple files/db, use status line to indicate what is being loaded
 . file format - megalogviewer
 . file format - vbox
+. file format - racepak? might have encryption problem
 . file format - link g4+
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
