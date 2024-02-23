@@ -5,7 +5,7 @@
 Later Milestones:
 
 * MATHS
-. math - proper dialog sizing for math groups/expressions
+. math - decide fate of ^ vs **
 . math - better status when editing expression - any missing channels, bad units, etc
 . math edit - UNITS
 . math expression help - search for channels

@@ -13,7 +13,6 @@ from PySide2.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QInputDialog,
     QLineEdit,
@@ -97,20 +96,14 @@ class ExpressionEditor(QDialog):
         self.color_edit.setCurrentIndex(base.color if base else 0)
         layout.addRow('Color', self.color_edit)
 
-        grid.addLayout(layout, 0, 0, 1, 1)
-
-        gbox = QGroupBox('Expression')
-        layout = QFormLayout()
-
         self.expr_unit_edit = QLineEdit(base.expr_unit if base else '') # XXX another dropdown
         layout.addRow('Expression units', self.expr_unit_edit)
 
+        grid.addLayout(layout, 0, 0, 1, 1)
+
         self.expression_edit = QPlainTextEdit(base.expression if base else '')
         self.highlighter = Highlighter(self.expression_edit.document())
-        layout.addRow(self.expression_edit)
-
-        gbox.setLayout(layout)
-        grid.addWidget(gbox, 0, 1, 1, 1)
+        grid.addWidget(self.expression_edit, 0, 1, 1, 1)
 
         dlgbutton = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         dlgbutton.accepted.connect(self.validate)
