@@ -59,6 +59,7 @@ class MathExpr:
     dec_pts: int
     interpolate: bool
     color: int
+    sample_rate: int # 0 = automatic
     expr_unit: str
     expression: str
     comment: str
@@ -111,7 +112,11 @@ class Maths:
                         walk.append(d)
 
         try:
-            timecodes = eval_.timecodes(log)
+            if expr.sample_rate:
+                timecodes = np.arange(0, log.laps[-1].end.time, 1000 / expr.sample_rate,
+                                      dtype=np.int32)
+            else:
+                timecodes = eval_.timecodes(log)
             values = eval_.values(log, timecodes)
             distances = log.log.outTime2Dist(timecodes)
         except (KeyError, ValueError):

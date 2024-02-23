@@ -13,18 +13,12 @@ from PySide2.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QGridLayout,
-    QHBoxLayout,
     QInputDialog,
     QLineEdit,
-    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QTabBar,
-    QToolButton,
     QTreeView,
-    QVBoxLayout,
-    QWidget,
 )
 
 from data import math_eval
@@ -91,6 +85,14 @@ class ExpressionEditor(QDialog):
         self.interpolate.setChecked(base.interpolate if base else True)
         layout.addRow('Interpolate', self.interpolate)
 
+        self.sample_rate = QComboBox()
+        self.sample_rate.addItem('auto', 0)
+        for rate in (1, 2, 5, 10, 20, 25, 50, 100):
+            self.sample_rate.addItem('%d Hz' % rate, rate)
+        self.sample_rate.setCurrentIndex(
+            self.sample_rate.findData(base.sample_rate if base else 0))
+        layout.addRow('Sample rate', self.sample_rate)
+
         self.color_edit = QComboBox()
         channels.add_channel_colors(self.color_edit)
         self.color_edit.setCurrentIndex(base.color if base else 0)
@@ -139,6 +141,7 @@ class ExpressionEditor(QDialog):
                                 QMessageBox.Ok)
             return
         interpolate = self.interpolate.isChecked()
+        sample_rate = self.sample_rate.currentData()
         color = self.color_edit.currentData()
         expr_unit = self.expr_unit_edit.text()
         expression = self.expression_edit.toPlainText()
@@ -158,6 +161,7 @@ class ExpressionEditor(QDialog):
         self.old_expr.dec_pts = dec_pts
         self.old_expr.interpolate = interpolate
         self.old_expr.color = color
+        self.old_expr.sample_rate = sample_rate
         self.old_expr.expr_unit = expr_unit
         self.old_expr.expression = expression
         self.new_expr = self.old_expr

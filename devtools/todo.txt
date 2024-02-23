@@ -69,6 +69,8 @@ Later Milestones:
 . time/dist detect whether should use meter vs feet depending on speed units?
 . time/distance widget - vertical zoom bar to easily adjust range on the fly
 . time/distance widget - resizable groups
+. time/distance widget and lap widget - when lots of laps, don't print each lap marker
+. time/distance widget - proper clipping of graphs (left edge can wander into axis)
 . bar graph widget - title!
 . bar graph widget - respond to channel messages
 . bar graph widget - value. update with cursor
@@ -77,3 +79,5 @@ Later Milestones:
 . video - keyboard shortcuts for frame by frame, arrow keys for second/5s/10s?
 . video - change overall playback speed (good for machines that have a hard time playing two streams)
 . video - ability to disable either video for performance
+. ui - more consistent/sane font choices: bigger fonts for everything but axis labels
+. ui - mac font sizes too small?

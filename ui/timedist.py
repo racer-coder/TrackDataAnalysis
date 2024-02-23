@@ -915,8 +915,9 @@ class TimeDist(widgets.MouseHelperWidget):
             menu = QMenu()
             menu.addAction(ch[1]) # dummy entry so the user knows exactly what we're operating on
             menu.addSeparator()
-            menu.addAction('Edit channel...').triggered.connect(
-                lambda: channel_editor(self, self.dataView, ch[1]))
+            menu.addAction('Edit expression...' if ch[1] in self.dataView.maths.channel_map
+                           else 'Edit channel...').triggered.connect(
+                                   lambda: channel_editor(self, self.dataView, ch[1]))
             menu.addSeparator()
             menu.addAction('Remove channel').triggered.connect(lambda: self.channelMenuRemove(ch))
             menu.exec_(event.globalPos())

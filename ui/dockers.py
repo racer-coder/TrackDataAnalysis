@@ -188,7 +188,8 @@ class ChannelsDockWidget(TempDockWidget):
         menu = QMenu()
         menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
         menu.addSeparator()
-        menu.addAction('Edit channel...').triggered.connect(
+        menu.addAction('Edit expression...' if ch in self.mainwindow.data_view.maths.channel_map
+                       else 'Edit channel...').triggered.connect(
             lambda: channel_editor(self, self.mainwindow.data_view, ch))
         ac = self.mainwindow.data_view.active_component
         if ac:
@@ -428,7 +429,8 @@ class ValuesDockWidget(TempDockWidget):
             menu = QMenu()
             menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
             menu.addSeparator()
-            menu.addAction('Edit channel...').triggered.connect(
+            menu.addAction('Edit expression...' if ch in self.mainwindow.data_view.maths.channel_map
+                           else 'Edit channel...').triggered.connect(
                 lambda: channel_editor(self, self.mainwindow.data_view, ch))
             ac = self.mainwindow.data_view.active_component
             if ac:
