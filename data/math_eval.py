@@ -29,6 +29,7 @@ class ExprLex(Lexer):
     literals = { '(', ')' }.union({k for k in op_map.keys() if len(k) == 1})
 
     ignore = ' \t\n'
+    ignore_comment = '\#.*'
 
     ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
     ID['and'] = AND
@@ -52,7 +53,7 @@ class EvalLiteral:
         return np.array([], dtype=np.int32)
 
     def values(self, log, timecodes):
-        return self._value
+        return np.repeat(self._value, len(timecodes))
 
 class EvalReference:
     def __init__(self, name, unit):

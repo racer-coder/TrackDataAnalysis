@@ -117,8 +117,10 @@ class Maths:
                                       dtype=np.int32)
             else:
                 timecodes = eval_.timecodes(log)
-            values = eval_.values(log, timecodes)
+            if len(timecodes) == 0: # throw in start and end at least
+                timecodes = np.array([0, log.laps[-1].end.time], dtype=np.int32)
             distances = log.log.outTime2Dist(timecodes)
+            values = eval_.values(log, timecodes)
         except (KeyError, ValueError):
             return dummy
 
