@@ -1,6 +1,7 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
+import configparser
 from dataclasses import dataclass
 import typing
 
@@ -19,6 +20,7 @@ from PySide2.QtWidgets import (
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -98,34 +100,46 @@ class LayoutEditor(QDialog):
         self.tree.itemSelectionChanged.connect(self.selectionChanged)
         self.tree.itemChanged.connect(self.itemChanged)
         self.tree.reordered.connect(self.reordered)
-        layout.addWidget(self.tree, 0, 0, 4, 1)
+        layout.addWidget(self.tree, 0, 0, 1, 1)
+
+        vbox = QVBoxLayout()
 
         rename_b = QPushButton('Rename')
         rename_b.clicked.connect(self.rename)
-        layout.addWidget(rename_b, 0, 1, 1, 1)
+        vbox.addWidget(rename_b)
 
         delete_b = QPushButton('Delete')
         delete_b.clicked.connect(self.deleteWorkitem)
-        layout.addWidget(delete_b, 1, 1, 1, 1)
+        vbox.addWidget(delete_b)
 
         addbook_b = QPushButton('New Workbook')
         addbook_b.clicked.connect(self.addWorkbook)
-        layout.addWidget(addbook_b, 2, 1, 1, 1)
+        vbox.addWidget(addbook_b)
 
         addsheet_b = QPushButton('New Worksheet')
         addsheet_b.clicked.connect(self.addWorksheet)
-        layout.addWidget(addsheet_b, 3, 1, 1, 1)
+        vbox.addWidget(addsheet_b)
+        layout.addLayout(vbox, 0, 1, 1, 1)
 
         dlgbutton = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         dlgbutton.accepted.connect(self.accept)
         dlgbutton.rejected.connect(self.reject)
-        layout.addWidget(dlgbutton, 4, 0, 1, 2)
+        layout.addWidget(dlgbutton, 1, 0, 1, 2)
 
-        for i in range(4):
-            layout.setRowStretch(i, 1)
-        layout.setRowStretch(4, 0)
+        layout.setRowStretch(0, 1)
+        layout.setRowStretch(1, 0)
 
         self.setLayout(layout)
+        try:
+            self.restoreGeometry(
+                bytes.fromhex(self.parent().data_view.config.get('main', 'layouteditor_geometry')))
+        except configparser.NoOptionError:
+            pass
+
+    def hideEvent(self, ev):
+        self.parent().data_view.config['main']['layouteditor_geometry'] = bytes(
+            self.saveGeometry()).hex()
+        super().hideEvent(ev)
 
     def insertWorksheet(self, wbitem, ws):
         shitem = QTreeWidgetItem(wbitem)

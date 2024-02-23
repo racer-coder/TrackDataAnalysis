@@ -135,6 +135,11 @@ def channel_editor(_parent, data_view, channel):
     dia.setWindowTitle('Channel editor for %s' % channel)
     dia.setLayout(layout)
 
+    #try:
+    #    dia.restoreGeometry(bytes.fromhex(data_view.config.get('main', 'channeleditor_geometry')))
+    #except configparser.NoOptionError:
+    #    pass
+
     bbox.accepted.connect(dia.accept)
     bbox.rejected.connect(dia.reject)
 
@@ -170,6 +175,8 @@ def channel_editor(_parent, data_view, channel):
 
         update_channel_properties(data_view)
         data_view.values_change.emit()
+
+    #data_view.config['main']['channeleditor_geometry'] = bytes(dia.saveGeometry()).hex()
 
 def initiate_drag(parent, data_view, channel):
     drag = QDrag(parent)

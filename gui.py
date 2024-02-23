@@ -103,7 +103,9 @@ class MainWindow(QMainWindow):
 
                                            cursor_change=self.cursor_change,
                                            values_change=self.values_change,
-                                           data_change=self.data_change)
+                                           data_change=self.data_change,
+
+                                           config=self.config)
 
         self.workspace_dir = (QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
                               + '/workspaces')

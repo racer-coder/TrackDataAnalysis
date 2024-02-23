@@ -1,6 +1,7 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
+from configparser import ConfigParser
 from dataclasses import dataclass, field
 import math
 import typing
@@ -217,6 +218,8 @@ class DataView:
     cursor_change: Signal # (old_cursor) when cursor position changed.  Lightest weight update
     values_change: Signal # () lap selection, lap shift, zoom window, time/dist mode.  Redraw all components, maybe more
     data_change: Signal # () focus change, channel selection, load log file.  Anything that requires dock widgets to update.
+
+    config: ConfigParser
 
     def get_laps(self):
         return [(l, c, idx + 3)

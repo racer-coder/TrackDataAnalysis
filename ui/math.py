@@ -1,6 +1,7 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
+import configparser
 from dataclasses import dataclass
 
 from PySide2.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt
@@ -64,9 +65,10 @@ class Highlighter(QSyntaxHighlighter):
         self.setCurrentBlockState(error_before_end)
 
 class ExpressionEditor(QDialog):
-    def __init__(self, parent, base=None):
+    def __init__(self, parent, config, base=None):
         super().__init__(parent)
         self.setWindowTitle('Expression Editor')
+        self.config = config
         self.old_expr = base
 
         grid = QGridLayout()
@@ -119,6 +121,15 @@ class ExpressionEditor(QDialog):
         grid.setColumnStretch(1, 1)
 
         self.setLayout(grid)
+        try:
+            self.restoreGeometry(
+                bytes.fromhex(self.config.get('main', 'expressioneditor_geometry')))
+        except configparser.NoOptionError:
+            pass
+
+    def hideEvent(self, ev):
+        self.config['main']['expressioneditor_geometry'] = bytes(self.saveGeometry()).hex()
+        super().hideEvent(ev)
 
     def validate(self):
         enabled = self.enabled.isChecked()
@@ -216,7 +227,7 @@ class MathTreeModel(QAbstractItemModel):
                 redo_math(self.data_view) # reordering groups can cause many effects
                 return True
             if role == Qt.CheckStateRole:
-                child.obj.enabled = value
+                child.obj.enabled = bool(value)
                 self.dataChanged.emit(index, index, [role])
                 redo_math(self.data_view)
                 return True
@@ -370,6 +381,19 @@ class MathEditor(QDialog):
         layout.setColumnStretch(1, 0)
 
         self.setLayout(layout)
+        try:
+            self.restoreGeometry(
+                bytes.fromhex(self.data_view.config.get('main', 'matheditor_geometry')))
+            self.tree_view.header().restoreState(
+                bytes.fromhex(self.data_view.config.get('main', 'matheditor_header')))
+        except configparser.NoOptionError:
+            pass
+
+    def hideEvent(self, ev):
+        self.data_view.config['main']['matheditor_geometry'] = bytes(self.saveGeometry()).hex()
+        self.data_view.config['main']['matheditor_header'] = bytes(
+            self.tree_view.header().saveState()).hex()
+        super().hideEvent(ev)
 
     def create_group(self):
         new_name, ok = QInputDialog.getText(self, 'New Math Group',
@@ -420,7 +444,7 @@ class MathEditor(QDialog):
                     child.src_obj[new_name] = child.obj
                     self.tree_model.layoutChanged.emit()
         else:
-            dlg = ExpressionEditor(self, child.obj)
+            dlg = ExpressionEditor(self, self.data_view.config, child.obj)
             try:
                 if dlg.exec_():
                     self.tree_model.layoutAboutToBeChanged.emit()
@@ -460,7 +484,7 @@ class MathEditor(QDialog):
             group = child.parent
         else:
             return # ??
-        dlg = ExpressionEditor(self)
+        dlg = ExpressionEditor(self, self.data_view.config)
         try:
             if dlg.exec_():
                 self.tree_model.layoutAboutToBeChanged.emit()
@@ -485,7 +509,7 @@ def redo_math(data_view):
 
 def channel_editor(parent, data_view, channel):
     if channel in data_view.maths.channel_map:
-        dlg = ExpressionEditor(parent, data_view.maths.channel_map[channel][0])
+        dlg = ExpressionEditor(parent, data_view.config, data_view.maths.channel_map[channel][0])
         try:
             if dlg.exec_():
                 redo_math(data_view)

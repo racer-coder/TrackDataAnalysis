@@ -2,6 +2,7 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 import bisect
+import configparser
 from dataclasses import dataclass
 import json
 import os
@@ -418,6 +419,11 @@ class DataDockWidget(TempDockWidget):
         bbox.accepted.connect(dia.accept)
         bbox.rejected.connect(dia.reject)
 
+        try:
+            dia.restoreGeometry(bytes.fromhex(self.config.get('main', 'open_geometry')))
+        except configparser.NoOptionError:
+            pass
+
         if dia.exec_():
             selection = files.selectedItems()
             for item in selection:
@@ -425,6 +431,7 @@ class DataDockWidget(TempDockWidget):
                     self.open_file(item.data(Qt.UserRole)['path'])
         self.config['main']['open_filters'] = json.dumps(active_filters)
         self.config['main']['open_search'] = search.text()
+        self.config['main']['open_geometry'] = bytes(dia.saveGeometry()).hex()
 
     def open_from_file(self):
         file_names = QFileDialog.getOpenFileNames(self, 'Open data file for analysis',

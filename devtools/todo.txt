@@ -1,5 +1,3 @@
-. save_state/restore_state on a bunch of dialogs.  make them more permanent?
-
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
 . lat/long g force calculation from GPS? or internal accelerometers? or both?
 . detection of braking/cornering based on exceeding threshold for a duration of time?
@@ -8,6 +6,7 @@ Later Milestones:
 
 * MATHS
 . math - proper dialog sizing for math groups/expressions
+. math - better status when editing expression - any missing channels, bad units, etc
 . math edit - UNITS
 . math expression help - search for channels
 . math expression help - search/help for functions
@@ -16,6 +15,8 @@ Later Milestones:
 . math - per-file expressions
 . math - 2d/3d tables
 . math - conditions on groups?
+. math - better handling of expr that "overwrite" existing channels
+. math - case insensitive channel loopup?
 
 * KEYBOARD SHORTCUTS
 
