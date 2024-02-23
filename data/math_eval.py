@@ -11,7 +11,7 @@ op_map = {
     '-': np.subtract,
     '*': np.multiply,
     '/': np.divide,
-    '^': np.bitwise_xor,
+    '^': np.power,
     '<': np.less,
     '>': np.greater,
     '&': np.bitwise_and,
@@ -22,11 +22,10 @@ op_map = {
     '!=': np.not_equal,
     'and': np.logical_and,
     'or': np.logical_or,
-    '**': np.power,
 }
 
 class ExprLex(Lexer):
-    tokens = { VAR, UNIT, ID, INT, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT, POW }
+    tokens = { VAR, UNIT, ID, INT, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT }
     literals = { '(', ')' }.union({k for k in op_map.keys() if len(k) == 1})
 
     ignore = ' \t\n'
@@ -43,7 +42,6 @@ class ExprLex(Lexer):
     GTE = r'>='
     EQ = r'=='
     NEQ = r'!='
-    POW = r'\*\*'
 
 class EvalLiteral:
     def __init__(self, lit):
@@ -94,17 +92,17 @@ class ParseError(Exception):
 class ExprParse(Parser):
     tokens = ExprLex.tokens
 
-    precedence = ( # python precedence
+    precedence = ( # python precedence, except ^ is power, not xor
         ('left', OR),
         ('left', AND),
         ('right', NOT),
         ('left', '<', '>', LTE, GTE, EQ, NEQ),
         ('left', '|'),
-        ('left', '^'),
         ('left', '&'),
         ('left', '+', '-'),
         ('left', '*', '/'),
-        ('left', POW),
+        ('right', 'UMINUS'),
+        ('left', '^'),
         )
 
     @_('VAR')
@@ -127,7 +125,7 @@ class ExprParse(Parser):
     def expr(self, p):
         return p.expr
 
-    @_('"-" expr')
+    @_('"-" expr %prec UMINUS')
     def expr(self, p):
         return EvalOp(np.negative, p.expr)
 
@@ -136,7 +134,7 @@ class ExprParse(Parser):
         return EvalOp(np.logical_not, p.expr)
 
     @_(*['expr "%s" expr' % k for k in op_map.keys() if len(k) == 1],
-       *['expr %s expr' % k for k in ('LTE', 'GTE', 'EQ', 'NEQ', 'AND', 'OR', 'POW')])
+       *['expr %s expr' % k for k in ('LTE', 'GTE', 'EQ', 'NEQ', 'AND', 'OR')])
     def expr(self, p):
         return EvalOp(op_map[p[1]], p.expr0, p.expr1)
 
