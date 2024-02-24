@@ -73,7 +73,7 @@ class Highlighter(QSyntaxHighlighter):
                 if tok.type == 'INT' or tok.type == 'FLOAT':
                     self.maybe_format(lit_format, tok.index, tok.end)
             # does it parse?  if not, we'll error out and highlight
-            p = self.parse.parse(self.lex.tokenize(all_text))
+            p = self.parse.parse(math_eval.eat_comments(self.lex.tokenize(all_text)))
             # great it parses.  but do we know all the variables?  Not fatal, but alert the user...
             for tok in self.lex.tokenize(all_text):
                 if tok.type == 'VAR':
@@ -91,8 +91,7 @@ class Highlighter(QSyntaxHighlighter):
                 try:
                     err_status = 'Ok.  Value at cursor: %f' % (
                         p.values(self.data_view.ref_lap.log,
-                                 np.array([self.data_view.cursor2outTime(self.data_view.ref_lap)],
-                                          dtype=np.int32))[0])
+                                 np.array([self.data_view.cursor2outTime(self.data_view.ref_lap)]))[0])
                 except BaseException as err:
                     err_status = 'Parses correctly, but unable to evaluate (%s).' % err
         except math_eval.LexError as err:
@@ -212,7 +211,7 @@ class ExpressionEditor(QDialog):
             self.old_expr = state.MathExpr('', False, '', 0, False, 0, '', '', '')
         self.old_expr.name = name
         self.old_expr.enabled = enabled
-        self.old_expr.units = units
+        self.old_expr.unit = units
         self.old_expr.dec_pts = dec_pts
         self.old_expr.interpolate = interpolate
         self.old_expr.color = color

@@ -25,7 +25,7 @@ op_map = {
 }
 
 class ExprLex(Lexer):
-    tokens = { VAR, UNIT, ID, INT, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT, COMMENT }
+    tokens = { VAR, UNIT, ID, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT, COMMENT }
     literals = { '(', ')' }.union({k for k in op_map.keys() if len(k) == 1})
 
     ignore = ' \t\n'
@@ -36,8 +36,7 @@ class ExprLex(Lexer):
     ID['not'] = NOT
     VAR = r"'[a-zA-z0-9_ ]+'"
     UNIT = r'\[[^\]]+\]'
-    FLOAT = r'([.][0-9]+|[0-9]+[.][0-9]*)([eE][-+]?[0-9]+)?'
-    INT = r'[0-9]+'
+    FLOAT = r'([.][0-9]+|[0-9]+([.][0-9]*)?)([eE][-+]?[0-9]+)?'
     LTE = r'<='
     GTE = r'>='
     EQ = r'=='
@@ -114,10 +113,6 @@ class ExprParse(Parser):
     def expr(self, p):
         return EvalReference(p.VAR[1:-1], p.UNIT[1:-1])
 
-    @_('INT')
-    def expr(self, p):
-        return EvalLiteral(int(p.INT))
-
     @_('FLOAT')
     def expr(self, p):
         return EvalLiteral(float(p.FLOAT))
@@ -157,5 +152,10 @@ class ExprParse(Parser):
         else:
             raise ParseError(p)
 
+def eat_comments(gen):
+    for tok in gen:
+        if tok.type != 'COMMENT':
+            yield tok
+
 def compile(text):
-    return ExprParse().parse(ExprLex().tokenize(text))
+    return ExprParse().parse(eat_comments(ExprLex().tokenize(text)))
