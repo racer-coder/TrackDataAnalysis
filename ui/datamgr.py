@@ -13,6 +13,7 @@ import typing
 from PySide2.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
 from PySide2 import QtGui
 from PySide2.QtWidgets import (
+    QApplication,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -455,6 +456,16 @@ class DataDockWidget(TempDockWidget):
             return None
 
     def open_file(self, file_name):
+        try:
+            QApplication.setOverrideCursor(Qt.WaitCursor)
+            self.mainwindow.statusBar().showMessage('Opening ' + file_name)
+            self.mainwindow.statusBar().repaint()
+            return self.open_file_worker(file_name)
+        finally:
+            QApplication.restoreOverrideCursor()
+            self.mainwindow.statusBar().showMessage('')
+
+    def open_file_worker(self, file_name):
         builder = self.get_builder(file_name)
         if not builder:
             QMessageBox.critical(self, 'Unknown extension',

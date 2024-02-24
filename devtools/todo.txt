@@ -37,7 +37,6 @@ Later Milestones:
 . tech debt - commit to using np.array for channel timecodes/values/etc to avoid rewrapping all the time
 . open from db - ability to choose columns to display in results
 . open - select fastest realistic lap, ignore abnormal laps
-. open - when opening multiple files/db, use status line to indicate what is being loaded
 . file format - megalogviewer
 . file format - vbox
 . file format - racepak? might have encryption problem
