@@ -9,6 +9,14 @@ from Cython.Build import cythonize
 # Dependencies are automatically detected, but it might need fine tuning.
 build_exe_options = {
     "excludes": ["tkinter", "unittest"],
+    'zip_include_packages': ['*'],
+    'zip_exclude_packages': ['PySide2',
+                             'glfw',
+                             'numpy',
+                             'numpy.libs',
+                             'shiboken2',
+                             'ui',
+                             'yaml'],
 }
 
 if sys.platform == 'win32':
@@ -36,4 +44,5 @@ setup(
                               shortcut_dir='StartMenuFolder',
                               )],
     ext_modules=cythonize('data/aim_xrk.pyx', language='c++'),
+    include_package_data=False, # don't include .cpp file from cython
 )

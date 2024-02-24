@@ -231,6 +231,10 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
+- 0.4.0
+  - Initial math expression support
+  - 4x faster AiM XRK file processing.
+  - Allow specifying 'last used' instead of 'interpolate' for channels (for gear, status, etc)
 - 0.3.3
   - Significantly (50%) faster AiM XRK file processing.
   - Add handling for interpolated vs previous values in graphs
