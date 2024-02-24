@@ -1,10 +1,15 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
+# pylint: disable=used-before-assignment
+# pylint: disable=undefined-variable
+# pylint: disable=unsupported-assignment-operation
+# pylint: disable=function-redefined
+
 import numpy as np
 
 from sly import Lexer, Parser
-from sly.lex import LexError
+from sly.lex import LexError # pylint: disable=unused-import
 
 op_map = {
     '+': np.add,
@@ -151,10 +156,10 @@ class ExprParse(Parser):
             if nargs:
                 nargs.sort()
                 raise ParseError("Function %s accepts %s arguments, not %d"
-                                 % (name, ', '.join([str(x) for x in nargs]), len(p.expr_list)),
-                                 p)
+                                 % (p.ID, ', '.join([str(x) for x in nargs]), len(p.expr_list)),
+                                 p) # pylint: disable=raise-from-missing
             else:
-                raise ParseError(("Unknown function", name), p)
+                raise ParseError(("Unknown function", p.ID), p) # pylint: disable=raise-from-missing
 
     @_('expr { "," expr }')
     def expr_list(self, p):
@@ -164,11 +169,11 @@ class ExprParse(Parser):
     def expr_list(self, p):
         return []
 
-    def error(self, p):
-        if not p:
-            raise ParseError('Parse error at end of file', p)
+    def error(self, token):
+        if not token:
+            raise ParseError('Parse error at end of file', token)
         elif p.type != 'COMMENT':
-            raise ParseError(('Parse error at token', p), p)
+            raise ParseError(('Parse error at token', token), token)
         else: # manually skip comments
             return next(self.tokens, None) # user manual says call errok() but that doesn't work...
 

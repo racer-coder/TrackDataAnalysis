@@ -44,7 +44,6 @@ class Highlighter(QSyntaxHighlighter):
             self.setFormat(start, end - start, fmt)
 
     def highlightBlock(self, text):
-        block = self.currentBlock()
         err_format = QTextCharFormat()
         err_format.setBackground(QColor(255, 160, 160))
         comment_format = QTextCharFormat()
