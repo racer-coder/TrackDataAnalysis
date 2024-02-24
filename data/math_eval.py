@@ -24,9 +24,15 @@ op_map = {
     'or': np.logical_or,
 }
 
+func_map = {
+    ('if', 3): np.where,
+    ('min', 2): np.minimum,
+    ('max', 2): np.maximum,
+}
+
 class ExprLex(Lexer):
     tokens = { VAR, UNIT, ID, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT, COMMENT }
-    literals = { '(', ')' }.union({k for k in op_map.keys() if len(k) == 1})
+    literals = { '(', ')', ',' }.union({k for k in op_map.keys() if len(k) == 1})
 
     ignore = ' \t\n'
 
@@ -82,15 +88,14 @@ class EvalOp:
         return self._op(*[a.values(log, timecodes) for a in self._args])
 
 class ParseError(Exception):
-    def __init__(self, tok):
-        if tok:
-            self.args = ('Parse error at token', tok)
-        else:
-            self.args = ('Parse error at end of file',)
+    def __init__(self, msg, tok):
+        if not isinstance(msg, tuple):
+            msg = (msg,)
+        self.args = msg
         self.token = tok
 
 class ExprParse(Parser):
-    tokens = ExprLex.tokens.difference({'COMMENT', 'ID'})
+    tokens = ExprLex.tokens.difference({'COMMENT'})
 
     precedence = ( # python precedence, except ^ is power, not xor
         ('left', OR),
@@ -134,23 +139,38 @@ class ExprParse(Parser):
     def expr(self, p):
         return EvalOp(op_map[p[1]], p.expr0, p.expr1)
 
-    #@_('ID "(" expr_list ")"')
-    #def expr(self, p):
-    #    return (p.ID, p.expr_list)
-    #
-    #@_('expr { "," expr }')
-    #def expr_list(self, p):
-    #    return [p.expr0] + p.expr1
-    #
-    #@_('')
-    #def expr_list(self, p):
-    #    return []
+    @_('ID "(" expr_list ")"')
+    def expr(self, p):
+        try:
+            return EvalOp(func_map[(p.ID, len(p.expr_list))], *p.expr_list)
+        except KeyError:
+            nargs = []
+            for name, n in func_map.keys():
+                if name == p.ID:
+                    nargs.append(n)
+            if nargs:
+                nargs.sort()
+                raise ParseError("Function %s accepts %s arguments, not %d"
+                                 % (name, ', '.join([str(x) for x in nargs]), len(p.expr_list)),
+                                 p)
+            else:
+                raise ParseError(("Unknown function", name), p)
+
+    @_('expr { "," expr }')
+    def expr_list(self, p):
+        return [p.expr0] + p.expr1
+
+    @_('')
+    def expr_list(self, p):
+        return []
 
     def error(self, p):
-        if p and p.type == 'COMMENT': # manually skip comments
+        if not p:
+            raise ParseError('Parse error at end of file', p)
+        elif p.type != 'COMMENT':
+            raise ParseError(('Parse error at token', p), p)
+        else: # manually skip comments
             return next(self.tokens, None) # user manual says call errok() but that doesn't work...
-        else:
-            raise ParseError(p)
 
 def eat_comments(gen):
     for tok in gen:
