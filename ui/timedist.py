@@ -641,6 +641,7 @@ class TimeDist(widgets.MouseHelperWidget):
         ph.painter.drawRect(self.graph_x, 0, ph.size.width() - self.graph_x - 1, graph_y - 2)
         # draw laps
         if self.x_axis:
+            right_x = self.graph_x * 2
             for lap in self.dataView.ref_lap.log.laps:
                 start_x = self.x_axis.calc(
                     self.dataView.getTDValue(lap.start) -
@@ -648,9 +649,14 @@ class TimeDist(widgets.MouseHelperWidget):
                 end_x = self.x_axis.calc(
                     self.dataView.getTDValue(lap.end) -
                     self.dataView.getTDValue(self.dataView.ref_lap.start))
-                ph.painter.drawText(start_x, 1, end_x - start_x, graph_y,
+                text = str(lap.num)
+                width = fontMetrics.horizontalAdvance(text) * 1.5
+                if start_x + end_x - width < right_x:
+                    continue
+                ph.painter.drawText((start_x + end_x - width) / 2, 1, width, graph_y,
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
-                                    str(lap.num))
+                                    text)
+                right_x = start_x + end_x + width
 
         # paint each channel group graph
         self.cursor_values = []

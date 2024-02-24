@@ -306,7 +306,6 @@ class LapWidget(MouseHelperWidget):
                 ph.painter.drawText(lapx, y, ph.size.width(), fh,
                                     Qt.AlignTop | Qt.AlignLeft, chr(0x2789 + idx))
 
-                ph.painter.setFont(font)
                 ph.painter.setPen(pen)
                 metadata = l.log.log.get_metadata()
                 txt = '[%s] %s [%s]' % (state.format_time(l.duration()),
@@ -339,12 +338,19 @@ class LapWidget(MouseHelperWidget):
                       ph.size.height() - 2 - lapy),
                 QtGui.QColor(48, 48, 48))
             # draw laps and lap markers
+            right_x = 0
             for lap in self.dataView.ref_lap.log.laps:
                 start_x = self.modeCalc(lap.start)
                 end_x = self.modeCalc(lap.end)
-                ph.painter.drawText(start_x, 1 + lapy, end_x - start_x, ph.size.height() - lapy,
+                text = str(lap.num)
+                width = metrics.horizontalAdvance(text) * 1.5
+                if start_x + end_x - width < right_x:
+                    continue
+                ph.painter.drawText((start_x + end_x - width) / 2, 1 + lapy,
+                                    width, ph.size.height() - lapy,
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
-                                    str(lap.num))
+                                    text)
+                right_x = start_x + end_x + width
             # draw lap boundaries
             pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
             pen.setStyle(Qt.DashLine)
