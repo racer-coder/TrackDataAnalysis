@@ -25,11 +25,10 @@ op_map = {
 }
 
 class ExprLex(Lexer):
-    tokens = { VAR, UNIT, ID, INT, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT }
+    tokens = { VAR, UNIT, ID, INT, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT, COMMENT }
     literals = { '(', ')' }.union({k for k in op_map.keys() if len(k) == 1})
 
     ignore = ' \t\n'
-    ignore_comment = '\#.*'
 
     ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
     ID['and'] = AND
@@ -43,6 +42,7 @@ class ExprLex(Lexer):
     GTE = r'>='
     EQ = r'=='
     NEQ = r'!='
+    COMMENT = '#.*' # explicit token so we can color syntax highlight
 
 class EvalLiteral:
     def __init__(self, lit):
@@ -91,7 +91,7 @@ class ParseError(Exception):
         self.token = tok
 
 class ExprParse(Parser):
-    tokens = ExprLex.tokens
+    tokens = ExprLex.tokens.difference({'COMMENT', 'ID'})
 
     precedence = ( # python precedence, except ^ is power, not xor
         ('left', OR),
@@ -151,8 +151,11 @@ class ExprParse(Parser):
     #def expr_list(self, p):
     #    return []
 
-    def error(self, token):
-        raise ParseError(token)
+    def error(self, p):
+        if p and p.type == 'COMMENT': # manually skip comments
+            return next(self.tokens, None) # user manual says call errok() but that doesn't work...
+        else:
+            raise ParseError(p)
 
 def compile(text):
     return ExprParse().parse(ExprLex().tokenize(text))

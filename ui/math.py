@@ -47,10 +47,31 @@ class Highlighter(QSyntaxHighlighter):
         block = self.currentBlock()
         err_format = QTextCharFormat()
         err_format.setBackground(QColor(255, 160, 160))
-        error_before_end = False
+        comment_format = QTextCharFormat()
+        comment_format.setFontItalic(True)
+        comment_format.setForeground(QColor(96, 96, 96))
+        var_format = QTextCharFormat()
+        var_format.setForeground(QColor(0, 0, 224))
+        var_format.setFontWeight(75)
+        unit_format = QTextCharFormat()
+        unit_format.setForeground(QColor(64, 64, 64,))
+        unit_format.setFontWeight(75)
+        lit_format = QTextCharFormat()
+        lit_format.setForeground(QColor(192, 0, 0))
+        error_value = 0
         err_status = 'Ok'
         try:
             all_text = self.document().toPlainText()
+            # base formatting
+            for tok in self.lex.tokenize(all_text):
+                if tok.type == 'COMMENT':
+                    self.maybe_format(comment_format, tok.index, tok.end)
+                if tok.type == 'VAR':
+                    self.maybe_format(var_format, tok.index, tok.end)
+                if tok.type == 'UNIT':
+                    self.maybe_format(unit_format, tok.index, tok.end)
+                if tok.type == 'INT' or tok.type == 'FLOAT':
+                    self.maybe_format(lit_format, tok.index, tok.end)
             # does it parse?  if not, we'll error out and highlight
             p = self.parse.parse(self.lex.tokenize(all_text))
             # great it parses.  but do we know all the variables?  Not fatal, but alert the user...
@@ -76,17 +97,17 @@ class Highlighter(QSyntaxHighlighter):
                     err_status = 'Parses correctly, but unable to evaluate (%s).' % err
         except math_eval.LexError as err:
             self.maybe_format(err_format, err.error_index, len(all_text))
-            if err.error_index - block.position() < block.length():
-                error_before_end = True
+            error_value = err.error_index + (2 << 24)
             err_status = err.args[0]
         except math_eval.ParseError as err:
             if err.token:
                 self.maybe_format(err_format, err.token.index, err.token.end)
-                if err.token.index - block.position() < block.length():
-                    error_before_end = True
+                error_value = err.token.index + (3 << 24)
+            else:
+                error_value = len(all_text) + (3 << 24)
             err_status = err.args[0]
         self.error_label.setText(err_status)
-        self.setCurrentBlockState(error_before_end)
+        self.setCurrentBlockState(error_value)
 
 class ExpressionEditor(QDialog):
     def __init__(self, parent, data_view, base=None):
@@ -187,7 +208,6 @@ class ExpressionEditor(QDialog):
                     self, 'Error', 'Unable to parse expression; save as incomplete?',
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No):
                 return
-            enabled = False
         if not self.old_expr:
             self.old_expr = state.MathExpr('', False, '', 0, False, 0, '', '', '')
         self.old_expr.name = name
