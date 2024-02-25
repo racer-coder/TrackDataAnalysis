@@ -17,6 +17,7 @@ from PySide2.QtWidgets import (
     QFormLayout,
     QGridLayout,
     QGroupBox,
+    QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
@@ -24,9 +25,11 @@ from PySide2.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QStyle,
     QTableWidget,
     QTableWidgetItem,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -99,13 +102,18 @@ class MainWindow(QMainWindow):
                                            channel_properties={},
                                            channel_defaults={},
 
-                                           maths=ui.state.Maths(groups={}),
+                                           maths=ui.state.Maths(),
 
                                            cursor_change=self.cursor_change,
                                            values_change=self.values_change,
                                            data_change=self.data_change,
 
                                            config=self.config)
+
+        try:
+            ui.math.set_user_func_dir(self.data_view, self.config.get('main', 'user_func_path'))
+        except configparser.NoOptionError:
+            pass
 
         self.workspace_dir = (QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
                               + '/workspaces')
@@ -294,6 +302,20 @@ class MainWindow(QMainWindow):
         maptiler_key = QLineEdit(self.data_view.maps_key[1] if self.data_view.maps_key else '')
         layout.addRow('Maptiler Key', maptiler_key)
 
+        ulayout = QHBoxLayout()
+        userfuncpath = QLineEdit(self.config.get('main', 'user_func_path', fallback=''))
+        ulayout.addWidget(userfuncpath)
+        userfuncbutton = QToolButton()
+        def userfunc_dialog():
+            d = QFileDialog.getExistingDirectory(self, 'Directory for user math functions',
+                                                 dir=userfuncpath.text())
+            if d:
+                userfuncpath.setText(d)
+        userfuncbutton.clicked.connect(userfunc_dialog)
+        userfuncbutton.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        ulayout.addWidget(userfuncbutton)
+        layout.addRow('Path for user math functions', ulayout)
+
         sdlayout = QGridLayout()
         scandirs = QListWidget()
         scandirs.addItems(json.loads(self.config.get('main', 'database_scan_dirs')))
@@ -335,6 +357,8 @@ class MainWindow(QMainWindow):
 
         if dia.exec_():
             self.data_view.maps_key = ['maptiler', maptiler_key.text()]
+            self.config['main']['user_func_path'] = userfuncpath.text()
+            ui.math.set_user_func_dir(self.data_view, userfuncpath.text())
             self.config['main']['database_scan_dirs'] = json.dumps(
                 [scandirs.item(i).text() for i in range(scandirs.count())])
             self.datamgr.update_scan_dirs()

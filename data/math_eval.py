@@ -6,6 +6,8 @@
 # pylint: disable=unsupported-assignment-operation
 # pylint: disable=function-redefined
 
+import importlib
+
 import numpy as np
 
 from sly import Lexer, Parser
@@ -37,7 +39,7 @@ func_map = {
 
 class ExprLex(Lexer):
     tokens = { VAR, UNIT, ID, FLOAT, LTE, GTE, EQ, NEQ, AND, OR, NOT, COMMENT }
-    literals = { '(', ')', ',' }.union({k for k in op_map.keys() if len(k) == 1})
+    literals = { '(', ')', ',', '.' }.union({k for k in op_map.keys() if len(k) == 1})
 
     ignore = ' \t\n'
 
@@ -63,7 +65,7 @@ class EvalLiteral:
         return np.array([], dtype=np.int32)
 
     def values(self, log, timecodes):
-        return np.repeat(self._value, len(timecodes))
+        return self._value
 
 class EvalReference:
     def __init__(self, name, unit):
@@ -91,6 +93,23 @@ class EvalOp:
 
     def values(self, log, timecodes):
         return self._op(*[a.values(log, timecodes) for a in self._args])
+
+class EvalUser(EvalOp):
+    def values(self, log, timecodes):
+        modname = 'usermathfunc.' + '.'.join(self._op[:-1])
+        mod = importlib.import_module(modname)
+        return mod.__dict__[self._op[-1]](*[a.values(log, timecodes) for a in self._args],
+                                          timecodes=timecodes)
+
+class EvalWrap(EvalOp):
+    def __init__(self, arg):
+        super().__init__(None, arg)
+
+    def values(self, log, timecodes):
+        val = self._args[0].values(log, timecodes)
+        if not isinstance(val, np.ndarray):
+            val = np.repeat(val, len(timecodes))
+        return val
 
 class ParseError(Exception):
     def __init__(self, msg, tok):
@@ -144,22 +163,24 @@ class ExprParse(Parser):
     def expr(self, p):
         return EvalOp(op_map[p[1]], p.expr0, p.expr1)
 
-    @_('ID "(" expr_list ")"')
+    @_('ID { "." ID } "(" expr_list ")"')
     def expr(self, p):
+        if p.ID1: # user function
+            return EvalUser([p.ID0] + p.ID1, *p.expr_list)
         try:
-            return EvalOp(func_map[(p.ID, len(p.expr_list))], *p.expr_list)
+            return EvalOp(func_map[(p.ID0, len(p.expr_list))], *p.expr_list)
         except KeyError:
             nargs = []
             for name, n in func_map.keys():
-                if name == p.ID:
+                if name == p.ID0:
                     nargs.append(n)
             if nargs:
                 nargs.sort()
                 raise ParseError("Function %s accepts %s arguments, not %d"
-                                 % (p.ID, ', '.join([str(x) for x in nargs]), len(p.expr_list)),
+                                 % (p.ID0, ', '.join([str(x) for x in nargs]), len(p.expr_list)),
                                  p) # pylint: disable=raise-from-missing
             else:
-                raise ParseError(("Unknown function", p.ID), p) # pylint: disable=raise-from-missing
+                raise ParseError(("Unknown function", p.ID0), p) # pylint: disable=raise-from-missing
 
     @_('expr { "," expr }')
     def expr_list(self, p):
@@ -183,4 +204,4 @@ def eat_comments(gen):
             yield tok
 
 def compile(text):
-    return ExprParse().parse(eat_comments(ExprLex().tokenize(text)))
+    return EvalWrap(ExprParse().parse(eat_comments(ExprLex().tokenize(text))))

@@ -3,8 +3,13 @@
 
 import configparser
 from dataclasses import dataclass
+import importlib.abc
+import importlib.machinery
+import os
+import sys
+import types
 
-from PySide2.QtCore import QAbstractItemModel, QMimeData, QModelIndex, Qt
+from PySide2.QtCore import QAbstractItemModel, QFileSystemWatcher, QMimeData, QModelIndex, Qt
 from PySide2.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
 from PySide2.QtWidgets import (
     QCheckBox,
@@ -34,7 +39,6 @@ class Highlighter(QSyntaxHighlighter):
         self.data_view = data_view
         self.error_label = error_label
         self.lex = math_eval.ExprLex()
-        self.parse = math_eval.ExprParse()
 
     def maybe_format(self, fmt, start, end):
         block = self.currentBlock()
@@ -72,7 +76,7 @@ class Highlighter(QSyntaxHighlighter):
                 if tok.type == 'INT' or tok.type == 'FLOAT':
                     self.maybe_format(lit_format, tok.index, tok.end)
             # does it parse?  if not, we'll error out and highlight
-            p = self.parse.parse(math_eval.eat_comments(self.lex.tokenize(all_text)))
+            p = math_eval.compile(all_text)
             # great it parses.  but do we know all the variables?  Not fatal, but alert the user...
             for tok in self.lex.tokenize(all_text):
                 if tok.type == 'VAR':
@@ -576,3 +580,40 @@ def channel_editor(parent, data_view, channel):
             dlg.deleteLater()
     else:
         channels.channel_editor(parent, data_view, channel)
+
+class MathModuleFinder(importlib.abc.MetaPathFinder):
+    def __init__(self):
+        super().__init__()
+        self.path = None
+        dummy_module = types.ModuleType('usermathfunc')
+        dummy_module.__path__ = []
+        sys.modules['usermathfunc'] = dummy_module
+
+    def set_path(self, path):
+        self.path = path
+
+    def find_spec(self, fullname, path, target=None):
+        if self.path and fullname.startswith('usermathfunc'):
+            return importlib.machinery.ModuleSpec(
+                fullname, importlib.machinery.SourceFileLoader(
+                    fullname, os.path.join(self.path, *fullname.split('.')[1:]) + '.py'))
+        return None
+
+def set_user_func_dir(data_view, dir_name):
+    if not data_view.maths.watcher:
+        data_view.maths.watcher = QFileSystemWatcher()
+        data_view.maths.watcher.directoryChanged.connect(lambda: clear_user_module(data_view))
+    data_view.maths.watcher.removePaths(data_view.maths.watcher.directories())
+    if dir_name:
+        data_view.maths.watcher.addPath(dir_name)
+    if not data_view.maths.finder:
+        data_view.maths.finder = MathModuleFinder()
+        sys.meta_path.append(data_view.maths.finder)
+    data_view.maths.finder.set_path(dir_name)
+
+def clear_user_module(data_view):
+    to_del = [k for k in sys.modules.keys() if k.startswith('usermathfunc.')]
+    for k in to_del:
+        del sys.modules[k]
+    data_view.math_invalidate()
+    data_view.values_change.emit()

@@ -75,6 +75,8 @@ class MathGroup:
 class Maths:
     groups: dict[str, MathGroup] = field(default_factory=dict)
     channel_map: dict[str, tuple[MathExpr, object]] = field(default_factory=dict) # computed from groups
+    watcher: object = None
+    finder: object = None
 
     def update_channel_map(self):
         cmap = {}
@@ -111,19 +113,19 @@ class Maths:
                     for d in self.channel_map[n][1].depends:
                         walk.append(d)
 
+        if expr.sample_rate:
+            timecodes = np.arange(0, log.laps[-1].end.time, 1000 / expr.sample_rate,
+                                  dtype=np.int32)
+        else:
+            timecodes = eval_.timecodes(log)
+        if len(timecodes) == 0: # throw in start and end at least
+            timecodes = np.linspace(0, log.laps[-1].end.time,
+                                    num = int(log.laps[-1].end.time / 1000), # roughly 1/sec
+                                    dtype=np.int32)
+        distances = log.log.outTime2Dist(timecodes)
         try:
-            if expr.sample_rate:
-                timecodes = np.arange(0, log.laps[-1].end.time, 1000 / expr.sample_rate,
-                                      dtype=np.int32)
-            else:
-                timecodes = eval_.timecodes(log)
-            if len(timecodes) == 0: # throw in start and end at least
-                timecodes = np.linspace(0, log.laps[-1].end.time,
-                                        num = int(log.laps[-1].end.time / 1000), # roughly 1/sec
-                                        dtype=np.int32)
-            distances = log.log.outTime2Dist(timecodes)
             values = eval_.values(log, timecodes)
-        except (KeyError, ValueError):
+        except:
             return dummy
 
         minval = np.min(values)

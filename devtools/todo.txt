@@ -15,6 +15,7 @@ Later Milestones:
 . math - conditions on groups?
 . math - better handling of expr that "overwrite" existing channels
 . math - case insensitive channel loopup?
+. math - try to rotate colors for math expressions? last expr + 1 or random or ??
 
 * KEYBOARD SHORTCUTS
 
@@ -27,6 +28,7 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
+. config - move maptiler key to config instead of workspace
 . values widget - sort should be case insensitive
 . channels widget - sort should be case insensitive
 . documentation - split among multiple files, add some pictures, quick start up front
