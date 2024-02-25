@@ -344,6 +344,8 @@ class TimeDist(widgets.MouseHelperWidget):
                     dvval = dv[xa_uniqidx[1:]-1]
                     np.minimum(umin[1:], dvval, out=umin[1:])
                     np.maximum(umax[1:], dvval, out=umax[1:])
+                ph.painter.save()
+                ph.painter.setClipRect(self.graph_x, y_offset, ph.size.width(), height)
                 # paint lines that live across pixel columns
                 for idx in memoryview(xa_uniqidx[1:] - 1):
                     ph.painter.drawLine(xa[idx], dvd1[idx], xa[idx+1], dvd2[idx])
@@ -351,6 +353,7 @@ class TimeDist(widgets.MouseHelperWidget):
                 for x, y1, y2 in zip(xa_uniqval.data, umin.data, umax.data):
                     if y1 != y2:
                         ph.painter.drawLine(x, y1, x, y2)
+                ph.painter.restore()
         # font for data stats
         font = self.selectFont('channel')
         ph.painter.setFont(font)
