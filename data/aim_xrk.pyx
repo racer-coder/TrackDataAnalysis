@@ -152,6 +152,13 @@ def _tokdec(s):
     if s: return ord(s[0]) + 256 * _tokdec(s[1:])
     return 0
 
+def _tokenc(i):
+    s = ''
+    while i:
+        s += chr(i & 255)
+        i >>= 8
+    return s
+
 accum = cython.struct(
     last_timecode=cython.int,
     add_helper=cython.int,
@@ -674,6 +681,12 @@ def AIMXRK(fname, progress):
         _get_metadata(data.messages),
         ['GPS Speed', 'GPS Latitude', 'GPS Longitude', 'GPS Altitude'],
         fname)
+
+def aim_track(fname):
+    with open(fname, 'rb') as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            data = _decode_sequence(m, None)
+    return {_tokenc(k): v for k, v in data.messages.items()}
 
 #def _help_decode_channels(self, chmap):
 #    pprint(chmap)
