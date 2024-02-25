@@ -124,14 +124,19 @@ class Maths:
         except (KeyError, ValueError):
             return dummy
 
+        minval = np.min(values)
+        maxval = np.max(values)
+        if not np.isfinite(minval) or not np.isfinite(maxval):
+            return dummy
+
         return ChannelData(timecodes,
                            distances,
                            values,
                            expr.unit,
                            expr.dec_pts,
                            expr.interpolate,
-                           np.min(values),
-                           np.max(values),
+                           minval,
+                           maxval,
                            expr.color)
 
 # Cursor time/dist: Offset time/dist for the reference lap

@@ -172,7 +172,7 @@ class ExprParse(Parser):
     def error(self, token):
         if not token:
             raise ParseError('Parse error at end of file', token)
-        elif p.type != 'COMMENT':
+        elif token.type != 'COMMENT':
             raise ParseError(('Parse error at token', token), token)
         else: # manually skip comments
             return next(self.tokens, None) # user manual says call errok() but that doesn't work...

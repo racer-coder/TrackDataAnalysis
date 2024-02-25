@@ -452,6 +452,11 @@ class MathEditor(QDialog):
             self.tree_model.layoutAboutToBeChanged.emit()
             self.data_view.maths.groups[new_name] = state.MathGroup(True, [], '')
             self.tree_model.layoutChanged.emit()
+            self.tree_view.setExpanded(
+                self.tree_model.createIndex(
+                    sorted(self.data_view.maths.groups.keys()).index(new_name), 0,
+                    self.data_view.maths),
+                True)
 
     def get_single_index(self):
         ind = [i for i in self.tree_view.selectedIndexes() if i.column() == 0]
@@ -522,6 +527,10 @@ class MathEditor(QDialog):
     def create_expr(self):
         child = self.get_single_child()
         if not child:
+            if not self.data_view.maths.groups.keys():
+                self.create_group()
+                if not self.data_view.maths.groups.keys():
+                    return
             group = QInputDialog.getItem(self, 'Math Group', 'Select a group to receive the new expression',
                                          sorted(self.data_view.maths.groups.keys()),
                                          editable=False)
