@@ -207,7 +207,7 @@ class ExpressionEditor(QDialog):
                     QMessageBox.Yes | QMessageBox.No, QMessageBox.No):
                 return
         if not self.old_expr:
-            self.old_expr = state.MathExpr('', False, '', 0, False, 0, '', '', '')
+            self.old_expr = state.MathExpr('', False, '', 0, False, 0, 0, '', '', '')
         self.old_expr.name = name
         self.old_expr.enabled = enabled
         self.old_expr.unit = units
