@@ -231,6 +231,8 @@ disable the satellite background by right clicking on the map.
 
 ## Changelog
 
+- 0.4.1
+  - Fix important usability bugs in 0.4.0
 - 0.4.0
   - Initial math expression support
   - 4x faster AiM XRK file processing.
