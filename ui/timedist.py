@@ -502,19 +502,21 @@ class TimeDist(widgets.MouseHelperWidget):
             return # nothing to do
 
         ph.painter.setFont(self.axis_font)
+        text_height = QtGui.QFontMetrics(self.axis_font).height()
         ph.painter.setPen(self.axis_pen)
 
         ph.painter.drawLine(self.graph_x, y_offset, self.graph_x, y_offset + height)
 
         exp = int(math.floor(math.log10(y_axis.logical_tick_spacing) + .01))
         exp = max(0, -exp)
-        i = np.arange(int(y_axis.logical_max_val / y_axis.logical_tick_spacing) + 1,
+        i = np.arange(int(y_axis.logical_max_val / y_axis.logical_tick_spacing),
                       int(y_axis.logical_min_val / y_axis.logical_tick_spacing) + 1)
         atc = i * y_axis.logical_tick_spacing
         for tc, y in zip(atc, y_axis.calc(atc)):
-            ph.painter.drawText(0, y - 25, self.graph_x - 4, 50,
-                                Qt.AlignVCenter | Qt.AlignRight | Qt.TextSingleLine,
-                                '%.*f' % (exp, tc))
+            if y + text_height / 2 <= y_offset + height:
+                ph.painter.drawText(0, y - 25, self.graph_x - 4, 50,
+                                    Qt.AlignVCenter | Qt.AlignRight | Qt.TextSingleLine,
+                                    '%.*f' % (exp, tc))
         spacing = y_axis.logical_tick_spacing / 5
         ai = np.arange(int(y_axis.logical_max_val / spacing) + 1,
                        int(y_axis.logical_min_val / spacing) + 1)
