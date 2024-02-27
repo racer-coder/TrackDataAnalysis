@@ -115,6 +115,11 @@ class MainWindow(QMainWindow):
         except configparser.NoOptionError:
             pass
 
+        try:
+            self.data_view.maps_key = json.loads(self.config.get('main', 'maps_key'))
+        except configparser.NoOptionError:
+            pass
+
         self.workspace_dir = (QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation)
                               + '/workspaces')
         os.makedirs(self.workspace_dir, exist_ok=True)
@@ -389,7 +394,6 @@ class MainWindow(QMainWindow):
             ws_data = json.load(f)
         self.layout_mgr.load_state(ws_data['layout'])
         self.data_view.video_alignment = ws_data['videos']
-        self.data_view.maps_key = ws_data['maps_key']
         self.data_view.channel_overrides = ws_data.get('channels', {})
         self.data_view.maths.groups = {k: dacite.from_dict(data_class=ui.state.MathGroup, data=v)
                                        for k, v in ws_data.get('math_groups', {}).items()}
@@ -404,7 +408,6 @@ class MainWindow(QMainWindow):
         with open(new_name, 'wt', encoding='utf-8') as f:
             json.dump({'layout': self.layout_mgr.save_state(),
                        'videos': self.data_view.video_alignment,
-                       'maps_key': self.data_view.maps_key,
                        'channels': self.data_view.channel_overrides,
                        'math_groups': {k: dataclasses.asdict(v)
                                        for k, v in self.data_view.maths.groups.items()},
@@ -444,6 +447,7 @@ class MainWindow(QMainWindow):
         self.datamgr.stop_metadata_scan()
         self.config['main']['geometry'] = bytes(self.saveGeometry()).hex()
         self.config['main']['widgets'] = bytes(self.saveState()).hex()
+        self.config['main']['maps_key'] = json.dumps(self.data_view.maps_key)
         new_name = self.config_fname + '.new'
         with open(new_name, 'wt', encoding='utf-8') as f:
             self.config.write(f)

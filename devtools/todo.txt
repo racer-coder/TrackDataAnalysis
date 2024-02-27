@@ -28,7 +28,6 @@ Later Milestones:
 . mixture/table
 . channel report (customizable min/max/avg etc for customizable list of channels)
 
-. config - move maptiler key to config instead of workspace
 . values widget - sort should be case insensitive
 . channels widget - sort should be case insensitive
 . documentation - split among multiple files, add some pictures, quick start up front
