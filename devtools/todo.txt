@@ -1,6 +1,19 @@
 * DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
-. lat/long g force calculation from GPS? or internal accelerometers? or both?
-. detection of braking/cornering based on exceeding threshold for a duration of time?
+. dialog box to edit sector sets
+.. include map (with gps) to make it easier to identify where the sector is
+. Store track maps somewhere? Workspace or another dir?
+. Can have multiple tracks at the same location (for different configs/directions)
+. Track identification by scanning entire gps lap (what if start/finish doesn't line up?)
+. filename contains rough gps coordinates plus a sequence counter for multiple configs at the same location
+. gps varies about 0.01 degrees in lat and long at a given track
+. about 5000+ tracks known throughout the world?
+
+. time/dist: ability to edit sectors directly in graph
+. lap stretch on section boundaries for some canonical "stretch" sector set
+. Each time/dist graph can select which sectors it uses.
+. should work reasonably well without a track map
+. Option to display sectors on gps map
+. time/dist: color entire graph with sector colors?
 
 Later Milestones:
 

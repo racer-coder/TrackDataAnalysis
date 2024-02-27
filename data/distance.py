@@ -7,6 +7,8 @@ import typing
 
 import numpy as np
 
+from . import base
+from . import gps
 from . import unitconv
 
 @dataclass(eq=False)
@@ -38,8 +40,8 @@ class ChannelData:
         if span == 0: return self.values[i]
         return self.values[i-1] + (self.values[i] - self.values[i-1]) * (tc - index[i-1]) / span
 
-    def interp_many(self, tc):
-        index = self.timecodes
+    def interp_many(self, tc, mode_time = True):
+        index = self.timecodes if mode_time else self.distances
         if self.interpolate:
             return np.interp(tc, index, self.values)
         else:
@@ -66,7 +68,26 @@ class DistanceWrapper:
         if not data.laps or not data.key_channel_map[0]:
             return
 
+        self.laps = data.laps
+
         self._update_time_dist()
+
+    def try_gps_lap_insert(self, marker, dist):
+        key_channels = self.get_key_channel_map()
+        lat_ch = self.get_channel_data(key_channels[1], unit='deg')
+        lon_ch = self.get_channel_data(key_channels[2], unit='deg')
+        if len(lat_ch.values) and len(lon_ch.values):
+            XYZ = np.column_stack(gps.lla2ecef(np.array(lat_ch.values),
+                                               np.array(lon_ch.values), 0))
+            lap_markers = gps.find_laps(XYZ,
+                                        np.array(lat_ch.timecodes),
+                                        marker)
+            if lap_markers:
+                lap_markers = [0] + lap_markers + [self.data.laps[-1].end_time]
+                self.laps = [base.Lap(lap + self.data.laps[0].num, start_time, end_time)
+                             for lap, (start_time, end_time) in enumerate(zip(lap_markers[:-1],
+                                                                              lap_markers[1:]))]
+        self._update_time_dist(dist)
 
     def _calc_time_dist(self, expected_len = None):
         distdata = self.data.channels[self.data.key_channel_map[0]]
@@ -77,12 +98,12 @@ class DistanceWrapper:
         # VALIDATED: AiM GPS Speed is just linear interpolation of raw
         # ECEF velocity between datapoints, modulo floating point
         # accuracy (they seem to use 32-bit floats).
-        tc = np.arange(0, self.data.laps[-1].end_time,
+        tc = np.arange(0, self.laps[-1].end_time,
                        10, dtype=np.float64) # np.interp requires float64 arrays for performance
-        gs = np.interp(tc, distdata.timecodes, converted)
+        gs = np.interp(tc, distdata.timecodes, converted) * (1. / 100) # account for samplerate
 
         # adjust distances of each lap to match the median, if within a certain percentage
-        dividers = [int(round(l.start_time / 10)) for l in self.data.laps]
+        dividers = [int(round(l.start_time / 10)) for l in self.laps]
         lap_len = np.add.reduceat(gs, dividers)[1:-1]  # ignore in/out laps
         if not expected_len:
             expected_len = np.median(lap_len)
@@ -90,7 +111,7 @@ class DistanceWrapper:
             if abs(ll - expected_len) / expected_len <= 0.05:
                 gs[s:e] *= expected_len / ll
 
-        ds = np.cumsum(gs / 100)
+        ds = np.cumsum(gs)
         return memoryview(tc), memoryview(ds), expected_len
 
     def _update_time_dist(self, expected_len = None):
@@ -107,7 +128,7 @@ class DistanceWrapper:
         return self.data.file_name
 
     def get_laps(self):
-        return self.data.laps
+        return self.laps
 
     def get_metadata(self):
         return self.data.metadata
@@ -143,12 +164,3 @@ class DistanceWrapper:
         if key in self.channel_cache and len(self.channel_cache[key].values):
             return self.channel_cache[key]
         return ChannelData.from_data([], [], [], '', 0, True)
-
-
-def unify_lap_distance(logs: typing.List[DistanceWrapper]):
-    lens = list(filter(bool, [dw._calc_time_dist()[2] for dw in logs])) # pylint: disable=protected-access
-    if not lens: return # what are we supposed to do here?
-    expected_len = np.mean(lens).item()
-    for dw in logs:
-        dw._update_time_dist(expected_len) # pylint: disable=protected-access
-

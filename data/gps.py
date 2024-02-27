@@ -222,6 +222,104 @@ def ecef2lla_vermeille2003(x, y, z):
                (k + e**2 - 1) / k * rtDDzz)
 
 
+def find_crossing(XYZD: np.ndarray, # coordinates to look up in (X, Y, Z, Distance), meters
+                  marker: tuple[float, float]): # (lat, long) tuple, degrees
+
+    # very similar to gps lap insert, but we can assume XYZD is a
+    # reference (as opposed to GPS lap insert where we aren't sure if
+    # the trajectory of the GPS is correct or not - think pit stops,
+    # going off track, etc).  As a result, only one pass is needed.
+    # Also we do not need to filter based on minspeed, so no timecodes
+    # are used in this function.
+
+    SO = np.array(lla2ecef(*marker, 0)).reshape((1, 3))
+    SD = np.array(lla2ecef(*marker, 1000)).reshape((1, 3)) - SO
+
+    O = XYZD[:,:3] - SO
+    D = O[1:] - O[:-1]
+    O = O[:-1]
+
+    SN = (np.sum(SD * SD, axis=1).reshape((len(SD), 1)) * D
+          - np.sum(SD * D, axis=1).reshape((len(D), 1)) * SD)
+    t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+
+    # XXX This won't work with rally stages (anything not a circuit)
+    idxs = np.nonzero((np.concatenate((t[-1:], t[:-1])) > 1) & (t <= 1))[0]
+    distsq = np.sum(np.square(O[idxs] + t.reshape((len(t), 1))[idxs] * D[idxs]),
+                    axis=1)
+    minidxidx = np.argmin(distsq)
+    minidx = idxs[minidxidx]
+    return (XYZD[minidx, 3] + t[minidx] * (XYZD[minidx + 1, 3] - XYZD[minidx, 3]),
+            float(np.sqrt(distsq[minidxidx])))
+
+
+def find_laps(XYZ: np.ndarray, # coordinates to look up in (X, Y, Z), meters
+              timecodes: np.ndarray, # time for above coordinates, ms
+              marker: tuple[float, float]): # (lat, long) tuple, degrees
+    # gps lap insert.  We assume the start finish "line" is a
+    # plane containing the vector that goes through the GPS
+    # coordinates sf lat/long from altitude 0 to 1000.  The normal
+    # of the plane is generally in line with the direction of
+    # travel, given the above constraint.
+
+    # O, D = vehicle vector (O=origin, D=direction, [0]=O, [1]=O+D)
+    # SO, SD = start finish origin, direction (plane must contain SO and SO+SD poitns)
+    # SN = start finish plane normal
+
+    # D = a*SD + SN
+    # 0 = SD . SN
+    # combine to get:  0 = SD . (D - a*SD)
+    #                  a * (SD . SD) = SD . D
+    # plug back into first eq:
+    # SN = D - (SD . D) / (SD . SD) * SD
+    # or to avoid division, and because length doesn't matter:
+    # SN = (SD . SD) * D - (SD. D) * SD
+
+    # now determine intersection with plane SO,SN from vector O,O+D:
+    # SN . (O + tD - SO) = 0
+    # t * (D . SN) + SN . (O - SO) = 0
+    # t = -SN.(O-SO) / D.SN
+
+    SO = np.array(lla2ecef(*marker, 0.)).reshape((1, 3))
+    SD = np.array(lla2ecef(*marker, 1000)).reshape((1, 3)) - SO
+
+    O = XYZ - SO
+
+    D = O[1:] - O[:-1]
+    O = O[:-1]
+
+    # Precalculate in which time periods we were traveling at least 4 m/s (~10mph)
+    minspeed = np.sum(D*D, axis=1) > np.square((timecodes[1:] - timecodes[:-1]) * (4 / 1000))
+
+    SN = (np.sum(SD * SD, axis=1).reshape((len(SD), 1)) * D
+          - np.sum(SD * D, axis=1).reshape((len(D), 1)) * SD)
+    t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+    # This only works because the track is considered at altitude 0
+    dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
+    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+
+    # Now that we have a decent candidate selection of lap
+    # crossings, generate a single normal vector for the
+    # start/finish line to use for all lap crossings, to make the
+    # lap times more accurate/consistent.  Weight the crossings by
+    # velocity and add them together.  As it happens, SN is
+    # already weighted by velocity...
+    SN = np.sum(SN[1:][pick & minspeed[1:]], axis=0).reshape((1,3))
+    # recompute t, dist, pick
+    t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+    dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
+    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+
+    lap_markers = [0]
+    for idx in (np.nonzero(pick)[0] + 1):
+        if timecodes[idx] <= lap_markers[-1]:
+            continue
+        if not minspeed[idx]:
+            idx = np.argmax(minspeed[idx:]) + idx
+        lap_markers.append(timecodes[idx] + t[idx] * (timecodes[idx+1]-timecodes[idx]))
+    return lap_markers[1:]
+
+
 ecef2lla = ecef2lla_vermeille2003
 
 if __name__ == '__main__':

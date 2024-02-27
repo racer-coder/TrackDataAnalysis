@@ -446,18 +446,18 @@ class TimeDist(widgets.MouseHelperWidget):
             d2 = self.dataView.get_channel_data(self.dataView.alt_lap, ch)
             if not len(d2.values): continue
             ph.painter.setPen(pen2)
+            alt_val = d2.interp(self.dataView.cursor2outTime(self.dataView.alt_lap))
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width,
                                 y, self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '%.*f' % (d.dec_pts,
-                                          d2.interp(self.dataView.cursor2outTime(self.dataView.alt_lap))))
+                                '%.*f' % (d.dec_pts, alt_val))
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width
                                 + self.channel_opt_width / 2,
                                 y, self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '\u0394 %.*f' % (d.dec_pts, d2.values[start_idx] - main_val))
+                                '\u0394 %.*f' % (d.dec_pts, alt_val - main_val))
             drange = d.values[
                 bisect.bisect_left(
                     d.timecodes if self.dataView.mode_time else d.distances,
@@ -563,6 +563,57 @@ class TimeDist(widgets.MouseHelperWidget):
         return max(channel_font_metrics.horizontalAdvance('%.*f' % (d.dec_pts, d.min or 0)),
                    channel_font_metrics.horizontalAdvance('%.*f' % (d.dec_pts, d.max or 0)))
 
+    def paint_sectors(self, ph, graph_y, height):
+        ph.painter.drawRect(self.graph_x, graph_y, ph.size.width() - self.graph_x -1, height)
+        if not self.x_axis:
+            return
+        try:
+            sectors = self.dataView.track.sector_sets['Default'].markers
+        except KeyError:
+            return
+        idx = bisect.bisect_right(sectors,
+                                  self.dataView.lapMode2Dist(self.dataView.ref_lap,
+                                                             self.x_axis.logical_min_val),
+                                  key=lambda x: x._dist)
+        last_x = max(
+            round(self.x_axis.calc(self.dataView.lapDist2Mode(
+                self.dataView.ref_lap, sectors[-1]._dist - self.dataView.track.coords[-1][3]))),
+            self.graph_x + 1) # XXX handle offset shift
+        metrics = ph.painter.fontMetrics()
+        for i in range(idx, len(sectors) + 1):
+            if i == len(sectors):
+                dist = sectors[0]._dist + self.dataView.track.coords[-1][3]
+                i = 0
+            else:
+                dist = sectors[i]._dist
+            next_x = min(round(self.x_axis.calc(self.dataView.lapDist2Mode(self.dataView.ref_lap,
+                                                                           dist))),
+                         ph.size.width() - 1) # don't overwrite boundary box
+            if sectors[i].typ == 'Straight':
+                color = QtGui.QColor(0, 0, 0)
+            elif sectors[i].typ == 'Left':
+                color = QtGui.QColor(0, 0, 192)
+            elif sectors[i].typ == 'Right':
+                color = QtGui.QColor(160, 0, 0)
+            elif i & 1:
+                color = QtGui.QColor(32, 32, 32)
+            ph.painter.fillRect(last_x, graph_y + 1, next_x - last_x, height - 2, color)
+            # XXX colorize rest of graph
+            # XXX only draw if room
+            text = sectors[i].name
+            allowed = next_x - last_x - 4
+            if metrics.horizontalAdvance(text) >= allowed:
+                if ' ' in text:
+                    newtext = text[0] + text[text.find(' ')+1:]
+                    if metrics.horizontalAdvance(newtext) < allowed:
+                        text = newtext
+            ph.painter.drawText(last_x, graph_y, next_x - last_x, height,
+                                Qt.AlignVCenter | Qt.AlignHCenter,
+                                metrics.elidedText(text, Qt.ElideLeft, allowed))
+            last_x = next_x
+            if next_x == ph.size.width() - 1:
+                break
+
     def paintEvent(self, event):
         ph = widgets.makePaintHelper(self, event)
 
@@ -662,6 +713,10 @@ class TimeDist(widgets.MouseHelperWidget):
                                     Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
                                     text)
                 right_x = start_x + end_x + width
+
+        if self.lapView:
+            self.paint_sectors(ph, graph_y, graph_y - 2)
+            graph_y *= 2
 
         # paint each channel group graph
         self.cursor_values = []

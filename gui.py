@@ -103,6 +103,7 @@ class MainWindow(QMainWindow):
                                            channel_defaults={},
 
                                            maths=ui.state.Maths(),
+                                           track=None,
 
                                            cursor_change=self.cursor_change,
                                            values_change=self.values_change,

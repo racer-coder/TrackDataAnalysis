@@ -42,6 +42,7 @@ from .dockers import (FastTableModel,
                       TextMatcher)
 from . import channels
 from . import state
+from . import track
 from . import widgets
 
 def closure(func, *args):
@@ -497,25 +498,16 @@ class DataDockWidget(TempDockWidget):
             progress.deleteLater()
 
         logref = state.LogRef(data.distance.DistanceWrapper(obj))
-        logref.update_laps()
         self.data_view.log_files.append(logref)
         if len(self.data_view.log_files) > 1:
-            # do it all again, but for multiple logs
-            data.distance.unify_lap_distance([logref.log for logref in self.data_view.log_files])
-            for logref in self.data_view.log_files:
-                logref.update_laps()
-            # this sucks but we've lost our mapping to the original laps
-            self.data_view.ref_lap = self.update_lap_ref(self.data_view.ref_lap)
-            self.data_view.alt_lap = self.update_lap_ref(self.data_view.alt_lap)
-            self.data_view.extra_laps = [
-                (self.update_lap_ref(lap), color)
-                for lap, color in self.data_view.extra_laps]
+            if self.data_view.track:
+                marker = self.data_view.track.coords[-1]
+                logref.log.try_gps_lap_insert((marker[0], marker[1]), marker[3])
+            logref.update_laps()
         else:
-            laps = logref.laps
-            best_lap = min(laps[1:-1] if len(laps) >= 3 else laps,
-                           key=lambda x: x.duration(),
-                           default=None)
-            self.data_view.ref_lap = best_lap
+            logref.update_laps()
+            self.data_view.ref_lap = logref.best_lap
+            track.select_track(self.data_view)
 
         channels.update_channel_properties(self.data_view)
 
@@ -534,6 +526,7 @@ class DataDockWidget(TempDockWidget):
         self.data_view.zoom_window = (state.TimeDistRef(0, 0),
                                       state.TimeDistRef(0, 0))
         self.data_view.log_files = []
+        self.data_view.track = None
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
 
@@ -553,13 +546,8 @@ class DataDockWidget(TempDockWidget):
                 self.data_view.ref_lap = self.data_view.alt_lap
                 self.data_view.alt_lap = None
             else:
-                self.data_view.ref_lap = min(
-                    [lap
-                     for log in self.data_view.log_files
-                     for lap in (log.laps[1:-1] if len(log.laps) >= 3
-                                 else log.laps)],
-                    key=lambda x: x.duration(),
-                    default=None)
+                self.data_view.ref_lap = min([log.best_lap for log in self.data_view.log_files],
+                                             default=None)
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
 
@@ -600,11 +588,6 @@ class DataDockWidget(TempDockWidget):
                 data_view.extra_laps.append((lapref, color))
         data_view.values_change.emit()
 
-    def best_lap(self, logref):
-        laps = logref.laps
-        return min(laps[1:-1] if len(laps) >= 3 else laps,
-                   key=lambda x: x.duration()).duration()
-
     def recompute(self):
         font_size = 12
         font = QtGui.QFont('Tahoma')
@@ -612,13 +595,12 @@ class DataDockWidget(TempDockWidget):
         section_font = QtGui.QFont(font)
         section_font.setBold(True)
         metrics = QtGui.QFontMetrics(font)
-        logs = [(logref, self.best_lap(logref)) for logref in self.mainwindow.data_view.log_files]
         self.table.clearSpans()
         laps = []
         last_date = None
-        logs.sort(key=lambda r: (r[0].log.get_metadata()['Log Date'],
-                                 r[0].log.get_metadata()['Log Time']))
-        for logref, best_lap in logs:
+        for logref in sorted(self.mainwindow.data_view.log_files,
+                             key=lambda r: (r.log.get_metadata()['Log Date'],
+                                            r.log.get_metadata()['Log Time'])):
             metadata = logref.log.get_metadata()
             date = metadata['Log Date']
             if date != last_date:
@@ -630,7 +612,7 @@ class DataDockWidget(TempDockWidget):
                 filter(bool, [metadata['Log Time'],
                               metadata.get('Session', None),
                               metadata.get('Driver', None)]))))
-            laps += [DataModelLap(lap, best_lap) for lap in logref.laps]
+            laps += [DataModelLap(lap, logref.best_lap.duration()) for lap in logref.laps]
         self.model.set_data(laps, font, section_font)
         self.deleg.metrics = metrics
         self.table.setColumnWidth(0, self.margin * 2 + metrics.horizontalAdvance('Lap 888'))

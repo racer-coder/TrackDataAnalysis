@@ -13,6 +13,7 @@ from PySide2.QtWidgets import QWidget
 import numpy as np
 
 from data import distance
+from data import gps
 from data import math_eval
 
 # belongs in a theme file, but ...
@@ -158,6 +159,7 @@ class LogRef:
     video_file: typing.Optional[str] = None
     video_alignment: typing.Optional[int] = None
     laps: typing.List['LapRef'] = field(default_factory=list)
+    best_lap: typing.Optional['LapRef'] = None
     math_cache: typing.Dict[str, ChannelData] = field(default_factory=dict)
 
     def get_channel_data(self, name, unit, maths=None):
@@ -179,6 +181,14 @@ class LogRef:
                    TimeDistRef(lap.end_time, self.log.outTime2Dist(lap.end_time)),
                    TimeDistRef(0., 0.))
             for lap in self.log.get_laps()]
+        if len(self.laps) <= 2:
+            self.best_lap = min(self.laps, key=lambda x: x.duration(), default=None)
+        else:
+            tgt_len = np.median([lap.end.dist - lap.start.dist
+                                 for lap in self.laps[1:-1]]) * 0.95
+            self.best_lap = min([lap for lap in self.laps[1:-1]
+                                 if lap.end.dist-lap.start.dist >= tgt_len],
+                                key=lambda x: x.duration())
 
     def math_invalidate(self):
         self.math_cache = {}
@@ -207,6 +217,39 @@ class LapRef:
         return self.log.get_channel_data(name, unit, maths)
 
 @dataclass(eq=False)
+class Marker: # denotes end of section?
+    name: str
+    lat: float # in degrees
+    lon: float # in degrees
+    typ: str # what types do we care about? straight vs corner? left vs right? braking?  Motec allows user named markers.  AiM autochooses straight/left/right.
+    _dist: float = None # in meters
+
+@dataclass(eq=False)
+class Sectors:
+    name: str
+    markers: list[Marker]
+
+@dataclass(eq=False)
+class Track:
+    name: str
+    file_name: str # not including holding directory
+    coords: list[tuple[float, float, float, float]] # lat/long/alt/dist in degrees/meters.  Start finish line is first and last.
+    sector_sets: dict[str, Sectors]
+
+    def __init__(self, name, file_name, coords, sector_sets):
+        self.name = name
+        self.file_name = file_name
+        self.coords = coords
+        self.sector_sets = sector_sets
+        na = np.array(coords)
+        # we ignore altitude data since the markers don't have it
+        # (some log formats don't include it)
+        xyzd = np.column_stack(list(gps.lla2ecef(na[:,0], na[:,1], 0.)) + [na[:,3]])
+        for ss in sector_sets.values():
+            for m in ss.markers:
+                m._dist = gps.find_crossing(xyzd, (m.lat, m.lon))[0]
+
+@dataclass(eq=False)
 class DataView:
     ref_lap: typing.Optional[LapRef]
     alt_lap: typing.Optional[LapRef]
@@ -230,6 +273,7 @@ class DataView:
     channel_defaults: typing.Dict[str, ChannelProperties] # [name]
 
     maths: Maths
+    track: typing.Optional[Track]
 
     cursor_change: Signal # (old_cursor) when cursor position changed.  Lightest weight update
     values_change: Signal # () lap selection, lap shift, zoom window, time/dist mode.  Redraw all components, maybe more
@@ -255,6 +299,12 @@ class DataView:
 
     def lapTime2Mode(self, lapref: LapRef, time):
         return time if self.mode_time else lapref.lapTime2Dist(time)
+
+    def lapMode2Dist(self, lapref: LapRef, val):
+        return lapref.lapTime2Dist(val) if self.mode_time else val
+
+    def lapDist2Mode(self, lapref: LapRef, dist):
+        return lapref.lapDist2Time(dist) if self.mode_time else dist
 
     def offTime2outMode(self, lapref: LapRef, time):
         return self.outTime2Mode(lapref, lapref.start.time + lapref.offset.time + time)
