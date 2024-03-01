@@ -43,7 +43,7 @@ def _decode_channel(s, addr):
     units = _dec_str(s, addr+72, 12)
 
     return base.Channel((np.arange(0, data_count) * (1000 / sample_rate)).data,
-                        ((np.multiply(data, 1 / (scale * 10 ** dec_pts)) + offset) * mul).data,
+                        (np.multiply(data, mul / (scale * 10 ** dec_pts)) + offset).data,
                         dec_pts=max(dec_pts, 0),
                         name=_dec_str(s, addr+32, 32),
                         #_dec_str(s, addr+64, 8),
