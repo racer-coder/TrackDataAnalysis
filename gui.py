@@ -44,6 +44,7 @@ import ui.layout
 import ui.math
 import ui.state
 import ui.timedist
+import ui.track
 import ui.widgets
 from version import version
 
@@ -194,6 +195,7 @@ class MainWindow(QMainWindow):
         data_menu.addSeparator()
         data_menu.addAction('Zoom to default').triggered.connect(self.zoom_default)
 
+        tools_menu.addAction('Track editor...').triggered.connect(self.track_editor)
         tools_menu.addAction('Math channels...').triggered.connect(self.math_editor)
 
         try:
@@ -281,6 +283,9 @@ class MainWindow(QMainWindow):
 
     def math_editor(self):
         ui.math.math_editor(self, self.data_view)
+
+    def track_editor(self):
+        ui.track.track_editor(self, self.data_view)
 
     def toggle_data_offsets(self, flag):
         if flag:

@@ -569,7 +569,7 @@ class TimeDist(widgets.MouseHelperWidget):
             return
         try:
             sectors = self.dataView.track.sector_sets['Default'].markers
-        except KeyError:
+        except (KeyError, AttributeError):
             return
         idx = bisect.bisect_right(sectors,
                                   self.dataView.lapMode2Dist(self.dataView.ref_lap,
@@ -597,6 +597,8 @@ class TimeDist(widgets.MouseHelperWidget):
                 color = QtGui.QColor(160, 0, 0)
             elif i & 1:
                 color = QtGui.QColor(32, 32, 32)
+            else:
+                color = QtGui.QColor(0, 0, 0)
             ph.painter.fillRect(last_x, graph_y + 1, next_x - last_x, height - 2, color)
             # XXX colorize rest of graph
             # XXX only draw if room
