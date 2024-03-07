@@ -222,36 +222,49 @@ def ecef2lla_vermeille2003(x, y, z):
                (k + e**2 - 1) / k * rtDDzz)
 
 
-def find_crossing(XYZD: np.ndarray, # coordinates to look up in (X, Y, Z, Distance), meters
-                  marker: tuple[float, float]): # (lat, long) tuple, degrees
+def find_crossing_idx(XYZ: np.ndarray, # coordinates to look up in (X, Y, Z), meters
+                      marker: np.ndarray): # (lat, long), degrees
 
-    # very similar to gps lap insert, but we can assume XYZD is a
+    if isinstance(marker, tuple):
+        marker = np.array(marker)
+    if len(marker.shape) == 1:
+        # force it to be a 2d shape to make the rest of the code simpler
+        return find_crossing_idx(XYZ, marker.reshape((1, len(marker))))[0]
+
+    # very similar to gps lap insert, but we can assume XYZ is a
     # reference (as opposed to GPS lap insert where we aren't sure if
     # the trajectory of the GPS is correct or not - think pit stops,
     # going off track, etc).  As a result, only one pass is needed.
     # Also we do not need to filter based on minspeed, so no timecodes
     # are used in this function.
 
-    SO = np.array(lla2ecef(*marker, 0)).reshape((1, 3))
-    SD = np.array(lla2ecef(*marker, 1000)).reshape((1, 3)) - SO
+    lat = marker[:, 0].reshape((len(marker), 1))
+    lon = marker[:, 1].reshape((len(marker), 1))
+    SO = np.stack(lla2ecef(lat, lon, 0), axis=2)
+    SD = np.stack(lla2ecef(lat, lon, 1000), axis=2) - SO
 
-    O = XYZD[:,:3] - SO
+    O = XYZ[:,:3]
     D = O[1:] - O[:-1]
-    O = O[:-1]
+    O = O[:-1] - SO
 
-    SN = (np.sum(SD * SD, axis=1).reshape((len(SD), 1)) * D
-          - np.sum(SD * D, axis=1).reshape((len(D), 1)) * SD)
-    t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
+    SN = (np.sum(SD * SD, axis=2, keepdims=True) * D
+          - np.sum(SD * D, axis=2, keepdims=True) * SD)
+    t = np.clip(-np.sum(SN * O, axis=2, keepdims=True) / np.sum(SN * D, axis=2, keepdims=True),
+                0, 1)
 
     # XXX This won't work with rally stages (anything not a circuit)
-    idxs = np.nonzero((np.concatenate((t[-1:], t[:-1])) > 1) & (t <= 1))[0]
-    distsq = np.sum(np.square(O[idxs] + t.reshape((len(t), 1))[idxs] * D[idxs]),
-                    axis=1)
-    minidxidx = np.argmin(distsq)
-    minidx = idxs[minidxidx]
-    return (XYZD[minidx, 3] + t[minidx] * (XYZD[minidx + 1, 3] - XYZD[minidx, 3]),
-            float(np.sqrt(distsq[minidxidx])))
+    distsq = np.sum(np.square(O + t * D), axis=2)
+    minidx = np.argmin(distsq, axis=1)
+    colrange = np.arange(t.shape[0])
+    return np.column_stack([minidx + t[colrange, minidx, 0], np.sqrt(distsq[colrange, minidx])])
 
+def find_crossing_dist(XYZD: np.ndarray, # coordinates to lookup in (X, Y, Z, Distance), meters
+                       marker: tuple[float, float]): # (lat, long) tuple, degrees
+    idx, _ = find_crossing_idx(XYZD, np.array(marker))
+    if idx + 1 >= len(XYZD):
+        return XYZD[int(idx), 3]
+    scale, idx = np.modf(idx)
+    return XYZD[int(idx), 3] + scale * (XYZD[int(idx) + 1, 3] - XYZD[int(idx), 3])
 
 def find_laps(XYZ: np.ndarray, # coordinates to look up in (X, Y, Z), meters
               timecodes: np.ndarray, # time for above coordinates, ms

@@ -3,10 +3,12 @@
 
 import configparser
 import copy
-from dataclasses import dataclass
+import dataclasses
+import json
+import os
 import time
 
-from PySide2.QtCore import QAbstractItemModel, QModelIndex, QPoint, QRectF, Qt, Signal
+from PySide2.QtCore import QAbstractItemModel, QModelIndex, QPoint, QRectF, QStandardPaths, Qt, Signal
 from PySide2.QtGui import QColor, QPen
 from PySide2.QtWidgets import (
     QCheckBox,
@@ -28,6 +30,7 @@ from PySide2.QtWidgets import (
     QWidget,
 )
 
+import dacite
 import numpy as np
 
 from data import gps
@@ -35,10 +38,72 @@ from .map import MapBaseWidget
 from . import state
 from . import widgets
 
-def _get_type(t):
-    if t < -150: return 'Left'
-    if t > 150: return 'Right'
-    return 'Straight'
+def track_dir():
+    track_dir = QStandardPaths.writableLocation(QStandardPaths.AppLocalDataLocation) + '/tracks'
+    os.makedirs(track_dir, exist_ok=True)
+    return track_dir
+
+strtable = ''.join([chr(48 + j) if j < 10 else chr(97 - 10 + j) for j in range(36)])
+def strcode(i):
+    i = min(int(i), 1295)
+    return strtable[i // 36] + strtable[i % 36]
+
+def strdeg(d):
+    return strcode((d + 180) * 1296 / 360)
+
+def coord_fname(lat, lon):
+    return strdeg(lat) + strdeg(lon)
+
+def find_many_crossing(xyz, latlon, adder=0):
+    # divide and conquer to reduce search space for each subsequent search
+    if len(xyz) * len(latlon) < 8192:
+        dist = gps.find_crossing_idx(xyz, latlon)
+        dist[:,0] += adder
+        return dist
+    else:
+        idx = len(latlon) // 2
+        crossing = gps.find_crossing_idx(xyz, latlon[idx])
+        cidx = int(crossing[0])
+        return np.row_stack([find_many_crossing(xyz[:cidx+2], latlon[:idx], adder),
+                             [[crossing[0] + adder, crossing[1]]],
+                             find_many_crossing(xyz[cidx:], latlon[idx+1:], adder + crossing[0])])
+
+def load_track(lat, lon):
+    # given a bunch of in-order lat,lon coordinates, try to find a stored track that matches
+    possible = {coord_fname(la, lo)
+                for la in (np.min(lat), np.max(lat))
+                for lo in (np.min(lon), np.max(lon))}
+    for entry in os.scandir(track_dir()):
+        if entry.name[:4].lower() in possible and entry.name[-4:].lower() == '.trk':
+            t1 = time.perf_counter()
+            with open(entry.path, 'rt', encoding='utf-8') as f:
+                track = dacite.from_dict(data_class=state.Track,
+                                         data=json.load(f),
+                                         config=dacite.Config(cast=[tuple]))
+            t2 = time.perf_counter()
+            na = np.array(track.coords)
+            xyzd = np.column_stack(list(gps.lla2ecef(na[:,0], na[:,1], 0.)) + [np.arange(len(na))])
+            t3 = time.perf_counter()
+            dist = find_many_crossing(xyzd, np.array(list(zip(lat, lon))))
+            t4 = time.perf_counter()
+            print('load track', t2-t1, t3-t2, t4-t3)
+            if np.max(dist[:,1]) < 15 and np.sum(dist[1:,0] > dist[:-1,0]) / len(dist) > 0.9:
+                return track
+
+def save_track(track):
+    dirbase = track_dir()
+    if not track.file_name:
+        coords = np.array(track.coords)
+        fbase = coord_fname(np.mean(coords[:,0]), np.mean(coords[:,1]))
+        for idx in range(36*36):
+            fname = fbase + strcode(idx) + '.trk'
+            if not os.path.isfile(os.path.join(dirbase, fname)):
+                track.file_name = fname
+                break
+    with state.atomic_write(os.path.join(dirbase, track.file_name)) as f:
+        json.dump(dataclasses.asdict(track,
+                                     dict_factory=lambda x: {a:b for a, b in x if a[0] != '_'}),
+                  f, indent=4)
 
 def select_track(data_view):
     t1 = time.perf_counter()
@@ -70,7 +135,7 @@ def select_track(data_view):
     marker_sample = 1 # meters
     map_sample = 10 # units of marker_sample
     dist = np.linspace(lap.start.dist, lap.end.dist,
-                       num=round((lap.end.dist - lap.start.dist) / marker_sample) + 1)
+                       num=round((lap.end.dist - lap.start.dist) / map_sample) * map_sample + 1)
     speed = gps_speed.interp_many(dist, mode_time=False)
     lat = gps_lat.interp_many(dist, mode_time=False)
     lon = gps_long.interp_many(dist, mode_time=False)
@@ -86,6 +151,11 @@ def select_track(data_view):
         lat += (lat[0] - lat[-1]) * np.linspace(0, 1, num=len(lat))
         lon += (lon[0] - lon[-1]) * np.linspace(0, 1, num=len(lon))
         alt += (alt[0] - alt[-1]) * np.linspace(0, 1, num=len(alt))
+
+    track = load_track(lat[::map_sample], lon[::map_sample])
+    if track:
+        data_view.track = track
+        return
 
     # build track
     try:
@@ -166,16 +236,12 @@ def select_track(data_view):
             s.name = 'Turn %d' % num
     last = num
     num = 1
-    last_straight = None
     for s in sectors:
         if s.typ == 'Straight':
-            s.name = 'Str %d-%d' % (last, num)
-            last_straight = (s, last)
+            s.name = 'Str %d-%d' % (last, num if sectors[-1] != s else 1)
         else:
             last = num
             num += 1
-    if last_straight:
-        last_straight[0].name = 'Str %d-1' % last_straight[1]
 
     t4 = time.perf_counter()
 
@@ -192,7 +258,7 @@ def select_track(data_view):
     print('select track: %.3f %.3f %.3f' % (t2-t1, t4-t2, t5-t4))
 
 
-@dataclass
+@dataclasses.dataclass
 class IndexDetails:
     name: str
     obj: object
@@ -286,8 +352,10 @@ class TrackSectorsMapWidget(MapBaseWidget):
             idx = np.argmin(np.sum(np.square(yx + t * v - eyx), axis=1))
 
             lat, lon = (coords[idx] + t[idx] * (coords[idx + 1] - coords[idx]))[:2]
-            dist = gps.find_crossing(np.column_stack(list(gps.lla2ecef(coords[:, 0], coords[:, 1], 0.)) + [coords[:, 3]]),
-                                     (lat, lon))[0]
+            dist = gps.find_crossing_dist(
+                np.column_stack(list(gps.lla2ecef(coords[:, 0], coords[:, 1], 0.))
+                                + [coords[:, 3]]),
+                (lat, lon))
             # make sure dist is within reasonable bounds
             if self.current_marker_idx and dist < self.sectors.markers[self.current_marker_idx - 1]._dist + 10:
                 return
@@ -321,14 +389,14 @@ class TrackSectorsMapWidget(MapBaseWidget):
             self.current_marker = None
             self.update()
 
-    def crossing_vector(self, coords, xyzd, lat, lon, extent):
-        idx = int(gps.find_crossing(xyzd, (lat, lon))[0])
+    def crossing_vector(self, coords, xyz, lat, lon, extent):
+        idx = int(gps.find_crossing_idx(xyz, (lat, lon))[0])
         vect = coords[idx + 1] - coords[idx]
         vect = np.array([vect[0] * self.lat_scale,
                          -vect[1] * self.long_scale])
         vect /= np.linalg.norm(vect)
         pt = np.array([(lon - self.long_base) * self.long_scale,
-                          (lat - self.lat_base) * self.lat_scale])
+                       (lat - self.lat_base) * self.lat_scale])
         p1 = pt + vect * extent
         p2 = pt - vect * extent
         return (p1[0], p1[1], p2[0], p2[1])
@@ -358,16 +426,20 @@ class TrackSectorsMapWidget(MapBaseWidget):
         pen.setWidth(widgets.deviceScale(self, 2))
         ph.painter.setPen(pen)
         draw_coords = coords
-        xyzd = np.column_stack(list(gps.lla2ecef(coords[:,0], coords[:,1], 0))
-                               + [np.arange(0, len(coords), dtype=np.float64)])
+        xyz = np.column_stack(list(gps.lla2ecef(coords[:,0], coords[:,1], 0)))
         if self.sector_idx is not None:
             m1 = self.sectors.markers[self.sector_idx - 1]
             m2 = self.sectors.markers[self.sector_idx]
-            c1 = int(1 + gps.find_crossing(xyzd, (m1.lat, m1.lon))[0])
-            c2 = int(np.ceil(gps.find_crossing(xyzd, (m2.lat, m2.lon))[0]))
-            draw_coords = np.row_stack([np.array([m1.lat, m1.lon], dtype=np.float64),
-                                        coords[c1:c2,:2],
-                                        np.array([m2.lat, m2.lon], dtype=np.float64)])
+            c1 = int(1 + gps.find_crossing_idx(xyz, (m1.lat, m1.lon))[0])
+            c2 = int(np.ceil(gps.find_crossing_idx(xyz, (m2.lat, m2.lon))[0]))
+            draw_coords = [np.array([m1.lat, m1.lon], dtype=np.float64)]
+            if c1 <= c2:
+                draw_coords.append(coords[c1:c2,:2])
+            else:
+                draw_coords.append(coords[c1:,:2])
+                draw_coords.append(coords[:c2,:2])
+            draw_coords = np.row_stack(draw_coords +
+                                       [np.array([m2.lat, m2.lon], dtype=np.float64)])
         y = ((draw_coords[:,0] - self.lat_base) * self.lat_scale).data
         x = ((draw_coords[:,1] - self.long_base) * self.long_scale).data
         for i in range(1, len(y)):
@@ -376,7 +448,7 @@ class TrackSectorsMapWidget(MapBaseWidget):
         pen = QPen(QColor(0, 0, 160))
         pen.setWidth(widgets.deviceScale(self, 3))
         ph.painter.setPen(pen)
-        ph.painter.drawLine(*self.crossing_vector(coords, xyzd, coords[0,0], coords[0,1],
+        ph.painter.drawLine(*self.crossing_vector(coords, xyz, coords[0,0], coords[0,1],
                                                   widgets.deviceScale(self, 15)))
         if self.sectors:
             for m in self.sectors.markers:
@@ -388,7 +460,7 @@ class TrackSectorsMapWidget(MapBaseWidget):
                 elif self.sector_idx is not None and m == self.sectors.markers[self.sector_idx]:
                     pen.setWidth(widgets.deviceScale(self, 2))
                 ph.painter.setPen(pen)
-                ph.painter.drawLine(*self.crossing_vector(coords, xyzd, m.lat, m.lon,
+                ph.painter.drawLine(*self.crossing_vector(coords, xyz, m.lat, m.lon,
                                                           widgets.deviceScale(self, 15)))
 
 class TrackDialog(QDialog):
@@ -553,6 +625,8 @@ def track_editor(parent, data_view):
     if data_view.track:
         orig_track = copy.deepcopy(data_view.track)
         dia = TrackDialog(data_view)
-        if not dia.exec_():
+        if dia.exec_():
+            save_track(data_view.track)
+        else:
             data_view.track = orig_track
             data_view.values_change.emit()

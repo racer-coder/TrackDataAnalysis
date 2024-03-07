@@ -410,17 +410,13 @@ class MainWindow(QMainWindow):
 
     def save_workspace(self):
         if not self.workspace_fname: return self.save_as_workspace()
-        new_name = self.workspace_fname + '.new'
-        with open(new_name, 'wt', encoding='utf-8') as f:
+        with ui.state.atomic_write(self.workspace_fname) as f:
             json.dump({'layout': self.layout_mgr.save_state(),
                        'videos': self.data_view.video_alignment,
                        'channels': self.data_view.channel_overrides,
                        'math_groups': {k: dataclasses.asdict(v)
                                        for k, v in self.data_view.maths.groups.items()},
                        }, f, indent=4)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(new_name, self.workspace_fname) # atomic replace
         return True
 
     def save_as_workspace(self):
@@ -454,12 +450,8 @@ class MainWindow(QMainWindow):
         self.config['main']['geometry'] = bytes(self.saveGeometry()).hex()
         self.config['main']['widgets'] = bytes(self.saveState()).hex()
         self.config['main']['maps_key'] = json.dumps(self.data_view.maps_key)
-        new_name = self.config_fname + '.new'
-        with open(new_name, 'wt', encoding='utf-8') as f:
+        with ui.state.atomic_write(self.config_fname) as f:
             self.config.write(f)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(new_name, self.config_fname)
         e.accept()
 
 

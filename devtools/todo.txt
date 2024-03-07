@@ -1,13 +1,3 @@
-* DETECT SECTIONS (STRAIGHT/CORNER/ETC) OR IMPORT FROM OTHER APP
-. Store track maps somewhere? Workspace or another dir?
-. Can have multiple tracks at the same location (for different configs/directions)
-. Track identification by scanning entire gps lap (what if start/finish doesn't line up?)
-. filename contains rough gps coordinates plus a sequence counter for multiple configs at the same location
-. gps varies about 0.01 degrees in lat and long at a given track
-. about 5000+ tracks known throughout the world?
-
-Later Milestones:
-
 * MATHS
 . math edit - UNITS
 . math expression help - search for channels
@@ -69,8 +59,10 @@ Later Milestones:
 . keyboard shortcut for workspace selection
 . keyboard shortcut ESC for closing floating dock widget
 . keyboard shortcut for bringing up channels dock widget
+. sectors: use detected lap as name of venue in metadata / database
 . sectors: lap stretch on section boundaries for some canonical "stretch" sector set
 . sectors: Support different sector sets
+. sectors/track map - handle when start/finish doesn't line up right
 . time/dist - in paintGraph, label channels even if no x_axis
 . time/dist detect whether should use meter vs feet depending on speed units?
 . time/distance widget - vertical zoom bar to easily adjust range on the fly

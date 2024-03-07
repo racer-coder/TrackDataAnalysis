@@ -2,8 +2,10 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 from configparser import ConfigParser
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 import math
+import os
 import typing
 
 from PySide2.QtCore import Signal
@@ -247,7 +249,7 @@ class Track:
         xyzd = np.column_stack(list(gps.lla2ecef(na[:,0], na[:,1], 0.)) + [na[:,3]])
         for ss in sector_sets.values():
             for m in ss.markers:
-                m._dist = gps.find_crossing(xyzd, (m.lat, m.lon))[0]
+                m._dist = gps.find_crossing_dist(xyzd, (m.lat, m.lon))
 
 @dataclass(eq=False)
 class DataView:
@@ -388,3 +390,16 @@ class DataView:
 def format_time(time_ms, sign=''): # pass '+' into sign to get +/- instead of ''/-
     return ('%' + sign + '.f:%06.3f') % (math.copysign(math.trunc(time_ms / 60000), time_ms),
                                          abs(time_ms) % 60000 / 1000)
+
+@contextmanager
+def atomic_write(fname):
+    new_name = fname + '.new'
+    try:
+        with open(new_name, 'wt', encoding='utf-8') as f:
+            yield f
+            f.flush()
+            os.fsync(f.fileno())
+    except:
+        os.remove(new_name)
+        raise
+    os.replace(new_name, fname)
