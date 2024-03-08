@@ -80,7 +80,8 @@ properties = [
 unit_map = {name.lower(): (prop, unit)
             for prop in properties
             for unit in prop.units
-            for name in [unit.name, unit.symbol] + unit.aliases}
+            for name in [unit.name, unit.display, unit.symbol] + unit.aliases
+            if name}
 
 def convert(values, from_unit, to_unit):
     # Do this check before looking up in unit_map in case we don't know these units
