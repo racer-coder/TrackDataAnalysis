@@ -59,7 +59,6 @@
 . keyboard shortcut for workspace selection
 . keyboard shortcut ESC for closing floating dock widget
 . keyboard shortcut for bringing up channels dock widget
-. sectors: use detected lap as name of venue in metadata / database
 . sectors: lap stretch on section boundaries for some canonical "stretch" sector set
 . sectors: Support different sector sets
 . sectors/track map - handle when start/finish doesn't line up right

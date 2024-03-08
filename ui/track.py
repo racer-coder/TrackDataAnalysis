@@ -105,16 +105,11 @@ def save_track(track):
                                      dict_factory=lambda x: {a:b for a, b in x if a[0] != '_'}),
                   f, indent=4)
 
-def select_track(data_view):
+def select_track(logref):
     t1 = time.perf_counter()
-    data_view.track = None
 
-    if len(data_view.log_files) != 1:
-        return
-
-    logref = data_view.log_files[0]
     if len(logref.laps) < 3:
-        return
+        return None
     lap = logref.best_lap
 
     # grab GPS coordinates, select roughly every 10 meters
@@ -130,7 +125,7 @@ def select_track(data_view):
     # those loggers without heavy filtering!
 
     if not len(gps_lat.values) or not len(gps_long.values):
-        return
+        return None
 
     marker_sample = 1 # meters
     map_sample = 10 # units of marker_sample
@@ -154,8 +149,7 @@ def select_track(data_view):
 
     track = load_track(lat[::map_sample], lon[::map_sample])
     if track:
-        data_view.track = track
-        return
+        return track
 
     # build track
     try:
@@ -245,7 +239,7 @@ def select_track(data_view):
 
     t4 = time.perf_counter()
 
-    data_view.track = state.Track(
+    track = state.Track(
         name = name,
         file_name = None,
         coords = [(float(la), float(lo), float(al), float(di))
@@ -256,6 +250,7 @@ def select_track(data_view):
 
     t5 = time.perf_counter()
     print('select track: %.3f %.3f %.3f' % (t2-t1, t4-t2, t5-t4))
+    return track
 
 
 @dataclasses.dataclass

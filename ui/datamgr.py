@@ -261,17 +261,26 @@ class DataDockWidget(TempDockWidget):
 
             self.status_msg.emit('Reading ' + path)
             try:
-                obj = builder(path, None).metadata # None means bg op
+                log = builder(path, None) # None means bg op
                 readable = True
             except: # pylint: disable=bare-except
-                obj = None
+                log = None
                 readable = False
+
+            if log:
+                try:
+                    logref = state.LogRef(data.distance.DistanceWrapper(log))
+                    logref.update_laps()
+                    venue = track.select_track(logref).name
+                    log.metadata['Venue'] = venue
+                except: # pylint: disable=bare-except
+                    pass
 
             metadata =  {'path': path,
                          'size': size,
                          'mtime': mtime,
                          'readable': readable,
-                         'metadata': obj}
+                         'metadata': log.metadata if log else None}
             self.metadata_cache[path] = metadata
             if not f:
                 # rewrite the cache if there is enough garbage
@@ -507,7 +516,7 @@ class DataDockWidget(TempDockWidget):
         else:
             logref.update_laps()
             self.data_view.ref_lap = logref.best_lap
-            track.select_track(self.data_view)
+            self.data_view.track = track.select_track(logref)
 
         channels.update_channel_properties(self.data_view)
 
