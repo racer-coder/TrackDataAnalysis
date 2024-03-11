@@ -37,6 +37,7 @@ import data.autosport_labs
 import data.ecumaster
 import data.iracing
 import data.motec
+import data.racetech
 from .dockers import (FastTableModel,
                       FastItemDelegate,
                       TempDockWidget,
@@ -449,7 +450,7 @@ class DataDockWidget(TempDockWidget):
         file_names = QFileDialog.getOpenFileNames(self, 'Open data file for analysis',
                                                  self.config.get('main', 'last_open_dir',
                                                                  fallback=os.getcwd()),
-                                                 'Data files (*.adulog *.ibt *.ld *.log *.xrk)')[0]
+                                                 'Data files (*.adulog *.ibt *.ld *.log *.run *.xrk)')[0]
         for file_name in file_names:
             if self.open_file(file_name):
                 self.config['main']['last_open_dir'] = os.path.dirname(file_name)
@@ -465,6 +466,8 @@ class DataDockWidget(TempDockWidget):
             return data.iracing.IRacing
         elif file_name.lower().endswith('.adulog'):
             return data.ecumaster.ECUMASTER_ADU
+        elif file_name.lower().endswith('.run'):
+            return data.racetech.RUN
         else:
             return None
 

@@ -162,6 +162,9 @@ class MapWidget(MapBaseWidget):
         zoom_long = gps_long.values[max(0, zoom_start-1) : zoom_end]
         zoom_alt = gps_alt.values[max(0, zoom_start-1) : zoom_end] if len(gps_alt.values) else np.array(0.)
 
+        if not len(zoom_lat): # zoom window too small or ??
+            return
+
         if not self.paint_satellite(ph,
                                     (np.min(zoom_lat), np.min(zoom_long), np.min(zoom_alt)),
                                     (np.max(zoom_lat), np.max(zoom_long), np.max(zoom_alt))):
