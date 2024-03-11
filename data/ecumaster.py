@@ -2,11 +2,13 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 from array import array
+import concurrent.futures
 from copy import copy
 from dataclasses import dataclass, field
 import gzip
 import struct
 import sys
+import time
 
 import numpy as np
 
@@ -145,7 +147,7 @@ def assign_channel_addresses(all_channels):
 @dataclass(slots=True)
 class AggregateData:
     tc: array = field(default_factory=lambda: array('I'))
-    idx: array = field(default_factory=lambda: array('H'))
+    idx_off: array = field(default_factory=lambda: array('I'))
     data: bytearray = field(default_factory=bytearray)
 
     def result(self):
@@ -154,14 +156,17 @@ class AggregateData:
         else:
             data = np.array(self.data, dtype=np.uint16)
 
-        stack = np.column_stack([data,
-                                 memoryview(self.tc).cast('B').cast('H')[0::2],
-                                 memoryview(self.tc).cast('B').cast('H')[1::2],
-                                 self.idx])
-        stack = memoryview(stack).cast('B').cast('Q')
+        idx_off = memoryview(self.idx_off).cast('B').cast('H')
+        tc = np.asarray(self.tc) + idx_off[0::2]
 
-        stack = np.sort(stack, kind='stable')
-        ch = stack >> 48
+        stack = np.column_stack([data,
+                                 memoryview(tc).cast('B').cast('H')[0::2],
+                                 memoryview(tc).cast('B').cast('H')[1::2],
+                                 idx_off[1::2]])
+        stack = np.ndarray(buffer=stack, dtype=np.uint64, shape=(len(stack),))
+
+        stack.sort(kind='stable')
+        ch = np.ndarray(buffer=stack, dtype=np.uint16, shape=(len(stack)*4,))[3::4]
         chboundaries = np.concatenate([[0],
                                        1 + np.nonzero(ch[1:] != ch[:-1])[0],
                                        [len(stack)]])
@@ -172,53 +177,82 @@ class AggregateData:
 fast_ch_table = array('H', range(65536))
 repeat_table = [20, 10, 5, 2, 1, 1, 1]
 
-def decode_row(timestamp, data, all_channel_data):
-    byte_cutoff = 0x200
-    pos = 4 + data[3] * 4
-    tca = array('I', [0])
-    for i in struct.unpack_from('>%dI' % data[3], data, 4):
-        start_ch = i >> 20
-        num_ch = i & 0xfff # not sure how much to mask
-        assert (start_ch < byte_cutoff) == (start_ch + num_ch <= byte_cutoff)
+class SecretDecoderRing:
+    def __init__(self, command, all_channel_data):
+        start_ch = (command[0] << 4) | (command[1] >> 4)
+        num_ch = ((command[2] & 0xf) << 8) | command[3]
+        repeat = repeat_table[command[1] & 0xf]
 
-        repeat = repeat_table[(i >> 16) & 15]
+        aci = start_ch >= 0x200
+        self.count = num_ch * repeat
+        self.size = self.count * (aci + 1)
+        self.idx_tcoff = array('I', [(idx << 16) | off
+                                     for off in range(0, 40, 40 // repeat)
+                                     for idx in range(start_ch, start_ch + num_ch)])
+        self.dest_idx_off = all_channel_data[aci].idx_off
+        self.dest_tc = all_channel_data[aci].tc
+        self.dest_data = all_channel_data[aci].data
+        self.advance = 4
 
-        aci = start_ch >= byte_cutoff
-        next_pos = pos + num_ch * repeat * (aci + 1)
-        assert (pos & aci) == 0 # round up when dealing with 2 byte elems?
+        if len(command) == 4:
+            self.next = None
+        else:
+            self.next = SecretDecoderRing(command[4:], all_channel_data)
+            if self.next.dest_data is self.dest_data:
+                self.count += self.next.count
+                self.size += self.next.size
+                self.idx_tcoff.extend(self.next.idx_tcoff)
+                self.advance += self.next.advance
+                self.next = self.next.next
 
-        ad = all_channel_data[aci]
-        ad.idx.extend(fast_ch_table[start_ch:start_ch + num_ch] * repeat)
-        for i in range(timestamp, timestamp + 40, 40 // repeat):
-            tca[0] = i
-            ad.tc.extend(tca * num_ch)
-        ad.data += data[pos:next_pos]
+def decode_row(timestamp, data, pos, end_pos, all_channel_data, decoder_ring):
+    pos += 4
+    next_pos = pos + data[pos - 1] * 4
+    tca = array('I', [timestamp])
+
+    try:
+        decoders = decoder_ring[data[pos:next_pos]]
+    except KeyError:
+        decoders = [SecretDecoderRing(data[pos:next_pos], all_channel_data)]
+        while decoders[-1].next:
+            decoders.append(decoders[-1].next)
+        decoder_ring[data[pos:next_pos]] = decoders
+
+    for decoder in decoders:
         pos = next_pos
-    assert pos <= len(data)
+        decoder.dest_idx_off.extend(decoder.idx_tcoff)
+        decoder.dest_tc.extend(tca * decoder.count)
+        next_pos += decoder.size
+        decoder.dest_data += data[pos:next_pos]
+    assert next_pos <= end_pos
 
 def decode_rows(data, pos, progress):
     all_channel_data = [AggregateData(), AggregateData()]
+    decoder_ring = {}
 
-    first_timestamp = None
+    first_timestamp = data[pos + 2]
     timestamp = 0
-    update_pos = 1 << 20
-    while pos + 4 < len(data):
+    update_pos = 8 << 20
+    len_data = len(data)
+    while pos + 4 < len_data:
         if pos >= update_pos:
             if progress:
-                progress(pos, len(data))
-            update_pos += 1 << 20
+                progress(pos, len_data)
+            update_pos += 8 << 20
         l = data[pos+1] * 8 + 8
-        if pos + l > len(data):
+        if pos + l > len_data:
             break
         timestamp += (data[pos+2] - timestamp) % 25
-        if first_timestamp is None:
-            first_timestamp = timestamp
-        decode_row((timestamp - first_timestamp) * 40, data[pos:pos+l], all_channel_data)
+        decode_row((timestamp - first_timestamp) * 40, data, pos, pos+l, all_channel_data,
+                   decoder_ring)
         pos += l
     return all_channel_data
 
 def assign_data(channel_map, all_channel_data):
-    data = all_channel_data[0].result() | all_channel_data[1].result()
+    with concurrent.futures.ThreadPoolExecutor() as worker:
+        d0 = worker.submit(all_channel_data[0].result)
+        d1 = worker.submit(all_channel_data[1].result)
+        data = d0.result() | d1.result()
     for ch in list(channel_map.values()):
         if ch.address not in data:
             continue
@@ -247,8 +281,8 @@ def assign_data(channel_map, all_channel_data):
                 chdup.samples = samples[i::16]
                 channel_map['%s[%d]' % (ch.name, i + 1)] = chdup
             continue
-        if ch.samples is not None:
-            ch.samples = ch.samples / ch.scale + ch.adder
+        if ch.samples is not None and (ch.scale != 1 or ch.adder != 0):
+            ch.samples = ch.samples * (1 / ch.scale) + ch.adder
 
 def decode_len_str(data, pos, num):
     ret = []
@@ -324,6 +358,7 @@ def generate_laps(channel_map, last_time):
             for lap, (start_time, end_time) in enumerate(zip(lap_markers[:-1], lap_markers[1:]))]
 
 def ECUMASTER_ADU(fname, progress):
+    t0 = time.perf_counter()
     with open(fname, 'rb') as f:
         data = gzip.decompress(f.read())
 
@@ -346,9 +381,14 @@ def ECUMASTER_ADU(fname, progress):
 
     channel_map = assign_channel_addresses(all_channels)
 
+    t1 = time.perf_counter()
     all_channel_data = decode_rows(data, pos, progress)
 
+    t2 = time.perf_counter()
     assign_data(channel_map, all_channel_data)
+
+    t3 = time.perf_counter()
+    print('decoder time: %.4f %.4f %.4f' % (t1-t0, t2-t1, t3-t2))
 
     #csv_analyze(channel_map)
 
