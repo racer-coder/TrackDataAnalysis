@@ -3,6 +3,7 @@
 
 from array import array
 from dataclasses import dataclass
+import datetime
 import struct
 import time
 
@@ -54,6 +55,8 @@ class DataView:
              self.ts_lookup(gps_time)]) # tc
 
         self.lap_crossing = np.array([], dtype=np.uint32)
+        self.metadata = {'Log Time': 'Unknown',
+                         'Log Date': 'Unknown'}
 
     def ts_lookup(self, pos):
         return self.timestamp_val[np.maximum(np.searchsorted(self.timestamp_pos, pos) - 1, 0)]
@@ -128,22 +131,24 @@ def analog_input(data_view, d): # 20-51
                          'Analog %d' % (i - 19), 'V', 3, True)]
 
 def data_storage_channel(data_view, d): # 55
-    # XXX should save timestamp to metadata
+    d = d[-1]
+    end_time = datetime.datetime(
+               data_view.sliding_u16[d+6].byteswap(),
+               data_view.sliding_u8[d+5],
+               data_view.sliding_u8[d+4],
+               data_view.sliding_u8[d+3],
+               data_view.sliding_u8[d+2],
+               data_view.sliding_u8[d+1])
+
+    # subtract timecode for last date message
+    end_time -= datetime.timedelta(milliseconds=int(data_view.ts_lookup(d)))
+
+    # add timezone data
+    end_time += datetime.timedelta(minutes=15*int(data_view.sliding_i8[d+8]))
+
+    data_view.metadata['Log Time'] = '%02d:%02d:%02d' % (end_time.hour, end_time.minute, end_time.second)
+    data_view.metadata['Log Date'] = '%02d/%02d/%d' % (end_time.month, end_time.day, end_time.year)
     return []
-    raise ValueError
-    validate(state, pos, 9)
-    #print('tod %d:%02d:%02d' % (state.data[pos+3], state.data[pos+2], state.data[pos+1]))
-    # Current GMT time is given by
-    # Seconds = Data1
-    # Minutes = Data2
-    # Hours = Data3
-    # Date = Data4
-    # Month = Data5
-    # Year = Data6 x 2^8 + Data7
-    # Offset from GMT = Data8 (2's complement)
-    # Offset from GMT is given by 15 minutes increments or decrements
-    # For example (-22) = (- 5:30 GMT)
-    return pos + 10
 
 def external_temperature_sensor(data_view, d): # 72
     names = [None,
@@ -373,7 +378,6 @@ def RUN(fname, progress):
                         [base.Lap(num, start, end)
                          for num, (start, end) in enumerate(zip(lap_crossing[:-1],
                                                                 lap_crossing[1:]))],
-                        {'Log Date': 'Unknown',
-                         'Log Time': 'Unknown'}, # metadata
+                        data_view.metadata,
                         ['Speed', 'GPS Latitude', 'GPS Longitude', None],
                         fname)
