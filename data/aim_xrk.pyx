@@ -304,6 +304,9 @@ def _decode_sequence(s, progress=None):
                                 assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
                                 assert channels[m.content.index].long_name == m.content.long_name
                         for m in data[_tokdec('GRP')]:
+                            #print('Group', m.content.index,
+                            #      ', '.join(channels[ch].long_name
+                            #                for ch in m.content.channels))
                             groups += [None] * (m.content.index - len(groups) + 1)
                             groups[m.content.index] = m.content
                             idx = 6
