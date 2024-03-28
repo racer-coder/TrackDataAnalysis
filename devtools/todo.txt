@@ -33,9 +33,9 @@
 . open from db - ability to choose columns to display in results
 . open - select fastest realistic lap, ignore abnormal laps
 . file format - megalogviewer
-. file format - vbox
 . file format - racepak? might have encryption problem
 . file format - link g4+
+. file format / gps - calc acceleration etc from change in velocity/heading? -> vbox
 . motec / non-gps - construct map from G-forces
 . motec - special handling for status channels
 . widgets - consider qpixmap cache for timedist graph and maps widget

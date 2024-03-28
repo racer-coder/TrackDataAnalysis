@@ -301,6 +301,9 @@ def find_laps(XYZ: np.ndarray, # coordinates to look up in (X, Y, Z), meters
     D = O[1:] - O[:-1]
     O = O[:-1]
 
+    # VBox seems to need 30, maybe my friend is using an old map description
+    marker_size = 30 # meters, how far you can be from the marker to count as a lap
+
     # Precalculate in which time periods we were traveling at least 4 m/s (~10mph)
     minspeed = np.sum(D*D, axis=1) > np.square((timecodes[1:] - timecodes[:-1]) * (4 / 1000))
 
@@ -309,7 +312,7 @@ def find_laps(XYZ: np.ndarray, # coordinates to look up in (X, Y, Z), meters
     t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
     # This only works because the track is considered at altitude 0
     dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
-    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < marker_size ** 2)
 
     # Now that we have a decent candidate selection of lap
     # crossings, generate a single normal vector for the
@@ -321,7 +324,7 @@ def find_laps(XYZ: np.ndarray, # coordinates to look up in (X, Y, Z), meters
     # recompute t, dist, pick
     t = np.maximum(-np.sum(SN * O, axis=1) / np.sum(SN * D, axis=1), 0)
     dist = np.sum(np.square(O + t.reshape((len(t), 1)) * D), axis=1)
-    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < 20 ** 2)
+    pick = (t[1:] <= 1) & (t[:-1] > 1) & (dist[1:] < marker_size ** 2)
 
     lap_markers = [0]
     for idx in (np.nonzero(pick)[0] + 1):

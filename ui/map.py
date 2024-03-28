@@ -50,8 +50,11 @@ class MapBaseWidget(QWidget):
 
     def handle_update(self, k, fut):
         pm = QtGui.QPixmap()
-        if not pm.loadFromData(fut.result()):
-            print('failed to load data for tile', k)
+        try:
+            if not pm.loadFromData(fut.result()):
+                print('failed to load data for tile', k)
+        except urllib.error.URLError:
+            return
         tile_cache[k] = pm
         self.update()
 
