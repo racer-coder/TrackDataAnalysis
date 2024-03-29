@@ -33,7 +33,7 @@ class ChannelData:
         index = self.timecodes if mode_time else self.distances
         # the 'not interpolate' mode requires bisect_right
         i = bisect.bisect_right(index, tc)
-        if len(self.values) == 0: return 0
+        if len(self.values) == 0: return None
         if i == 0: return self.values[i]
         if i == len(self.values) or not self.interpolate: return self.values[i - 1]
         span = index[i] - index[i-1]
