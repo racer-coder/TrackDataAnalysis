@@ -414,34 +414,34 @@ class TimeDist(widgets.MouseHelperWidget):
                         channel=(graph_idx, ch),
                         drop_rect=QRect(self.graph_x, y - 2,
                                         ph.size.width() - self.graph_x, 4)))
-            if not len(d.values): continue
-            main_val = d.interp(self.dataView.cursor2outTime(lap))
-            self.cursor_values.append(y_axis.calc(main_val))
-            ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y,
-                                self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '%.*f' % (d.dec_pts, main_val))
+            if len(d.values):
+                main_val = d.interp(self.dataView.cursor2outTime(lap))
+                self.cursor_values.append(y_axis.calc(main_val))
+                ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y,
+                                    self.channel_value_width, fontMetrics.height(),
+                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    '%.*f' % (d.dec_pts, main_val))
 
-            # print min/max for zoom window
-            if not self.lapView: continue
-            zoomsize = self.dataView.windowSize2Mode()
-            drange = d.values[
-                bisect.bisect_left(
-                    d.timecodes if self.dataView.mode_time else d.distances,
-                    self.dataView.offMode2outMode(
-                        lap, self.dataView.getTDValue(self.dataView.zoom_window[0])))
-                : bisect.bisect_left(
-                    d.timecodes if self.dataView.mode_time else d.distances,
-                    self.dataView.offMode2outMode(
-                        lap, zoomsize + self.dataView.getTDValue(self.dataView.zoom_window[0])))]
-            ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax + 6,
-                                y, self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '\u25bc' + (' %.*f' % (d.dec_pts, np.min(drange)) if len(drange) else ''))
-            ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax / 2 + 6,
-                                y, self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '\u25b2' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
+                # print min/max for zoom window
+                if self.lapView:
+                    zoomsize = self.dataView.windowSize2Mode()
+                    drange = d.values[
+                        bisect.bisect_left(
+                            d.timecodes if self.dataView.mode_time else d.distances,
+                            self.dataView.offMode2outMode(
+                                lap, self.dataView.getTDValue(self.dataView.zoom_window[0])))
+                        : bisect.bisect_left(
+                            d.timecodes if self.dataView.mode_time else d.distances,
+                            self.dataView.offMode2outMode(
+                                lap, zoomsize + self.dataView.getTDValue(self.dataView.zoom_window[0])))]
+                    ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax + 6,
+                                        y, self.channel_value_width, fontMetrics.height(),
+                                        Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                        '\u25bc' + (' %.*f' % (d.dec_pts, np.min(drange)) if len(drange) else ''))
+                    ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax / 2 + 6,
+                                        y, self.channel_value_width, fontMetrics.height(),
+                                        Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                        '\u25b2' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
             if not self.dataView.alt_lap or ch == 'Time Slip': continue
             d2 = self.dataView.get_channel_data(self.dataView.alt_lap, ch)
             if not len(d2.values): continue
@@ -452,20 +452,23 @@ class TimeDist(widgets.MouseHelperWidget):
                                 y, self.channel_value_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 '%.*f' % (d.dec_pts, alt_val))
-            ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
-                                + self.channel_name_width + self.channel_value_width
-                                + self.channel_opt_width / 2,
-                                y, self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '\u0394 %.*f' % (d.dec_pts, alt_val - main_val))
-            drange = d.values[
+            if len(d.values):
+                ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
+                                    + self.channel_name_width + self.channel_value_width
+                                    + self.channel_opt_width / 2,
+                                    y, self.channel_value_width, fontMetrics.height(),
+                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    '\u0394 %.*f' % (d.dec_pts, alt_val - main_val))
+            if not self.lapView: continue
+            zoomsize = self.dataView.windowSize2Mode()
+            drange = d2.values[
                 bisect.bisect_left(
-                    d.timecodes if self.dataView.mode_time else d.distances,
+                    d2.timecodes if self.dataView.mode_time else d2.distances,
                     self.dataView.offMode2outMode(
                         self.dataView.alt_lap,
                         self.dataView.getTDValue(self.dataView.zoom_window[0])))
                 : bisect.bisect_left(
-                    d.timecodes if self.dataView.mode_time else d.distances,
+                    d2.timecodes if self.dataView.mode_time else d2.distances,
                     self.dataView.offMode2outMode(
                         self.dataView.alt_lap,
                         zoomsize + self.dataView.getTDValue(self.dataView.zoom_window[0])))]
