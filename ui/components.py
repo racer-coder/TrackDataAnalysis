@@ -12,11 +12,13 @@ from PySide2.QtWidgets import (
 )
 
 from . import widgets
+from . import table_builder
 from . import timedist
 from . import video
 
 class ComponentManager(QWidget):
     factory = {
+        'table_builder': table_builder.TableBuilder,
         'timedist': timedist.TimeDist,
         'video': video.Video,
     }
@@ -30,6 +32,7 @@ class ComponentManager(QWidget):
         addMenu.addAction('Time/Distance Graph').triggered.connect(self.newTDGraph)
         addMenu.addAction('Session Graph').triggered.connect(self.newSessionGraph)
         addMenu.addAction('Video').triggered.connect(self.newVideo)
+        addMenu.addAction('Table Builder').triggered.connect(self.newTableBuilder)
 
         act = QAction('Paste', self)
         act.triggered.connect(self.paste_component)
@@ -48,6 +51,9 @@ class ComponentManager(QWidget):
 
     def newVideo(self):
         ComponentBase(self, None, self.dataView, video.Video(self.dataView))
+
+    def newTableBuilder(self):
+        ComponentBase(self, None, self.dataView, table_builder.TableBuilder(self.dataView))
 
     def paintEvent(self, e: QtGui.QPaintEvent):
         ph = widgets.makePaintHelper(self, e)

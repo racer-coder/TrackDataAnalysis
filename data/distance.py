@@ -45,8 +45,8 @@ class ChannelData:
         if self.interpolate:
             return np.interp(tc, index, self.values)
         else:
-            return self.values[np.minimum(np.searchsorted(index, tc, side='right'),
-                                          len(index) - 1)]
+            return np.asarray(self.values)[np.minimum(np.searchsorted(index, tc, side='right'),
+                                                      len(index) - 1)]
 
     def change_units(self, units):
         converted = unitconv.convert(self.values, self.units, units)
