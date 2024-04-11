@@ -138,6 +138,7 @@ _unit_map = {
     30: ('lambda', 2),
     31: ('gear', 0),
     33: ('%', 2),
+    43: ('kg', 3),
 }
 
 def _ndarray_from_mv(mv):
@@ -246,7 +247,7 @@ def _decode_sequence(s, progress=None):
                     ms = Mms[ch.unknown[64]]
                     msi: cython.uint = ms
                     if show_all:
-                        print('tc=%8d M idx=%d cnt=%d' % (msg.timecode, msg.index, msg.count))
+                        print('tc=%d M idx=%d cnt=%d' % (msg.timecode, msg.index, msg.count))
                     if msg.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.timecode + (msg.count-1) * msi
                         ch.timecodes += array('i', range(msg.timecode,
@@ -304,9 +305,6 @@ def _decode_sequence(s, progress=None):
                                 assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
                                 assert channels[m.content.index].long_name == m.content.long_name
                         for m in data[_tokdec('GRP')]:
-                            #print('Group', m.content.index,
-                            #      ', '.join(channels[ch].long_name
-                            #                for ch in m.content.channels))
                             groups += [None] * (m.content.index - len(groups) + 1)
                             groups[m.content.index] = m.content
                             idx = 6
@@ -339,7 +337,13 @@ def _decode_sequence(s, progress=None):
                          data.short_name,
                          data.long_name,
                          data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
-                        data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
+                        try:
+                            data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
+                        except KeyError:
+                            print('Unknown units[%d] for %s' %
+                                  (dcopy[12] & 127, data.long_name))
+                            data.units = ''
+                            data.dec_pts = 0
 
                         # [12] maybe type (lower bits) combined with scale or ??
                         # [13] decoder of some type?
@@ -393,6 +397,7 @@ def _decode_sequence(s, progress=None):
                 # print('Bad bytes(%d at %x):' % (badbytes, badpos))
                 badbytes = 0
             if not badbytes:
+                # sys.stdout.flush()
                 # traceback.print_exc()
                 badpos = oldpos # pylint: disable=unused-variable
             if oldpos < len_s:
@@ -414,15 +419,16 @@ def _decode_sequence(s, progress=None):
                             #XXX*[s2mv[l[l.size()-1]] for l in ch_indices if l.size()],
                             *[c.timecodes[len(c.timecodes)-1] for c in channels if c and len(c.timecodes)]))
     def process_group(g):
-        data_p = &gc_data[0][g.index]
-        if data_p.data.size():
-            g.samples = np.asarray(<cython.uchar[:data_p.data.size()]> &data_p.data[0])
-            rows = len(g.samples) // (data_p.add_helper - 3)
-            g.timecodes = np.ndarray(buffer=g.samples, dtype=np.int32,
-                                     shape=(rows,), strides=(data_p.add_helper-3,)) - time_offset
-        else:
-            g.samples = np.array([], dtype=np.int32)
-            g.timecodes = g.samples.data
+        g.samples = np.array([], dtype=np.int32)
+        g.timecodes = g.samples.data
+        if g.index < gc_data[0].size():
+            data_p = &gc_data[0][g.index]
+            if data_p.data.size():
+                g.samples = np.asarray(<cython.uchar[:data_p.data.size()]> &data_p.data[0])
+                rows = len(g.samples) // (data_p.add_helper - 3)
+                g.timecodes = np.ndarray(buffer=g.samples, dtype=np.int32,
+                                         shape=(rows,),
+                                         strides=(data_p.add_helper-3,)) - time_offset
         for ch in g.channels:
             process_channel(channels[ch])
 
@@ -497,7 +503,7 @@ def _decode_sequence(s, progress=None):
 
     return DataStream(
         channels={ch.long_name: ch for ch in channels
-                  if channels and len(ch.sampledata)
+                  if ch and len(ch.sampledata)
                   and ch.long_name not in ('StrtRec', 'Master Clk')},
         messages=messages,
         laps=laps,
