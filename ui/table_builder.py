@@ -216,7 +216,7 @@ class TableBuilder(QWidget):
 
     def clear_table(self, reason):
         print('CLEAR TABLE:', reason)
-        pass
+        self.table.clear()
 
     def recompute(self):
         if not self.data_view.ref_lap:
