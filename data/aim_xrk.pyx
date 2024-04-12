@@ -410,14 +410,19 @@ def _decode_sequence(s, progress=None):
     assert pos == len(s)
     # quick scan through all the groups/channels for the first used timecode
     if channels:
-        time_offset = int(min(time_offset, time_offset,
-                              #XXX*[s2mv[l[0]] for l in g_indices if l.size()],
-                              #XXX*[s2mv[l[0]] for l in ch_indices if l.size()],
-                              *[c.timecodes[0] for c in channels if c and len(c.timecodes)]))
-        last_time = int(max(last_time, last_time,
-                            #XXX*[s2mv[l[l.size()-1]] for l in g_indices if l.size()],
-                            #XXX*[s2mv[l[l.size()-1]] for l in ch_indices if l.size()],
-                            *[c.timecodes[len(c.timecodes)-1] for c in channels if c and len(c.timecodes)]))
+        # int(min(time_offset, time_offset,
+        time_offset = int(min(
+            ([time_offset] if time_offset is not None else [])
+            #XXX*[s2mv[l[0]] for l in g_indices if l.size()],
+            #XXX*[s2mv[l[0]] for l in ch_indices if l.size()],
+            + [c.timecodes[0] for c in channels if c and len(c.timecodes)],
+            default=0))
+        last_time = int(max(
+            ([last_time] if last_time is not None else [])
+            #XXX*[s2mv[l[l.size()-1]] for l in g_indices if l.size()],
+            #XXX*[s2mv[l[l.size()-1]] for l in ch_indices if l.size()],
+            + [c.timecodes[len(c.timecodes)-1] for c in channels if c and len(c.timecodes)],
+            default=0))
     def process_group(g):
         g.samples = np.array([], dtype=np.int32)
         g.timecodes = g.samples.data

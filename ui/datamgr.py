@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import threading
+import traceback
 import typing
 
 from PySide2.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
@@ -506,6 +507,7 @@ class DataDockWidget(TempDockWidget):
         except KeyboardInterrupt:
             return # abort load
         except: # pylint: disable=bare-except
+            traceback.print_exc()
             progress.reset()
             QMessageBox.critical(self, 'Unable to parse',
                                  'Unable to read file "%s".  Please file a bug.' % file_name,
