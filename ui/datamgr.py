@@ -567,6 +567,7 @@ class DataDockWidget(TempDockWidget):
                 self.data_view.alt_lap = None
             else:
                 self.data_view.ref_lap = min([log.best_lap for log in self.data_view.log_files],
+                                             key=lambda x: x.duration(),
                                              default=None)
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
