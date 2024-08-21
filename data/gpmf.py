@@ -144,33 +144,32 @@ class KLV_data:
         self.cache = None # (struct decoder, qf, rcount)
 
     def build_cache(self):
-        if self.cache: return
+        if self.cache is not None: return
+
         qm = ''.join(type_map[t][0] for t in self.qt)
         qf = [type_map[t][1] for t in self.qt]
         rcount = self.s // struct.calcsize(qm)
         if self.s != struct.calcsize(qm) * rcount:
-            self.data = b''
-            self.cache = True
+            self.cache = []
         else:
-            self.cache = (struct.Struct('>' + qm * rcount), qf * rcount, rcount)
+            data = struct.unpack('>' + qm * rcount * (len(self.data) // self.s), self.data)
+            if data:
+                data = list(zip(*[[f(d) for d in data[i::len(qf)]]
+                                  if f else data[i::len(qf)]
+                                  for i, f in enumerate(qf)]))
+                if len(qf) == 1:
+                    data = [d[0] for d in data]
+                if rcount > 1:
+                    data = [data[i:i+rcount] for i in range(0, len(data), rcount)]
+            self.cache = data
 
     def __len__(self):
         self.build_cache()
-        return len(self.data) / self.s
+        return len(self.cache)
 
     def __getitem__(self, idx):
         self.build_cache()
-        p = idx * self.s
-        self.data[p] # raise IndexError
-        ret = [f(d) if f else d
-               for f, d in zip(self.cache[1],
-                               self.cache[0].unpack_from(self.data, p))]
-        if len(self.cache[1]) != self.cache[2]: # Do we have structs?
-            num = len(self.cache[1]) // self.cache[2]
-            ret = [ret[i:i+num] for i in range(0, len(ret), num)]
-        if self.cache[2] == 1: # If no repeat, then turn into scalar
-            ret = ret[0]
-        return ret
+        return self.cache[idx]
 
 def KLV_parser(m):
     ret = []
@@ -195,8 +194,8 @@ def KLV_parser(m):
             if fc == 'TYPE':
                 qtype = data
         else:
-            data = list(KLV_data(qtype if t == '?' else t,
-                            s, bytes(data)))
+            data = KLV_data(qtype if t == '?' else t,
+                            s, bytes(data))
         ret.append((fc, data))
         p += 8 + s * r + ((-s * r) & 3)
     return ret
@@ -210,4 +209,5 @@ if __name__ == '__main__':
             for i, p in enumerate(parse_mp4(memoryview(m))):
                 #print('Payload %f-%f' % (p.start_time, p.end_time))
                 KLV_parser(p.data)
+                #pprint.pp((i, KLV_parser(p.data)))
             p = None
