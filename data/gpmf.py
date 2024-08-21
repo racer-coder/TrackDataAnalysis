@@ -3,6 +3,7 @@
 
 import datetime
 import mmap
+import pprint
 import struct
 
 def valid_4cc(fc):
@@ -171,6 +172,10 @@ class KLV_data:
         self.build_cache()
         return self.cache[idx]
 
+    def __repr__(self):
+        self.build_cache()
+        return pprint.pformat(self.cache)
+
 def KLV_parser(m):
     ret = []
     p = 0
@@ -201,7 +206,6 @@ def KLV_parser(m):
     return ret
 
 if __name__ == '__main__':
-    import pprint
     import sys
     with open(sys.argv[1], 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
