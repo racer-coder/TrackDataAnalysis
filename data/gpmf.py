@@ -56,7 +56,6 @@ def parse_mp4(m):
         mdia = BoxParser(trak.get_one('mdia'))
         hdlr = struct.unpack_from('>8x4s', mdia.get_one('hdlr'), 0)
         if hdlr[0].decode('utf-8') != 'meta':
-            print('.. not meta')
             continue
 
         trak_clockdemon, = struct.unpack_from('>12xI', mdia.get_one('mdhd'), 0)
@@ -66,7 +65,6 @@ def parse_mp4(m):
         stbl = BoxParser(minf.get_one('stbl'))
         stsd = struct.unpack_from('>12x4s', stbl.get_one('stsd'), 0)
         if stsd[0].decode('utf-8') != 'gpmd':
-            print('.. not gpmd')
             continue
 
         metadataoffset_clockcount = 0 # XXX edts - editlist not supported yet
@@ -142,7 +140,7 @@ class KLV_data:
         self.qt = qt
         self.s = s
         self.data = data
-        self.cache = None # (struct decoder, qf, rcount)
+        self.cache = None
 
     def build_cache(self):
         if self.cache is not None: return
@@ -205,13 +203,38 @@ def KLV_parser(m):
         p += 8 + s * r + ((-s * r) & 3)
     return ret
 
+def MP4_estimate_start_time(fname):
+    with open(fname, 'rb') as f:
+        with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
+            try:
+                m.madvise(mmap.MADV_RANDOM)
+            except AttributeError:
+                pass # Windows
+            ret = []
+            for p in parse_mp4(memoryview(m)):
+                for fc, d in KLV_parser(p.data)[0][1]:
+                    if fc == 'STRM':
+                        for fc2, d2 in d:
+                            if fc2 == 'GPSU':
+                                ret.append(d2[0] - datetime.timedelta(seconds=p.start_time))
+            p = None # drop last reference to mmap
+            return ret[0] + sum([r - ret[0] for r in ret],
+                                start=datetime.timedelta()) / len(ret)
+
 if __name__ == '__main__':
     import sys
+    #print(MP4_estimate_start_time(sys.argv[1]))
+    #sys.exit(0)
     with open(sys.argv[1], 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
             m.madvise(mmap.MADV_RANDOM)
             for i, p in enumerate(parse_mp4(memoryview(m))):
                 #print('Payload %f-%f' % (p.start_time, p.end_time))
-                KLV_parser(p.data)
+                p = KLV_parser(p.data)
+                for fc, d in p[0][1]:
+                    if fc == 'STRM':
+                        for fc2, d2 in d:
+                            if fc2 == 'GPSU':
+                                print(d2)
                 #pprint.pp((i, KLV_parser(p.data)))
             p = None
