@@ -18,14 +18,19 @@ class BoxParser:
     def __init__(self, m):
         self._boxes = {}
         p = 0
-        print('BOX:')
+        #print('BOX:')
         while p < len(m):
             l, fc = struct.unpack_from('>I4s', m, p)
-            assert l >= 8 # l==1 means 64-bit length follows?
+            if l == 1:
+                p += 8
+                l, = struct.unpack_from('>Q', m, p)
+                l -= 8
+            else:
+                assert l >= 8
             assert p + l <= len(m)
             fc = fc.decode('utf-8')
             assert valid_4cc(fc)
-            print('  %s' % fc)
+            #print('  %s %d' % (fc, l))
             if fc not in self._boxes:
                 self._boxes[fc] = []
             self._boxes[fc].append(m[p+8:p+l])
@@ -97,8 +102,12 @@ def parse_mp4(m):
         else:
             metastsc = []
 
-        num_samples, = struct.unpack_from('>4xI', stbl.get_one('stco'), 0)
-        metaoffsets = struct.unpack('>%dI' % num_samples, stbl.get_one('stco')[8:])
+        if stbl.count('stco'):
+            num_samples, = struct.unpack_from('>4xI', stbl.get_one('stco'), 0)
+            metaoffsets = struct.unpack('>%dI' % num_samples, stbl.get_one('stco')[8:])
+        else:
+            num_samples, = struct.unpack_from('>4xI', stbl.get_one('co64'), 0)
+            metaoffsets = struct.unpack('>%dQ' % num_samples, stbl.get_one('co64')[8:])
         assert num_samples == len(metasizes) # need to chunk it up using metastsc, see GPMF_mp4reader.c maybe line 614?
 
         assert len(metaoffsets) == len(metasizes)
