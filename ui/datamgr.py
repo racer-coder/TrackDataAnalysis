@@ -436,6 +436,8 @@ class DataDockWidget(TempDockWidget):
 
         try:
             dia.restoreGeometry(bytes.fromhex(self.config.get('main', 'open_geometry')))
+            files.horizontalHeader().restoreState(
+                bytes.fromhex(self.config.get('main', 'open_files_header')))
         except configparser.NoOptionError:
             pass
 
@@ -447,6 +449,8 @@ class DataDockWidget(TempDockWidget):
         self.config['main']['open_filters'] = json.dumps(active_filters)
         self.config['main']['open_search'] = search.text()
         self.config['main']['open_geometry'] = bytes(dia.saveGeometry()).hex()
+        self.config['main']['open_files_header'] = bytes(
+            files.horizontalHeader().saveState()).hex()
 
     def open_from_file(self):
         file_names = QFileDialog.getOpenFileNames(self, 'Open data file for analysis',

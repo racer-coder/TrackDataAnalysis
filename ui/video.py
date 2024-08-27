@@ -273,7 +273,7 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         self.update()
 
     def paintEvent(self, event):
-        if not self.data_view.ref_lap:
+        if not self.data_view.ref_lap or not self.data_view.ref_lap.log.video_file:
             self.xaxis_click.geometry.setRect(0, 0, 0, 0)
             return
 
@@ -411,8 +411,10 @@ class Video(QWidget):
         if not lap: return
         file_name = QFileDialog.getOpenFileName(
             self, 'Open video file to associate with reference lap',
-            os.path.dirname(lap.log.log.get_filename()), 'Video files (*.mp4 *.mov)')[0]
+            self.data_view.config.get('main', 'open_video_last_dir', fallback=os.getcwd()),
+            'Video files (*.mp4 *.mov)')[0]
         if file_name:
+            self.data_view.config['main']['open_video_last_dir'] = os.path.dirname(file_name)
             lap.log.video_file = file_name
             lap.log.video_alignment = estimate_lap_offset(file_name, lap)
             self.data_view.video_alignment[lap.log.log.get_filename()] = (
