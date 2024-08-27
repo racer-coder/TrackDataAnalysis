@@ -76,7 +76,6 @@ class OneVideo(QOpenGLWidget):
         self.setMouseTracking(True) # Normally set by ComponentBase
         self.data_view = data_view
         self.secondary = secondary
-        self.lname = None
         self.vname = None
 
         #self.media_player = QMediaPlayer()
@@ -169,26 +168,12 @@ class OneVideo(QOpenGLWidget):
     def updateCursor(self, old_cursor):
         if self.control_cursor or self.frame_step_wait_seek or not self.ctx: return
         lap = self.data_view.alt_lap if self.secondary else self.data_view.ref_lap
-        if lap.log.log.get_filename() != self.lname:
-            # Try to infer video filename.  Use self.lname to gate trying more than once.
-            self.lname = lap.log.log.get_filename()
-            if self.lname not in self.data_view.video_alignment:
-                base = os.path.splitext(lap.log.log.get_filename())[0]
-                vfile = None
-                for ext in ('.mp4', '.mov'):
-                    if os.path.exists(base + ext):
-                        vfile = base + ext
-                        break
-                if not vfile: return
-                self.data_view.video_alignment[self.lname] = (vfile,
-                                                              estimate_lap_offset(vfile, lap))
-        if not self.vname or lap.log.video_file != self.vname:
-            if not lap.log.video_file:
-                if self.lname not in self.data_view.video_alignment: return
-                lap.log.video_file, lap.log.video_alignment = self.data_view.video_alignment[self.lname]
-            self.player.play(lap.log.video_file)
-            self.player.wait_for_property('seekable', timeout=0.5)
+        if not lap.log.video_file:
+            return
+        if lap.log.video_file != self.vname:
             self.vname = lap.log.video_file
+            self.player.play(self.vname)
+            self.player.wait_for_property('seekable', timeout=0.5)
         seek_time = max(0, lap.log.video_alignment + self.data_view.cursor2outTime(lap)) / 1000
         if (abs(seek_time - self.last_seek_time) < 0.002 and
             (self.async_outstanding or self.last_seek_exact)):
@@ -273,7 +258,8 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         rel = self.x_axis.invertRelative(relPos.x())
         log = self.data_view.ref_lap.log
         log.video_alignment = orig_align - rel
-        self.data_view.video_alignment[log.log.get_filename()] = (log.video_file, log.video_alignment)
+        self.data_view.video_alignment[log.log.get_filename()] = (
+            log.video_file, log.video_alignment)
         self.data_view.cursor_change.emit(None)
 
     def select_font(self):
@@ -394,13 +380,23 @@ class Video(QWidget):
         pass # not supported
 
     def update_video_index(self, idx, lap):
-        if lap and not self.videos[idx]:
-            self.videos[idx] = OneVideo(self.data_view, idx == 1)
-            self.layout.addWidget(self.videos[idx], 0, idx, 1, 1)
-        elif not lap and self.videos[idx]:
-            self.videos[idx].setParent(None)
-            self.videos[idx].deleteLater()
-            self.videos[idx] = None
+        if not lap:
+            if self.videos[idx]:
+                self.videos[idx].setParent(None)
+                self.videos[idx].deleteLater()
+                self.videos[idx] = None
+        else:
+            if not lap.log.video_file:
+                try:
+                    lap.log.video_file, lap.log.video_alignment = self.data_view.video_alignment[
+                        lap.log.log.get_filename()]
+                except KeyError:
+                    if self.videos[idx] and self.videos[idx].vname:
+                        # clear it out, we'll create a fresh one a couple lines later
+                        self.update_video_index(idx, None)
+            if not self.videos[idx]:
+                self.videos[idx] = OneVideo(self.data_view, idx == 1)
+                self.layout.addWidget(self.videos[idx], 0, idx, 1, 1)
 
     def updateCursor(self, old_cursor):
         self.update_video_index(0, self.data_view.ref_lap)
@@ -417,8 +413,10 @@ class Video(QWidget):
             self, 'Open video file to associate with reference lap',
             os.path.dirname(lap.log.log.get_filename()), 'Video files (*.mp4 *.mov)')[0]
         if file_name:
+            lap.log.video_file = file_name
+            lap.log.video_alignment = estimate_lap_offset(file_name, lap)
             self.data_view.video_alignment[lap.log.log.get_filename()] = (
-                file_name, estimate_lap_offset(file_name, lap))
+                lap.log.video_file, lap.log.video_alignment)
             self.updateCursor(None)
 
     def set_align_mode(self, mode):
