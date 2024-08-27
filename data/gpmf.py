@@ -61,6 +61,7 @@ def parse_mp4(m):
         mdia = BoxParser(trak.get_one('mdia'))
         hdlr = struct.unpack_from('>8x4s', mdia.get_one('hdlr'), 0)
         if hdlr[0].decode('utf-8') != 'meta':
+            #print('not meta - %s' % hdlr[0])
             continue
 
         trak_clockdemon, = struct.unpack_from('>12xI', mdia.get_one('mdhd'), 0)
@@ -70,6 +71,7 @@ def parse_mp4(m):
         stbl = BoxParser(minf.get_one('stbl'))
         stsd = struct.unpack_from('>12x4s', stbl.get_one('stsd'), 0)
         if stsd[0].decode('utf-8') != 'gpmd':
+            #print('not gpmd - %s' % stsd[0])
             continue
 
         metadataoffset_clockcount = 0 # XXX edts - editlist not supported yet
@@ -117,14 +119,21 @@ def parse_mp4(m):
                                  metadatalength) + metadataoffset_clockcount) / meta_clockdemon)
                     for index, (offs, sz) in enumerate(zip(metaoffsets, metasizes))]
         return payloads
-    return None
+    print('nothing found')
+    return []
 
 def type_date(d):
     # yymmddhhmmss.sss
-    d = d.decode('ascii')
-    return datetime.datetime(2000 + int(d[0:2]), int(d[2:4]), int(d[4:6]),
-                             int(d[6:8]), int(d[8:10]), int(d[10:12]),
-                             int(d[13:16]))
+    try:
+        d = d.decode('ascii')
+        #print(d)
+        return datetime.datetime(2000 + int(d[0:2]), int(d[2:4]), int(d[4:6]),
+                                 int(d[6:8]), int(d[8:10]), int(d[10:12]),
+                                 int(d[13:16]),
+                                 tzinfo=datetime.timezone.utc)
+    except:
+        print('cannot parse date', d)
+        return None
 
 type_map = { # map GoPro type to python struct module type
     'b': ('b', None),
@@ -225,10 +234,17 @@ def MP4_estimate_start_time(fname):
                     if fc == 'STRM':
                         for fc2, d2 in d:
                             if fc2 == 'GPSU':
-                                ret.append(d2[0] - datetime.timedelta(seconds=p.start_time))
+                                if d2[0]:
+                                    ret.append(d2[0] - datetime.timedelta(seconds=p.start_time))
             p = None # drop last reference to mmap
-            return ret[0] + sum([r - ret[0] for r in ret],
-                                start=datetime.timedelta()) / len(ret)
+            if not ret:
+                return None
+            ret.sort()
+            base_line = ret[len(ret) // 2]
+            ret = [r - base_line
+                   for r in ret
+                   if abs((r - base_line).total_seconds()) < 10]
+            return base_line + sum(ret, start=datetime.timedelta()) / len(ret)
 
 if __name__ == '__main__':
     import sys
