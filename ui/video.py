@@ -2,10 +2,12 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 import ctypes
+import datetime
 import locale
 import math
 import os
 import platform
+import traceback
 
 import glfw
 from PySide2 import QtGui
@@ -23,6 +25,7 @@ os.environ['PATH'] = os.path.dirname(__file__) + os.pathsep + os.environ['PATH']
 from . import mpv
 from . import widgets
 from .timedist import roundUpHumanNumber, AxisGrid
+from data import gpmf
 
 
 class GetProcAddressGetter:
@@ -47,6 +50,21 @@ class GetProcAddressGetter:
     def wrap(self, _, name: bytes):
         return ctypes.cast(glfw.get_proc_address(name.decode('utf8')), ctypes.c_void_p).value
 
+
+def estimate_lap_offset(vname, lap):
+    try:
+        leap_seconds = datetime.timedelta(seconds=18)
+        video_time = gpmf.MP4_estimate_start_time(vname)
+        log_time = datetime.datetime.combine(
+            video_time.date(),
+            datetime.time.fromisoformat(lap.log.log.get_metadata()['Log Time']),
+            tzinfo=datetime.timezone.utc) - leap_seconds
+        delta = (log_time - video_time).total_seconds()
+        delta = (delta + 1800) % 3600 - 1800 # discard differences of +- hours to ignore tz
+        return delta * 1000 # convert to ms
+    except:
+        traceback.print_exc()
+        return 0 # sensible default
 
 #class Video(QVideoWidget):
 class OneVideo(QOpenGLWidget):
@@ -148,13 +166,9 @@ class OneVideo(QOpenGLWidget):
         if not self.last_seek_exact:
             self.updateCursor(None)
 
-    def addChannel(self, ch):
-        pass # not supported
-
     def updateCursor(self, old_cursor):
         if self.control_cursor or self.frame_step_wait_seek or not self.ctx: return
         lap = self.data_view.alt_lap if self.secondary else self.data_view.ref_lap
-        if not lap: return
         if lap.log.log.get_filename() != self.lname:
             # Try to infer video filename.  Use self.lname to gate trying more than once.
             self.lname = lap.log.log.get_filename()
@@ -166,7 +180,8 @@ class OneVideo(QOpenGLWidget):
                         vfile = base + ext
                         break
                 if not vfile: return
-                self.data_view.video_alignment[self.lname] = (vfile, 0)
+                self.data_view.video_alignment[self.lname] = (vfile,
+                                                              estimate_lap_offset(vfile, lap))
         if not self.vname or lap.log.video_file != self.vname:
             if not lap.log.video_file:
                 if self.lname not in self.data_view.video_alignment: return
@@ -272,7 +287,10 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         self.update()
 
     def paintEvent(self, event):
-        # shamelessly copied from TimeDist paintXAxis
+        if not self.data_view.ref_lap:
+            self.xaxis_click.geometry.setRect(0, 0, 0, 0)
+            return
+
         ph = widgets.makePaintHelper(self, event)
         self.xaxis_click.geometry.setRect(0, 0, ph.size.width(), ph.size.height())
         session_time = self.data_view.cursor2outTime(self.data_view.ref_lap)
@@ -280,7 +298,6 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         est_spacing = roundUpHumanNumber(self.zoom_window / (ph.size.width() / ph.scale / 60))
         self.x_axis = AxisGrid(zero_offset, zero_offset + self.zoom_window, est_spacing,
                                ph.size.width() / self.zoom_window, 0)
-        if not self.data_view.ref_lap: return
 
         font = self.select_font()
         ph.painter.setFont(font)
@@ -353,13 +370,12 @@ class Video(QWidget):
 
         self.layout = QGridLayout()
 
-        self.videos = [OneVideo(self.data_view, False)]
-        if self.data_view.alt_lap: self.videos.append(OneVideo(self.data_view, True))
-        for c, v in enumerate(self.videos):
-            self.layout.addWidget(v, 0, c, 1, 1)
+        self.videos = [None, None]
+        self.update_video_index(0, self.data_view.ref_lap)
+        self.update_video_index(1, self.data_view.alt_lap)
 
         self.slider = AlignmentSlider(self.data_view)
-        self.layout.addWidget(self.slider, 1, 0, 1, 1,)
+        self.layout.addWidget(self.slider, 1, 0, 1, 1)
         self.slider.hide()
 
         self.layout.setRowStretch(0, 1)
@@ -374,17 +390,24 @@ class Video(QWidget):
     def channels(self):
         return set()
 
+    def addChannel(self, ch):
+        pass # not supported
+
+    def update_video_index(self, idx, lap):
+        if lap and not self.videos[idx]:
+            self.videos[idx] = OneVideo(self.data_view, idx == 1)
+            self.layout.addWidget(self.videos[idx], 0, idx, 1, 1)
+        elif not lap and self.videos[idx]:
+            self.videos[idx].setParent(None)
+            self.videos[idx].deleteLater()
+            self.videos[idx] = None
+
     def updateCursor(self, old_cursor):
-        if bool(self.data_view.alt_lap) != bool(len(self.videos) == 2):
-            if self.data_view.alt_lap:
-                self.videos.append(OneVideo(self.data_view, True))
-                self.layout.addWidget(self.videos[-1], 0, 1, 1, 1)
-            else:
-                last = self.videos.pop()
-                last.setParent(None)
-                last.deleteLater()
+        self.update_video_index(0, self.data_view.ref_lap)
+        self.update_video_index(1, self.data_view.alt_lap)
         for v in self.videos:
-            v.updateCursor(old_cursor)
+            if v:
+                v.updateCursor(old_cursor)
         self.slider.update()
 
     def load_ref_video(self):
@@ -394,23 +417,27 @@ class Video(QWidget):
             self, 'Open video file to associate with reference lap',
             os.path.dirname(lap.log.log.get_filename()), 'Video files (*.mp4 *.mov)')[0]
         if file_name:
-            self.data_view.video_alignment[lap.log.log.get_filename()] = (file_name, 0)
+            self.data_view.video_alignment[lap.log.log.get_filename()] = (
+                file_name, estimate_lap_offset(file_name, lap))
             self.updateCursor(None)
 
     def set_align_mode(self, mode):
         self.slider.setVisible(mode)
 
     def play_cb(self):
-        is_play = self.play_button.text() == 'Play'
+        is_play = (self.play_button.text() == 'Play') and self.videos[0]
         self.play_button.setText('Pause' if is_play else 'Play')
         for v in self.videos:
-            if is_play:
-                v.play_cb()
-            else:
-                v.pause_cb()
+            if v:
+                if is_play:
+                    v.play_cb()
+                else:
+                    v.pause_cb()
 
     def next_frame(self):
-        self.videos[0].next_frame() # secondary will get updateCursor call
+        if self.videos[0]:
+            self.videos[0].next_frame() # secondary will get updateCursor call
 
     def prev_frame(self):
-        self.videos[0].prev_frame() # secondary will get updateCursor call
+        if self.videos[0]:
+            self.videos[0].prev_frame() # secondary will get updateCursor call
