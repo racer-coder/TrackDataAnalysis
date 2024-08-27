@@ -106,6 +106,7 @@ Ubuntu 22.04:
 ```
 sudo apt install python3-pyside2.qtwidgets python3-numpy libmpv1
 pip3 install dacite glfw pyyaml # Ubuntu 23.04+ has apt package python3-pyglfw
+python3 setup.py build_ext --inplace
 ```
 
 You should then be able to run the program using either of the following:
@@ -152,6 +153,7 @@ brew install pyside@2
 brew link pyside@2
 brew install mpv
 pip3.10 install dacite glfw numpy pyyaml
+python3.10 setup.py build_ext --inplace
 ```
 
 Then you should be able to run the program with either:
