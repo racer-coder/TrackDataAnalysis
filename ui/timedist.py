@@ -332,7 +332,7 @@ class TimeDist(widgets.MouseHelperWidget):
                 search = self.x_axis.invert(max(ph.rect.right() + 0.5, self.graph_x)) + lap_base
                 end_idx = min(len(xa), bisect.bisect_right(xa, search) + 1)
                 xa = memoryview(np.round(self.x_axis.calc(np.subtract(xa[start_idx:end_idx], lap_base))).astype(int))
-                dv = np.round(y_axis.calc(d.values[start_idx:end_idx])).astype(int)
+                dv = np.round(y_axis.calc(np.asarray(d.values[start_idx:end_idx]))).astype(int)
                 dvd1 = dv.data
                 xa_uniqval, xa_uniqidx = np.unique(xa, return_index=True)
                 umin = np.minimum.reduceat(dv, xa_uniqidx)
