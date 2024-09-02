@@ -165,16 +165,35 @@ accum = cython.struct(
     add_helper=cython.int,
     data=vector[cython.uchar])
 
-cdef packed struct msg_hdr:
+cdef packed struct msg_hdr:  # covers G, S, and M messages
     cython.ushort op
     cython.int timecode
     cython.ushort index
     cython.ushort count # for M messages only
+    # data field(s) follow(s), size depends on type/group
+
+cdef packed struct cmsg_hdr:  # covers c messages
+    cython.ushort op
+    cython.uchar unk1 # always 0?
+    cython.ushort channel # bottom 3 bits always 4?
+    cython.uchar unk3 # always 0x84?
+    cython.uchar unk4 # always 6?
+    cython.int timecode
+    # data field follows, size depends on type
+
 ctypedef const cython.uchar* byte_ptr
 ctypedef vector[accum] vaccum
 
 cdef extern from '<numeric>' namespace 'std' nogil:
     T accumulate[InputIt, T](InputIt first, InputIt last, T init)
+
+cdef _resize_vaccum(vaccum & v, int idx):
+    if idx >= v.size():
+        old_len = v.size()
+        v.resize(idx + 1)
+        for i in range(old_len, v.size()):
+            v[i].add_helper = 1
+            v[i].last_timecode = -1
 
 @cython.wraparound(False)
 def _decode_sequence(s, progress=None):
@@ -204,11 +223,12 @@ def _decode_sequence(s, progress=None):
     ord_op_G : cython.int = ord_op + 256 * ord('G')
     ord_op_S : cython.int = ord_op + 256 * ord('S')
     ord_op_M : cython.int = ord_op + 256 * ord('M')
+    ord_op_c : cython.int = ord_op + 256 * ord('c')
     ord_lt: cython.int = ord('<')
     ord_lt_h : cython.int = ord_lt + 256 * ord('h')
     ord_gt: cython.int = ord('>')
     len_s  = len(s)
-    cdef vaccum[2] gc_data # [0]: groups [1]: channels
+    cdef vaccum[3] gc_data # [0]: G messages (groups) [1]: S messages (samples?) [2]: c messages (channels from expansion)
     time_offset = None
     last_time = None
     slow_time: cython.double = 0
@@ -254,6 +274,26 @@ def _decode_sequence(s, progress=None):
                                                          msg.timecode + msg.count * msi, ms))
                         ch.sampledata += s[oldpos+10:pos]
                     pos += 1
+                elif typ == ord_op_c:
+                    msgc = <cmsg_hdr *>&sv[pos]
+                    assert msgc.unk1 == 0, '%x' % msgc.unk1
+                    assert (msgc.channel & 7) == 4, '%x' % (msgc.channel & 7)
+                    assert msgc.unk3 == 0x84, '%x' % msgc.unk3
+                    assert msgc.unk4 == 6, '%x' % msgc.unk4
+                    data_cat = &gc_data[2]
+                    data_p = &dereference(data_cat)[msgc.channel >> 3]
+                    if data_p >= &dereference(data_cat.end()):
+                        raise IndexError
+                    pos += data_p.add_helper
+                    last = &sv[pos-1]
+                    if last[0] != ord_cp:
+                        raise ValueError("%c at %x" % (s[pos-1], pos-1))
+                    if show_all:
+                        print('tc=%d c idx=%d' % (msgc.timecode, msgc.channel >> 3))
+                    if msgc.timecode > data_p.last_timecode:
+                        data_p.last_timecode = msgc.timecode
+                        data_p.data.insert(data_p.data.end(),
+                                           <const cython.uchar *>&msgc.timecode, last)
                 elif typ == ord_lt_h:
                     htime: cython.double = time.perf_counter()
                     if pos > next_progress:
@@ -294,17 +334,14 @@ def _decode_sequence(s, progress=None):
                             channels += [None] * (m.content.index - len(channels) + 1)
                             if not channels[m.content.index]:
                                 channels[m.content.index] = m.content
-                                if m.content.index >= gc_data[1].size():
-                                    old_len = gc_data[1].size()
-                                    gc_data[1].resize(m.content.index + 1)
-                                    for i in range(old_len, gc_data[1].size()):
-                                        gc_data[1][i].add_helper = 1
-                                        gc_data[1][i].last_timecode = -1
+                                _resize_vaccum(gc_data[1], m.content.index)
                                 gc_data[1][m.content.index].add_helper = m.content.size + 9
+                                _resize_vaccum(gc_data[2], m.content.index)
+                                gc_data[2][m.content.index].add_helper = m.content.size + 12
                             else:
                                 assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
                                 assert channels[m.content.index].long_name == m.content.long_name
-                        for m in data[_tokdec('GRP')]:
+                        for m in data.get(_tokdec('GRP'), []):
                             groups += [None] * (m.content.index - len(groups) + 1)
                             groups[m.content.index] = m.content
                             idx = 6
@@ -316,12 +353,7 @@ def _decode_sequence(s, progress=None):
                                       [(ch, channels[ch].long_name, channels[ch].size)
                                        for ch in m.content.channels])
 
-                            if m.content.index >= gc_data[0].size():
-                                old_len = gc_data[0].size()
-                                gc_data[0].resize(m.content.index + 1)
-                                for i in range(old_len, gc_data[0].size()):
-                                    gc_data[0][i].add_helper = 1
-                                    gc_data[0][i].last_timecode = -1
+                            _resize_vaccum(gc_data[0], m.content.index)
                             gc_data[0][m.content.index].add_helper = 9 + sum(
                                 channels[ch].size for ch in m.content.channels)
                     elif tok == _tokdec('GRP'):
@@ -394,7 +426,9 @@ def _decode_sequence(s, progress=None):
                     assert False, "%02x%02x at %x" % (s[pos], s[pos+1], pos)
         except Exception as _err: # pylint: disable=broad-exception-caught
             if oldpos != badpos + badbytes and badbytes:
-                # print('Bad bytes(%d at %x):' % (badbytes, badpos))
+                # print('Bad bytes(%d at %x):' % (badbytes, badpos),
+                #       ', '.join('%02x' % c for c in s[badpos:badpos + badbytes])
+                #       )
                 badbytes = 0
             if not badbytes:
                 # sys.stdout.flush()
@@ -405,7 +439,9 @@ def _decode_sequence(s, progress=None):
                 pos = oldpos + 1
     t2 = time.perf_counter()
     if badbytes:
-        # print('Bad bytes(%d at %x):' % (badbytes, badpos))
+        # print('Bad bytes(%d at %x):' % (badbytes, badpos),
+        #       ', '.join('%02x' % c for c in s[badpos:badpos + badbytes])
+        #       )
         badbytes = 0
     assert pos == len(s)
     # quick scan through all the groups/channels for the first used timecode
@@ -453,18 +489,26 @@ def _decode_sequence(s, progress=None):
                                       shape=grp.timecodes.shape,
                                       strides=(gc_data[0][grp.index].add_helper-3,)).copy()
         else:
+            # check for S messages
+            view_offset = 6
+            stride_offset = 3
             data_p = &gc_data[1][c.index]
+            if not data_p.data.size():
+                # No? maybe c messages
+                view_offset = 4
+                stride_offset = 8
+                data_p = &gc_data[2][c.index]
             if data_p.data.size():
-                assert len(c.timecodes) == 0, "Can't have both S and M records for channel %s (index=%d)" % (c.long_name, c.index)
+                assert len(c.timecodes) == 0, "Can't have both S/c and M records for channel %s (index=%d)" % (c.long_name, c.index)
 
                 # TREAD LIGHTLY - raw pointers here
                 view = np.asarray(<cython.uchar[:data_p.data.size()]> &data_p.data[0])
-                rows = len(view) // (data_p.add_helper-3)
+                rows = len(view) // (data_p.add_helper - stride_offset)
 
                 tc = np.ndarray(buffer=view, dtype=np.int32,
-                                shape=(rows,), strides=(data_p.add_helper-3,)).copy()
-                samp = np.ndarray(buffer=view[6:], dtype=d.stype,
-                                  shape=(rows,), strides=(data_p.add_helper-3,)).copy()
+                                shape=(rows,), strides=(data_p.add_helper-stride_offset,)).copy()
+                samp = np.ndarray(buffer=view[view_offset:], dtype=d.stype,
+                                  shape=(rows,), strides=(data_p.add_helper-stride_offset,)).copy()
             else:
                 tc = _ndarray_from_mv(c.timecodes)
                 samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
