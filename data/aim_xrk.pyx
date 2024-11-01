@@ -597,7 +597,14 @@ def _decode_gps(msg_by_type, time_offset):
     if not gpsmsg: return []
     alldata = memoryview(b''.join(m.content for m in gpsmsg))
     assert len(alldata) % 56 == 0
-    timecodes = alldata[0:].cast('i')[::56//4]
+    timecodes = np.array(alldata[0:].cast('i')[::56//4])
+    # certain old MXP firmware (and maybe others) would periodically
+    # butcher the upper 16-bits of the timecode field.  If necessary,
+    # reconstruct it using only the bottom 16-bits and assuming time
+    # never skips ahead too far.
+    if np.any(timecodes[1:] < timecodes[:-1]):
+        timecodes = (np.array(timecodes) & 65535) + (timecodes[0] - (timecodes[0] & 65535))
+        timecodes += 65536 * np.cumsum(np.concatenate(([0], timecodes[1:] < timecodes[:-1])))
     #itow_ms = alldata[4:].cast('I')[::56//4]
     #weekN = alldata[12:].cast('H')[::56//2]
     ecefX_cm = alldata[16:].cast('i')[::56//4]
@@ -610,7 +617,7 @@ def _decode_gps(msg_by_type, time_offset):
     #velacc_cms = alldata[44:].cast('i')[::56//4]
     #nsat = alldata[51::56]
 
-    timecodes = memoryview(np.subtract(timecodes, time_offset))
+    timecodes = memoryview(timecodes - time_offset)
 
     gpsconv = gps.ecef2lla(np.divide(ecefX_cm, 100),
                            np.divide(ecefY_cm, 100),
