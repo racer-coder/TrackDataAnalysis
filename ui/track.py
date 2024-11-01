@@ -222,6 +222,8 @@ def select_track(logref):
 
     sectors = [state.Marker('Hi', lat[i + orig_index], lon[i + orig_index], type_map[typ[i - 1]])
                for i in typidx[1:-1]]
+    if not sectors:
+        return None
 
     num = 0
     for s in sectors:
