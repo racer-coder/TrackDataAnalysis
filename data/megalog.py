@@ -11,7 +11,7 @@ import numpy as np
 
 from . import base
 
-def _build_channel(timestamps, channel_data, name, units, disp, transform, scale):
+def _build_channel(timestamps, channel_data, name, units, digits, transform, scale):
     if transform != 0:
         channel_data = channel_data.astype(np.float32)
         channel_data += transform
@@ -22,7 +22,7 @@ def _build_channel(timestamps, channel_data, name, units, disp, transform, scale
                         channel_data.copy(), # reorder data to make it efficient
                         name,
                         units,
-                        disp,
+                        digits,
                         True) # interpolate
 
 def _decode(m):
@@ -73,7 +73,7 @@ def _decode(m):
     row_offset = 0
     with concurrent.futures.ThreadPoolExecutor() as worker:
         for i in range(num_fields):
-            ftype, name, units, disp, scale, transform, digits, category = struct.unpack_from(
+            ftype, name, units, style, scale, transform, digits, category = struct.unpack_from(
                 '>B34s10sBffb34s', m, 24 + i * 89)
             assert ftype < len(type_map) # XXX we don't support bit fields (10, 11, 12) among others.  Without handling the width we can't handle any more fields
             name = name.decode('utf-8').rstrip('\0')
@@ -86,7 +86,7 @@ def _decode(m):
                                       buffer=data)
             row_offset += channel_data.itemsize
             channels[name] = worker.submit(_build_channel, timestamps, channel_data, name, units,
-                                           disp, transform, scale)
+                                           digits, transform, scale)
         for n in channels.keys():
             channels[n] = channels[n].result()
 
