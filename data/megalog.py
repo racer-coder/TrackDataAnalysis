@@ -11,6 +11,8 @@ import numpy as np
 
 from . import base
 
+# https://www.efianalytics.com/TunerStudio/docs/MLG_Binary_LogFormat_2.0.pdf
+
 def _build_channel(timestamps, channel_data, name, units, digits, transform, scale):
     if transform != 0:
         channel_data = channel_data.astype(np.float32)
@@ -25,7 +27,7 @@ def _build_channel(timestamps, channel_data, name, units, digits, transform, sca
                         digits,
                         True) # interpolate
 
-def _decode(m):
+def _decode(m, progress):
     metadata = {}
     ftag, ver, ts, info_offset, data_offset, record_len, num_fields = struct.unpack_from(
         '>6sHIIIHH', m, 0)
@@ -38,6 +40,9 @@ def _decode(m):
         metadata['Log Date'] = '%02d/%02d/%d' % (tm.tm_mon, tm.tm_mday, tm.tm_year) # Yes I'm American
         metadata['Log Time'] = '%02d:%02d:%02d' % (tm.tm_hour, tm.tm_min, tm.tm_sec)
 
+    # XXX what to do with embedded info field? Throw in metadata?
+    # if info_offset and info_offset < data_offset:
+    #     print('Info found:', bytes(m[info_offset:data_offset]))
 
     # collect data
     timestamp = 0
@@ -53,6 +58,8 @@ def _decode(m):
                 timestamp += (ts16 - timestamp) & 65535
                 timestamps.append(timestamp)
                 data.append(chunk)
+                if (len(data) & 8191) == 0 and progress:
+                    progress(data_offset, len(m))
             data_offset += 5 + record_len
         elif m[data_offset] == 1:
             # handle marker
@@ -60,7 +67,6 @@ def _decode(m):
         else:
             print('unknown', m[data_offset])
             data_offset += 1 # keep looking?
-        # XXX call progress meter, maybe every 1000 or 5000 records?
     data = memoryview(b''.join(data))
 
     # convert timestamps to 32-bit ms.  Yes we lose some resolution....
@@ -95,7 +101,7 @@ def _decode(m):
 def Megalog(fname, progress):
     with open(fname, 'rb') as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
-            channels, metadata, timestamps = _decode(memoryview(m))
+            channels, metadata, timestamps = _decode(memoryview(m), progress)
 
     return base.LogFile(
         channels,
