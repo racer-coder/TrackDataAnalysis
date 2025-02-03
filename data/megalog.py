@@ -2,6 +2,7 @@
 # Copyright 2025, Scott Smith.  MIT License (see LICENSE).
 
 from array import array
+import concurrent.futures
 import mmap
 import struct
 import time
@@ -9,6 +10,20 @@ import time
 import numpy as np
 
 from . import base
+
+def _build_channel(timestamps, channel_data, name, units, disp, transform, scale):
+    if transform != 0:
+        channel_data = channel_data.astype(np.float32)
+        channel_data += transform
+    if scale != 1:
+        channel_data = channel_data.astype(np.float32)
+        channel_data *= scale
+    return base.Channel(timestamps,
+                        channel_data.copy(), # reorder data to make it efficient
+                        name,
+                        units,
+                        disp,
+                        True) # interpolate
 
 def _decode(m):
     metadata = {}
@@ -27,18 +42,17 @@ def _decode(m):
     # collect data
     timestamp = 0
     timestamps = array('Q')
-    data = bytearray()
-    record_len8 = (record_len + 7) & -8
-    pad = b'\0' * (record_len8 - record_len)
+    data = []
+    decoder = struct.Struct('>xxH')
     while data_offset + 2 < len(m):
         if m[data_offset] == 0:
             # handle data block
             chunk = m[data_offset+4:data_offset+4+record_len]
-            if m[data_offset + 4 + record_len] == (sum(chunk) & 255):
-                counter, ts16 = struct.unpack_from('>xBH', m, data_offset)
+            if m[data_offset + 4 + record_len] == (np.sum(chunk) & 255):
+                ts16, = decoder.unpack_from(m, data_offset)
                 timestamp += (ts16 - timestamp) & 65535
                 timestamps.append(timestamp)
-                data.extend(chunk.tobytes() + pad)
+                data.append(chunk)
             data_offset += 5 + record_len
         elif m[data_offset] == 1:
             # handle marker
@@ -47,7 +61,7 @@ def _decode(m):
             print('unknown', m[data_offset])
             data_offset += 1 # keep looking?
         # XXX call progress meter, maybe every 1000 or 5000 records?
-    data = memoryview(data)
+    data = memoryview(b''.join(data))
 
     # convert timestamps to 32-bit ms.  Yes we lose some resolution....
     timestamps = ((np.array(timestamps) + 50) // 100).astype(np.uint32)
@@ -57,31 +71,24 @@ def _decode(m):
     channels = {}
     type_map = 'BbHhIiqf'
     row_offset = 0
-    for i in range(num_fields):
-        ftype, name, units, disp, scale, transform, digits, category = struct.unpack_from(
-            '>B34s10sBffb34s', m, 24 + i * 89)
-        assert ftype < len(type_map) # XXX we don't support bit fields (10, 11, 12) among others.  Without handling the width we can't handle any more fields
-        name = name.decode('utf-8').rstrip('\0')
-        units = units.decode('utf-8').rstrip('\0')
-        category = category.decode('utf-8').rstrip('\0')
-        channel_data = np.ndarray(shape=timestamps.shape,
-                                  strides=(record_len8,),
-                                  dtype='>' + type_map[ftype],
-                                  offset=row_offset,
-                                  buffer=data)
-        row_offset += channel_data.itemsize
-        if transform != 0:
-            channel_data = channel_data.astype(np.float32)
-            channel_data += transform
-        if scale != 1:
-            channel_data = channel_data.astype(np.float32)
-            channel_data *= scale
-        channels[name] = base.Channel(timestamps,
-                                      channel_data.copy(), # reorder data to make it efficient
-                                      name,
-                                      units,
-                                      disp,
-                                      True) # interpolate
+    with concurrent.futures.ThreadPoolExecutor() as worker:
+        for i in range(num_fields):
+            ftype, name, units, disp, scale, transform, digits, category = struct.unpack_from(
+                '>B34s10sBffb34s', m, 24 + i * 89)
+            assert ftype < len(type_map) # XXX we don't support bit fields (10, 11, 12) among others.  Without handling the width we can't handle any more fields
+            name = name.decode('utf-8').rstrip('\0')
+            units = units.decode('utf-8').rstrip('\0')
+            category = category.decode('utf-8').rstrip('\0')
+            channel_data = np.ndarray(shape=timestamps.shape,
+                                      strides=(record_len,),
+                                      dtype='>' + type_map[ftype],
+                                      offset=row_offset,
+                                      buffer=data)
+            row_offset += channel_data.itemsize
+            channels[name] = worker.submit(_build_channel, timestamps, channel_data, name, units,
+                                           disp, transform, scale)
+        for n in channels.keys():
+            channels[n] = channels[n].result()
 
     return channels, metadata, timestamps
 
@@ -96,5 +103,3 @@ def Megalog(fname, progress):
         metadata,
         [None, None, None, None],
         fname)
-
-# Megalog('../sampledata/2025-02-02_16.09.30 angle 10.mlg', None)
