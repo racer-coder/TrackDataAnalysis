@@ -1,5 +1,5 @@
 
-# Copyright 2024, Scott Smith.  MIT License (see LICENSE).
+# Copyright 2025, Scott Smith.  MIT License (see LICENSE).
 
 import bisect
 import configparser
@@ -37,6 +37,7 @@ import data.aim_xrk
 import data.autosport_labs
 import data.ecumaster
 import data.iracing
+import data.megalog
 import data.motec
 import data.racelogic
 import data.racetech
@@ -456,7 +457,7 @@ class DataDockWidget(TempDockWidget):
         file_names = QFileDialog.getOpenFileNames(self, 'Open data file for analysis',
                                                  self.config.get('main', 'last_open_dir',
                                                                  fallback=os.getcwd()),
-                                                 'Data files (*.adulog *.ibt *.ld *.log *.run *.vbo *.xrk)')[0]
+                                                 'Data files (*.adulog *.ibt *.ld *.log *.mlg *.run *.vbo *.xrk)')[0]
         for file_name in file_names:
             if self.open_file(file_name):
                 self.config['main']['last_open_dir'] = os.path.dirname(file_name)
@@ -476,6 +477,8 @@ class DataDockWidget(TempDockWidget):
             return data.racetech.RUN
         elif file_name.lower().endswith('.vbo'):
             return data.racelogic.VBOX
+        elif file_name.lower().endswith('.mlg'):
+            return data.megalog.Megalog
         else:
             return None
 

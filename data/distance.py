@@ -1,5 +1,5 @@
 
-# Copyright 2024, Scott Smith.  MIT License (see LICENSE).
+# Copyright 2025, Scott Smith.  MIT License (see LICENSE).
 
 import bisect
 from dataclasses import dataclass
@@ -65,12 +65,10 @@ class DistanceWrapper:
         self.dist_map_time = np.array([0.]).data
         self.dist_map_dist = self.dist_map_time
 
-        if not data.laps or not data.key_channel_map[0]:
-            return
-
         self.laps = data.laps
 
-        self._update_time_dist()
+        if data.laps and data.key_channel_map[0]:
+            self._update_time_dist()
 
     def try_gps_lap_insert(self, marker, dist):
         key_channels = self.get_key_channel_map()

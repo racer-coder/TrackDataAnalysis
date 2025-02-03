@@ -52,7 +52,8 @@ Every data acquisition tool comes with their own software, so why make another t
 - Cross platform (Windows 8+, Ubuntu 22.04+, Mac Arm)
 
 - Opens AiM XRK, MoTeC LD, ECUMaster ADULOG, Autosport Lab LOG,
-  RaceLogic VBOX, Race Technology RUN, and iRacing IBT files natively.
+  RaceLogic VBOX, Race Technology RUN, MegaLogViewer MLG, and iRacing
+  IBT files natively.
 
 - Time/distance graph with overlaying channels, drag and drop channel
   support (for reordering the view), zoom in/out, pan, multiple laps
