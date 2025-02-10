@@ -215,6 +215,8 @@ def _decode_sequence(s, progress=None):
     badpos: cython.uint = 0
     xIxH_decoder = struct.Struct('<xxIxxH')
     Mms = {
+        8:   5,
+        16: 10,
         32: 20,
         64: 40,
     }
@@ -264,10 +266,11 @@ def _decode_sequence(s, progress=None):
                     data_p = &gc_data[1][msg.index]
                     pos += (data_p.add_helper - 9) * msg.count + 10
                     assert sv[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    ms = Mms[ch.unknown[64]]
+                    ms = Mms[ch.unknown[64] & 127]
                     msi: cython.uint = ms
                     if show_all:
-                        print('tc=%d M idx=%d cnt=%d' % (msg.timecode, msg.index, msg.count))
+                        print('tc=%d M idx=%d cnt=%d ms=%d' %
+                              (msg.timecode, msg.index, msg.count, ms))
                     if msg.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.timecode + (msg.count-1) * msi
                         ch.timecodes += array('i', range(msg.timecode,
@@ -499,7 +502,7 @@ def _decode_sequence(s, progress=None):
                 stride_offset = 8
                 data_p = &gc_data[2][c.index]
             if data_p.data.size():
-                assert len(c.timecodes) == 0, "Can't have both S/c and M records for channel %s (index=%d)" % (c.long_name, c.index)
+                assert len(c.timecodes) == 0, "Can't have both S/c and M records for channel %s (index=%d, %d vs %d)" % (c.long_name, c.index, len(c.timecodes), data_p.data.size())
 
                 # TREAD LIGHTLY - raw pointers here
                 view = np.asarray(<cython.uchar[:data_p.data.size()]> &data_p.data[0])
