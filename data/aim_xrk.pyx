@@ -162,8 +162,10 @@ def _tokenc(i):
 
 accum = cython.struct(
     last_timecode=cython.int,
-    add_helper=cython.int,
-    data=vector[cython.uchar])
+    add_helper=cython.ushort,
+    Mms=cython.ushort,
+    data=vector[cython.uchar],
+    timecodes=vector[cython.int])
 
 cdef packed struct msg_hdr:  # covers G, S, and M messages
     cython.ushort op
@@ -192,8 +194,9 @@ cdef _resize_vaccum(vaccum & v, int idx):
         old_len = v.size()
         v.resize(idx + 1)
         for i in range(old_len, v.size()):
-            v[i].add_helper = 1
             v[i].last_timecode = -1
+            v[i].add_helper = 1
+            v[i].Mms = 0
 
 @cython.wraparound(False)
 def _decode_sequence(s, progress=None):
@@ -215,10 +218,13 @@ def _decode_sequence(s, progress=None):
     badpos: cython.uint = 0
     xIxH_decoder = struct.Struct('<xxIxxH')
     Mms = {
-        8:   5,
-        16: 10,
-        32: 20,
-        64: 40,
+        # Not sure how to represent 500 Hz
+        8:   5, # 200 Hz
+        16: 10, # 100 Hz
+        32: 20, #  50 Hz
+        64: 40, #  25 Hz
+        80: 50, #  20 Hz
+        # I guess 10Hz, 5Hz, 2Hz, and 1Hz don't use M messages
     }
     ord_op: cython.int = ord('(')
     ord_cp: cython.int = ord(')')
@@ -230,7 +236,7 @@ def _decode_sequence(s, progress=None):
     ord_lt_h : cython.int = ord_lt + 256 * ord('h')
     ord_gt: cython.int = ord('>')
     len_s  = len(s)
-    cdef vaccum[3] gc_data # [0]: G messages (groups) [1]: S messages (samples?) [2]: c messages (channels from expansion)
+    cdef vaccum[4] gc_data # [0]: G messages (groups) [1]: S messages (samples?) [2]: c messages (channels from expansion) [3]: M messages
     time_offset = None
     last_time = None
     slow_time: cython.double = 0
@@ -238,6 +244,7 @@ def _decode_sequence(s, progress=None):
     cdef vaccum * data_cat
     cdef accum * data_p
     show_all: cython.int = 0
+    show_bad: cython.int = 0
     while pos < len_s:
         try:
             while True:
@@ -262,20 +269,25 @@ def _decode_sequence(s, progress=None):
                         data_p.data.insert(data_p.data.end(),
                                            <const cython.uchar *>&msg.timecode, last)
                 elif typ == ord_op_M:
-                    ch = channels[msg.index]
-                    data_p = &gc_data[1][msg.index]
-                    pos += (data_p.add_helper - 9) * msg.count + 10
-                    assert sv[pos] == ord_cp, "%c at %x" % (s[pos], pos)
-                    ms = Mms[ch.unknown[64] & 127]
-                    msi: cython.uint = ms
+                    data_p = &gc_data[3][msg.index]
+                    if data_p >= &dereference(gc_data[3].end()):
+                        raise IndexError
+                    if data_p.Mms == 0:
+                        raise ValueError('No ms understood for channel %s' %
+                                         channels[msg.index].long_name)
+                    pos += data_p.add_helper * msg.count + 10
+                    if sv[pos] != ord_cp:
+                        raise ValueError("%c at %x" % (s[pos], pos))
                     if show_all:
                         print('tc=%d M idx=%d cnt=%d ms=%d' %
-                              (msg.timecode, msg.index, msg.count, ms))
+                              (msg.timecode, msg.index, msg.count, data_p.Mms))
                     if msg.timecode > data_p.last_timecode:
-                        data_p.last_timecode = msg.timecode + (msg.count-1) * msi
-                        ch.timecodes += array('i', range(msg.timecode,
-                                                         msg.timecode + msg.count * msi, ms))
-                        ch.sampledata += s[oldpos+10:pos]
+                        data_p.last_timecode = msg.timecode + (msg.count-1) * data_p.Mms
+                        m_tc : cython.int
+                        for m_tc in range(msg.count):
+                            data_p.timecodes.push_back(msg.timecode + m_tc * data_p.Mms)
+                        data_p.data.insert(data_p.data.end(),
+                                           &sv[oldpos+10], &sv[pos])
                     pos += 1
                 elif typ == ord_op_c:
                     msgc = <cmsg_hdr *>&sv[pos]
@@ -341,6 +353,10 @@ def _decode_sequence(s, progress=None):
                                 gc_data[1][m.content.index].add_helper = m.content.size + 9
                                 _resize_vaccum(gc_data[2], m.content.index)
                                 gc_data[2][m.content.index].add_helper = m.content.size + 12
+                                _resize_vaccum(gc_data[3], m.content.index)
+                                gc_data[3][m.content.index].add_helper = m.content.size
+                                gc_data[3][m.content.index].Mms = Mms.get(
+                                    m.content.unknown[64] & 127, 0)
                             else:
                                 assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
                                 assert channels[m.content.index].long_name == m.content.long_name
@@ -429,22 +445,25 @@ def _decode_sequence(s, progress=None):
                     assert False, "%02x%02x at %x" % (s[pos], s[pos+1], pos)
         except Exception as _err: # pylint: disable=broad-exception-caught
             if oldpos != badpos + badbytes and badbytes:
-                # print('Bad bytes(%d at %x):' % (badbytes, badpos),
-                #       ', '.join('%02x' % c for c in s[badpos:badpos + badbytes])
-                #       )
+                if show_bad:
+                    print('Bad bytes(%d at %x):' % (badbytes, badpos),
+                          ', '.join('%02x' % c for c in s[badpos:badpos + badbytes])
+                          )
                 badbytes = 0
             if not badbytes:
-                # sys.stdout.flush()
-                # traceback.print_exc()
+                if show_bad:
+                    sys.stdout.flush()
+                    traceback.print_exc()
                 badpos = oldpos # pylint: disable=unused-variable
             if oldpos < len_s:
                 badbytes += 1
                 pos = oldpos + 1
     t2 = time.perf_counter()
     if badbytes:
-        # print('Bad bytes(%d at %x):' % (badbytes, badpos),
-        #       ', '.join('%02x' % c for c in s[badpos:badpos + badbytes])
-        #       )
+        if show_bad:
+            print('Bad bytes(%d at %x):' % (badbytes, badpos),
+                  ', '.join('%02x' % c for c in s[badpos:badpos + badbytes])
+                  )
         badbytes = 0
     assert pos == len(s)
     # quick scan through all the groups/channels for the first used timecode
@@ -513,8 +532,16 @@ def _decode_sequence(s, progress=None):
                 samp = np.ndarray(buffer=view[view_offset:], dtype=d.stype,
                                   shape=(rows,), strides=(data_p.add_helper-stride_offset,)).copy()
             else:
-                tc = _ndarray_from_mv(c.timecodes)
-                samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
+                data_p = &gc_data[3][c.index] # M messages
+                if data_p.timecodes.size():
+                    tc = np.asarray(<cython.int[:data_p.timecodes.size()]>
+                                    &data_p.timecodes[0]).copy()
+                    samp = np.ndarray(buffer=np.asarray(<cython.uchar[:data_p.data.size()]>
+                                                        &data_p.data[0]),
+                                      dtype=d.stype, shape=tc.shape).copy()
+                else:
+                    tc = _ndarray_from_mv(c.timecodes)
+                    samp = _ndarray_from_mv(memoryview(c.sampledata).cast(d.stype))
             c.timecodes = (tc - time_offset).data
             c.sampledata = samp.data
 
