@@ -167,7 +167,7 @@ accum = cython.struct(
     data=vector[cython.uchar],
     timecodes=vector[cython.int])
 
-cdef packed struct msg_hdr:  # covers G, S, and M messages
+cdef packed struct smsg_hdr:  # covers G, S, and M messages
     cython.ushort op
     cython.int timecode
     cython.ushort index
@@ -182,6 +182,24 @@ cdef packed struct cmsg_hdr:  # covers c messages
     cython.uchar unk4 # always 6?
     cython.int timecode
     # data field follows, size depends on type
+
+cdef packed struct hmsg_hdr:
+    cython.ushort op
+    cython.uint tok
+    cython.int hlen
+    cython.uchar ver
+    cython.uchar cl
+
+cdef packed struct hmsg_ftr:
+    cython.uchar op
+    cython.uint tok
+    cython.ushort bytesum
+    cython.uchar cl
+
+cdef union msg_hdr:
+    smsg_hdr s
+    cmsg_hdr c
+    hmsg_hdr h
 
 ctypedef const cython.uchar* byte_ptr
 ctypedef vector[accum] vaccum
@@ -198,13 +216,19 @@ cdef _resize_vaccum(vaccum & v, int idx):
             v[i].add_helper = 1
             v[i].Mms = 0
 
+cdef _Mms_lookup(int k):
+    # Not sure how to represent 500 Hz
+    if k == 8:  return 5  # 200 Hz
+    if k == 16: return 10 # 100 Hz
+    if k == 32: return 20 #  50 Hz
+    if k == 64: return 40 #  25 Hz
+    if k == 80: return 50 #  20 Hz
+    # I guess 10Hz, 5Hz, 2Hz, and 1Hz don't use M messages
+    return 0
+
 @cython.wraparound(False)
 def _decode_sequence(s, progress=None):
     cdef const cython.uchar[::1] sv = s
-    cdef const cython.ushort[:] sv2 = np.ndarray(buffer=s, dtype=np.uint16,
-                                                 shape=(len(s)-1,), strides=(1,))
-    cdef const cython.uint[:] sv4 = np.ndarray(buffer=s, dtype=np.uint32,
-                                               shape=(len(s)-3,), strides=(1,))
     groups = []
     channels = []
     messages = {}
@@ -216,16 +240,6 @@ def _decode_sequence(s, progress=None):
     oldpos: cython.uint = pos
     badbytes: cython.uint = 0
     badpos: cython.uint = 0
-    xIxH_decoder = struct.Struct('<xxIxxH')
-    Mms = {
-        # Not sure how to represent 500 Hz
-        8:   5, # 200 Hz
-        16: 10, # 100 Hz
-        32: 20, #  50 Hz
-        64: 40, #  25 Hz
-        80: 50, #  20 Hz
-        # I guess 10Hz, 5Hz, 2Hz, and 1Hz don't use M messages
-    }
     ord_op: cython.int = ord('(')
     ord_cp: cython.int = ord(')')
     ord_op_G : cython.int = ord_op + 256 * ord('G')
@@ -235,14 +249,14 @@ def _decode_sequence(s, progress=None):
     ord_lt: cython.int = ord('<')
     ord_lt_h : cython.int = ord_lt + 256 * ord('h')
     ord_gt: cython.int = ord('>')
-    len_s  = len(s)
+    len_s = len(s)
     cdef vaccum[4] gc_data # [0]: G messages (groups) [1]: S messages (samples?) [2]: c messages (channels from expansion) [3]: M messages
     time_offset = None
     last_time = None
-    slow_time: cython.double = 0
     t1 = time.perf_counter()
     cdef vaccum * data_cat
     cdef accum * data_p
+    gpsmsg: vector[cython.uchar]
     show_all: cython.int = 0
     show_bad: cython.int = 0
     while pos < len_s:
@@ -252,10 +266,10 @@ def _decode_sequence(s, progress=None):
                 if pos + 10 >= len_s: # smallest message is 3 (frame) + 4 (tc) + 2 (idx) + 1 (data)
                     raise IndexError
                 msg = <msg_hdr *>&sv[pos]
-                typ: cython.int = msg.op
+                typ: cython.int = msg.s.op
                 if abs(typ - (ord_op_G + ord_op_S) // 2) == (ord_op_S - ord_op_G) // 2:
                     data_cat = &gc_data[typ == ord_op_S]
-                    data_p = &dereference(data_cat)[msg.index]
+                    data_p = &dereference(data_cat)[msg.s.index]
                     if data_p >= &dereference(data_cat.end()):
                         raise IndexError
                     pos += data_p.add_helper
@@ -263,40 +277,39 @@ def _decode_sequence(s, progress=None):
                     if last[0] != ord_cp:
                         raise ValueError("%c at %x" % (s[pos-1], pos-1))
                     if show_all:
-                        print('tc=%d %c idx=%d' % (msg.timecode, msg.op >> 8, msg.index))
-                    if msg.timecode > data_p.last_timecode:
-                        data_p.last_timecode = msg.timecode
+                        print('tc=%d %c idx=%d' % (msg.s.timecode, msg.s.op >> 8, msg.s.index))
+                    if msg.s.timecode > data_p.last_timecode:
+                        data_p.last_timecode = msg.s.timecode
                         data_p.data.insert(data_p.data.end(),
-                                           <const cython.uchar *>&msg.timecode, last)
+                                           <const cython.uchar *>&msg.s.timecode, last)
                 elif typ == ord_op_M:
-                    data_p = &gc_data[3][msg.index]
+                    data_p = &gc_data[3][msg.s.index]
                     if data_p >= &dereference(gc_data[3].end()):
                         raise IndexError
                     if data_p.Mms == 0:
                         raise ValueError('No ms understood for channel %s' %
-                                         channels[msg.index].long_name)
-                    pos += data_p.add_helper * msg.count + 10
+                                         channels[msg.s.index].long_name)
+                    pos += data_p.add_helper * msg.s.count + 10
                     if sv[pos] != ord_cp:
                         raise ValueError("%c at %x" % (s[pos], pos))
                     if show_all:
                         print('tc=%d M idx=%d cnt=%d ms=%d' %
-                              (msg.timecode, msg.index, msg.count, data_p.Mms))
-                    if msg.timecode > data_p.last_timecode:
-                        data_p.last_timecode = msg.timecode + (msg.count-1) * data_p.Mms
+                              (msg.s.timecode, msg.s.index, msg.s.count, data_p.Mms))
+                    if msg.s.timecode > data_p.last_timecode:
+                        data_p.last_timecode = msg.s.timecode + (msg.s.count-1) * data_p.Mms
                         m_tc : cython.int
-                        for m_tc in range(msg.count):
-                            data_p.timecodes.push_back(msg.timecode + m_tc * data_p.Mms)
+                        for m_tc in range(msg.s.count):
+                            data_p.timecodes.push_back(msg.s.timecode + m_tc * data_p.Mms)
                         data_p.data.insert(data_p.data.end(),
                                            &sv[oldpos+10], &sv[pos])
                     pos += 1
                 elif typ == ord_op_c:
-                    msgc = <cmsg_hdr *>&sv[pos]
-                    assert msgc.unk1 == 0, '%x' % msgc.unk1
-                    assert (msgc.channel & 7) == 4, '%x' % (msgc.channel & 7)
-                    assert msgc.unk3 == 0x84, '%x' % msgc.unk3
-                    assert msgc.unk4 == 6, '%x' % msgc.unk4
+                    assert msg.c.unk1 == 0, '%x' % msg.c.unk1
+                    assert (msg.c.channel & 7) == 4, '%x' % (msg.c.channel & 7)
+                    assert msg.c.unk3 == 0x84, '%x' % msg.c.unk3
+                    assert msg.c.unk4 == 6, '%x' % msg.c.unk4
                     data_cat = &gc_data[2]
-                    data_p = &dereference(data_cat)[msgc.channel >> 3]
+                    data_p = &dereference(data_cat)[msg.c.channel >> 3]
                     if data_p >= &dereference(data_cat.end()):
                         raise IndexError
                     pos += data_p.add_helper
@@ -304,143 +317,144 @@ def _decode_sequence(s, progress=None):
                     if last[0] != ord_cp:
                         raise ValueError("%c at %x" % (s[pos-1], pos-1))
                     if show_all:
-                        print('tc=%d c idx=%d' % (msgc.timecode, msgc.channel >> 3))
-                    if msgc.timecode > data_p.last_timecode:
-                        data_p.last_timecode = msgc.timecode
+                        print('tc=%d c idx=%d' % (msg.c.timecode, msg.c.channel >> 3))
+                    if msg.c.timecode > data_p.last_timecode:
+                        data_p.last_timecode = msg.c.timecode
                         data_p.data.insert(data_p.data.end(),
-                                           <const cython.uchar *>&msgc.timecode, last)
+                                           <const cython.uchar *>&msg.c.timecode, last)
                 elif typ == ord_lt_h:
-                    htime: cython.double = time.perf_counter()
                     if pos > next_progress:
                         next_progress += progress_interval
                         if progress:
                             progress(pos, len(s))
-                    tok: cython.uint = msg.timecode
-                    pos += 6
-                    hlen: cython.uint = sv4[pos]
+                    tok: cython.uint = msg.h.tok
+                    hlen: cython.uint = msg.h.hlen
                     if hlen >= len_s:
                         raise IndexError
-                    pos += 6
-                    ver = sv[pos-2]
-                    assert sv[pos-1] == ord_gt, "%c at %x" % (s[pos-1], pos-1)
+                    ver = msg.h.ver
+                    assert msg.h.cl == ord_gt, "%c at %x" % (msg.h.cl, pos+11)
+                    pos += 12
 
                     # get some "free" range checking here before we go walking data[]
                     assert sv[pos+hlen] == ord_lt, "%s at %x" % (s[pos+hlen], pos+hlen)
 
-                    data = s[pos:pos + hlen]
                     bytesum: cython.ushort = accumulate[byte_ptr, cython.int](
                         &sv[pos], &sv[pos+hlen], 0)
                     pos += hlen
 
-                    assert sv4[pos+1] == sv4[oldpos+2], "%s vs %s at %x" % (s[pos+1:pos+5], tok, pos+1)
-                    assert sv2[pos+5] == bytesum, '%x vs %x at %x' % (sv[pos+5] + 256*sv[pos+6], bytesum, pos+5)
-                    assert sv[pos+7] == ord_gt, "%c at %x" % (s[pos+7], pos+7)
+                    msgf = <hmsg_ftr *>&sv[pos]
+
+                    assert msgf.tok == tok, "%x vs %x at %x" % (msgf.tok, tok, pos+1)
+                    assert msgf.bytesum == bytesum, '%x vs %x at %x' % (msgf.bytesum, bytesum, pos+5)
+                    assert msgf.cl == ord_gt, "%c at %x" % (msgf.cl, pos+7)
                     pos += 8
 
                     if (tok >> 24) == 32:
                         tok -= 32 << 24 # rstrip(' ')
 
                     if tok == tok_GPS or tok == tok_GPS1:
-                        pass # fast path common case
-                    elif tok == _tokdec('CNF'):
-                        data = _decode_sequence(data).messages
-                        #channels = {} # Replays don't necessarily contain all the original channels
-                        for m in data[_tokdec('CHS')]:
-                            channels += [None] * (m.content.index - len(channels) + 1)
-                            if not channels[m.content.index]:
-                                channels[m.content.index] = m.content
-                                _resize_vaccum(gc_data[1], m.content.index)
-                                gc_data[1][m.content.index].add_helper = m.content.size + 9
-                                _resize_vaccum(gc_data[2], m.content.index)
-                                gc_data[2][m.content.index].add_helper = m.content.size + 12
-                                _resize_vaccum(gc_data[3], m.content.index)
-                                gc_data[3][m.content.index].add_helper = m.content.size
-                                gc_data[3][m.content.index].Mms = Mms.get(
-                                    m.content.unknown[64] & 127, 0)
-                            else:
-                                assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
-                                assert channels[m.content.index].long_name == m.content.long_name
-                        for m in data.get(_tokdec('GRP'), []):
-                            groups += [None] * (m.content.index - len(groups) + 1)
-                            groups[m.content.index] = m.content
-                            idx = 6
-                            for ch in m.content.channels:
-                                channels[ch].group = GroupRef(m.content, idx)
-                                idx += channels[ch].size
-                            if show_all:
-                                print('GROUP', m.content.index,
-                                      [(ch, channels[ch].long_name, channels[ch].size)
-                                       for ch in m.content.channels])
+                        # fast path common case
+                        gpsmsg.insert(gpsmsg.end(), &sv[oldpos+12], &sv[pos-8])
+                    else:
+                        data = s[oldpos + 12 : pos - 8]
+                        if tok == _tokdec('CNF'):
+                            data = _decode_sequence(data).messages
+                            #channels = {} # Replays don't necessarily contain all the original channels
+                            for m in data[_tokdec('CHS')]:
+                                channels += [None] * (m.content.index - len(channels) + 1)
+                                if not channels[m.content.index]:
+                                    channels[m.content.index] = m.content
+                                    _resize_vaccum(gc_data[1], m.content.index)
+                                    gc_data[1][m.content.index].add_helper = m.content.size + 9
+                                    _resize_vaccum(gc_data[2], m.content.index)
+                                    gc_data[2][m.content.index].add_helper = m.content.size + 12
+                                    _resize_vaccum(gc_data[3], m.content.index)
+                                    gc_data[3][m.content.index].add_helper = m.content.size
+                                    gc_data[3][m.content.index].Mms = _Mms_lookup(
+                                        m.content.unknown[64] & 127)
+                                else:
+                                    assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
+                                    assert channels[m.content.index].long_name == m.content.long_name
+                            for m in data.get(_tokdec('GRP'), []):
+                                groups += [None] * (m.content.index - len(groups) + 1)
+                                groups[m.content.index] = m.content
+                                idx = 6
+                                for ch in m.content.channels:
+                                    channels[ch].group = GroupRef(m.content, idx)
+                                    idx += channels[ch].size
+                                if show_all:
+                                    print('GROUP', m.content.index,
+                                          [(ch, channels[ch].long_name, channels[ch].size)
+                                           for ch in m.content.channels])
 
-                            _resize_vaccum(gc_data[0], m.content.index)
-                            gc_data[0][m.content.index].add_helper = 9 + sum(
-                                channels[ch].size for ch in m.content.channels)
-                    elif tok == _tokdec('GRP'):
-                        data = memoryview(data).cast('H')
-                        assert data[1] == len(data[2:])
-                        data = Group(index = data[0], channels = data[2:])
-                    elif tok == _tokdec('CDE'):
-                        data = ['%02x' % x for x in data]
-                    elif tok == _tokdec('CHS'):
-                        dcopy = bytearray(data) # copy
-                        data = Channel()
-                        (data.index,
-                         data.short_name,
-                         data.long_name,
-                         data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
+                                _resize_vaccum(gc_data[0], m.content.index)
+                                gc_data[0][m.content.index].add_helper = 9 + sum(
+                                    channels[ch].size for ch in m.content.channels)
+                        elif tok == _tokdec('GRP'):
+                            data = memoryview(data).cast('H')
+                            assert data[1] == len(data[2:])
+                            data = Group(index = data[0], channels = data[2:])
+                        elif tok == _tokdec('CDE'):
+                            data = ['%02x' % x for x in data]
+                        elif tok == _tokdec('CHS'):
+                            dcopy = bytearray(data) # copy
+                            data = Channel()
+                            (data.index,
+                             data.short_name,
+                             data.long_name,
+                             data.size) = struct.unpack('<H22x8s24s16xB39x', dcopy)
+                            try:
+                                data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
+                            except KeyError:
+                                print('Unknown units[%d] for %s' %
+                                      (dcopy[12] & 127, data.long_name))
+                                data.units = ''
+                                data.dec_pts = 0
+
+                            # [12] maybe type (lower bits) combined with scale or ??
+                            # [13] decoder of some type?
+                            # [20] possibly how to decode bytes
+                            # [64] data rate.  32=50Hz, 64=25Hz, 80=20Hz, 160=10Hz.  What about 5Hz, 2Hz, 1Hz?
+                            # [84] decoder of some type?
+                            dcopy[0:2] = [0] * 2 # reset index
+                            dcopy[24:32] = [0] * 8 # short name
+                            dcopy[32:56] = [0] * 24 # long name
+                            data.unknown = bytes(dcopy)
+                            data.short_name = _nullterm_string(data.short_name)
+                            data.long_name = _nullterm_string(data.long_name)
+                            data.timecodes = array('i')
+                            data.sampledata = bytearray()
+                        elif tok == _tokdec('LAP'):
+                            # cache first time offset for use later
+                            duration, end_time = struct.unpack('4xI8xI', data)
+                            if time_offset is None:
+                                time_offset = end_time - duration
+                            last_time = end_time
+                        elif tok in (_tokdec('RCR'), _tokdec('VEH'), _tokdec('CMP'), _tokdec('VTY'), _tokdec('NDV'), _tokdec('TMD'), _tokdec('TMT'),
+                                     _tokdec('DBUN'), _tokdec('DBUT'), _tokdec('DVER'), _tokdec('MANL'), _tokdec('MODL'), _tokdec('MANI'),
+                                     _tokdec('MODI'), _tokdec('HWNF'), _tokdec('PDLT'), _tokdec('NTE')):
+                            data = _nullterm_string(data)
+                        elif tok == _tokdec('ENF'):
+                            data = _decode_sequence(data).messages
+                        elif tok == _tokdec('TRK'):
+                            data = {'name': _nullterm_string(data[:32]),
+                                    'sf_lat': memoryview(data).cast('i')[9] / 1e7,
+                                    'sf_long': memoryview(data).cast('i')[10] / 1e7}
+                        elif tok == _tokdec('ODO'):
+                            # not sure how to map fuel.
+                            # Fuel Used channel claims 8.56l used (2046.0-2037.4)
+                            # Fuel Used odo says 70689.
+                            data = {_nullterm_string(data[i:i+16]):
+                                    {'time': memoryview(data[i+16:i+24]).cast('I')[0], # seconds
+                                     'dist': memoryview(data[i+16:i+24]).cast('I')[1]} # meters
+                                    for i in range(0, len(data), 64)
+                                    # not sure how to parse fuel, doesn't match any expected units
+                                    if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
+
                         try:
-                            data.units, data.dec_pts = _unit_map[dcopy[12] & 127]
+                            messages[tok].append(Message(tok, ver, data))
                         except KeyError:
-                            print('Unknown units[%d] for %s' %
-                                  (dcopy[12] & 127, data.long_name))
-                            data.units = ''
-                            data.dec_pts = 0
-
-                        # [12] maybe type (lower bits) combined with scale or ??
-                        # [13] decoder of some type?
-                        # [20] possibly how to decode bytes
-                        # [64] data rate.  32=50Hz, 64=25Hz, 80=20Hz, 160=10Hz.  What about 5Hz, 2Hz, 1Hz?
-                        # [84] decoder of some type?
-                        dcopy[0:2] = [0] * 2 # reset index
-                        dcopy[24:32] = [0] * 8 # short name
-                        dcopy[32:56] = [0] * 24 # long name
-                        data.unknown = bytes(dcopy)
-                        data.short_name = _nullterm_string(data.short_name)
-                        data.long_name = _nullterm_string(data.long_name)
-                        data.timecodes = array('i')
-                        data.sampledata = bytearray()
-                    elif tok == _tokdec('LAP'):
-                        # cache first time offset for use later
-                        duration, end_time = struct.unpack('4xI8xI', data)
-                        if time_offset is None:
-                            time_offset = end_time - duration
-                        last_time = end_time
-                    elif tok in (_tokdec('RCR'), _tokdec('VEH'), _tokdec('CMP'), _tokdec('VTY'), _tokdec('NDV'), _tokdec('TMD'), _tokdec('TMT'),
-                                 _tokdec('DBUN'), _tokdec('DBUT'), _tokdec('DVER'), _tokdec('MANL'), _tokdec('MODL'), _tokdec('MANI'),
-                                 _tokdec('MODI'), _tokdec('HWNF'), _tokdec('PDLT'), _tokdec('NTE')):
-                        data = _nullterm_string(data)
-                    elif tok == _tokdec('ENF'):
-                        data = _decode_sequence(data).messages
-                    elif tok == _tokdec('TRK'):
-                        data = {'name': _nullterm_string(data[:32]),
-                                'sf_lat': memoryview(data).cast('i')[9] / 1e7,
-                                'sf_long': memoryview(data).cast('i')[10] / 1e7}
-                    elif tok == _tokdec('ODO'):
-                        # not sure how to map fuel.
-                        # Fuel Used channel claims 8.56l used (2046.0-2037.4)
-                        # Fuel Used odo says 70689.
-                        data = {_nullterm_string(data[i:i+16]):
-                                {'time': memoryview(data[i+16:i+24]).cast('I')[0], # seconds
-                                 'dist': memoryview(data[i+16:i+24]).cast('I')[1]} # meters
-                                for i in range(0, len(data), 64)
-                                # not sure how to parse fuel, doesn't match any expected units
-                                if not _nullterm_string(data[i:i+16]).startswith('Fuel')}
-
-                    try:
-                        messages[tok].append(Message(tok, ver, data))
-                    except KeyError:
-                        messages[tok] = [Message(tok, ver, data)]
-                    slow_time += time.perf_counter() - htime
+                            messages[tok] = [Message(tok, ver, data)]
                 else:
                     assert False, "%02x%02x at %x" % (s[pos], s[pos+1], pos)
         except Exception as _err: # pylint: disable=broad-exception-caught
@@ -552,11 +566,12 @@ def _decode_sequence(s, progress=None):
 
     laps = None
     if not channels:
-        t4 =time.perf_counter()
+        t4 = time.perf_counter()
         pass # nothing to do
     elif progress:
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(2, os.cpu_count())) as worker:
-            bg_work = worker.submit(_bg_gps_laps, messages, time_offset, last_time)
+            bg_work = worker.submit(_bg_gps_laps, <cython.uchar[:gpsmsg.size()]> &gpsmsg[0],
+                                    messages, time_offset, last_time)
             group_work = worker.map(process_group, [x for x in groups if x])
             channel_work = worker.map(process_channel,
                                       [x for x in channels if x and not x.group])
@@ -573,12 +588,13 @@ def _decode_sequence(s, progress=None):
         for c in channels:
             if c and not c.group: process_channel(c)
         t4 = time.perf_counter()
-        gps_ch, laps = _bg_gps_laps(messages, time_offset, last_time)
+        gps_ch, laps = _bg_gps_laps(<cython.uchar[:gpsmsg.size()]> &gpsmsg[0],
+                                    messages, time_offset, last_time)
         channels.extend(gps_ch)
 
     t3 = time.perf_counter()
     if t3-t1 > 0.1:
-        print('division: scan=%f (slowtime=%f), gps=%f, group/ch=%f more' % (t2-t1, slow_time, t4-t2, t3-t4))
+        print('division: scan=%f, gps=%f, group/ch=%f more' % (t2-t1, t4-t2, t3-t4))
 
     return DataStream(
         channels={ch.long_name: ch for ch in channels
@@ -611,8 +627,8 @@ def _get_metadata(msg_by_type):
                                                           stats['time'] % 60)
     return ret
 
-def _bg_gps_laps(msg_by_type, time_offset, last_time):
-    channels = _decode_gps(msg_by_type, time_offset)
+def _bg_gps_laps(gpsmsg, msg_by_type, time_offset, last_time):
+    channels = _decode_gps(gpsmsg, time_offset)
     lat_ch = None
     lon_ch = None
     for ch in channels:
@@ -621,19 +637,17 @@ def _bg_gps_laps(msg_by_type, time_offset, last_time):
     laps = _get_laps(lat_ch, lon_ch, msg_by_type, time_offset, last_time)
     return channels, laps
 
-def _decode_gps(msg_by_type, time_offset):
-    # look for either GPS or GPS1 messages
-    gpsmsg = msg_by_type.get(_tokdec('GPS'), msg_by_type.get(_tokdec('GPS1'), None))
+def _decode_gps(gpsmsg, time_offset):
     if not gpsmsg: return []
-    alldata = memoryview(b''.join(m.content for m in gpsmsg))
+    alldata = memoryview(gpsmsg)
     assert len(alldata) % 56 == 0
-    timecodes = np.array(alldata[0:].cast('i')[::56//4])
+    timecodes = np.asarray(alldata[0:].cast('i')[::56//4])
     # certain old MXP firmware (and maybe others) would periodically
     # butcher the upper 16-bits of the timecode field.  If necessary,
     # reconstruct it using only the bottom 16-bits and assuming time
     # never skips ahead too far.
     if np.any(timecodes[1:] < timecodes[:-1]):
-        timecodes = (np.array(timecodes) & 65535) + (timecodes[0] - (timecodes[0] & 65535))
+        timecodes = (timecodes & 65535) + (timecodes[0] - (timecodes[0] & 65535))
         timecodes += 65536 * np.cumsum(np.concatenate(([0], timecodes[1:] < timecodes[:-1])))
     #itow_ms = alldata[4:].cast('I')[::56//4]
     #weekN = alldata[12:].cast('H')[::56//2]
