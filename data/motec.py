@@ -29,23 +29,25 @@ def _decode_channel(s, addr):
     (data_addr, data_count, elem_type, elem_size, sample_rate,
      offset, mul, scale, dec_pts) = struct.unpack_from('<IIxxHHHHHHh', s, addr + 8)
 
+    name = _dec_str(s, addr+32, 32)
+
     # cast the data into the right datatype
     data = s[data_addr : data_addr + elem_size * data_count]
     if elem_type in (0, 3, 5):
         if elem_size == 2: data = data.cast('h')
         elif elem_size == 4: data = data.cast('i')
-        else: raise TypeError
+        else: raise ValueError('%s: Integer channel size is unexpectedly %d' % (name, elem_size))
     elif elem_type == 7:
         if elem_size == 4: data = data.cast('f')
-        else: raise TypeError
-    else: raise TypeError
+        else: raise ValueError('%s: Float channel size is unexpectedly %d' % (name, elem_size))
+    else: raise ValueError('%s: Unknown element type %d' % (name, elem_type))
 
     units = _dec_str(s, addr+72, 12)
 
     return base.Channel((np.arange(0, data_count) * (1000 / sample_rate)).data,
                         (np.multiply(data, mul / (scale * 10 ** dec_pts)) + offset).data,
                         dec_pts=max(dec_pts, 0),
-                        name=_dec_str(s, addr+32, 32),
+                        name=name,
                         #_dec_str(s, addr+64, 8),
                         units=units,
                         interpolate=units not in ('s', '')) # best guess
@@ -61,7 +63,7 @@ def _decode(s):
     metadata['Device Serial'] = _dec_u32(s, 70)
     metadata['Device Type'] = _dec_str(s, 74, 8)
     metadata['Device Version'] = '%.2f' % (_dec_u16(s, 82) / 100)
-    num_channels = _dec_u32(s, 86)
+    num_channels = _dec_u16(s, 86)
     metadata['Log Date'] = _dec_str(s, 94, 16)
     metadata['Log Time'] = _dec_str(s, 126, 16)
     metadata['Driver'] = _dec_str(s, 158, 64)
@@ -106,26 +108,28 @@ def MOTEC(fname, progress):
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as m:
             data, metadata = _decode(memoryview(m))
     laps = [0]
-    seq_start_tc = None
-    for tc, v in zip(data['Beacon'].timecodes, data['Beacon'].values):
-        if seq_start_tc is None:
-            if v < 0:
-                seq_start_tc = tc
-        else:
-            if v >= 16384:
-                last_val = int(v)
-            elif v >= 0:
-                if v == 100 or v == 2: # but not 56?
-                    last_val &= 16383
-                    if last_val >= 8192:
-                        last_val -= 16384
-                    laps.append(seq_start_tc - 1000 + last_val)
-                seq_start_tc = None
+    if 'Beacon' in data:
+        seq_start_tc = None
+        for tc, v in zip(data['Beacon'].timecodes, data['Beacon'].values):
+            if seq_start_tc is None:
+                if v < 0:
+                    seq_start_tc = tc
+            else:
+                if v >= 16384:
+                    last_val = int(v)
+                elif v >= 0:
+                    if v == 100 or v == 2: # but not 56?
+                        last_val &= 16383
+                        if last_val >= 8192:
+                            last_val -= 16384
+                        laps.append(seq_start_tc - 1000 + last_val)
+                    seq_start_tc = None
     laps.append(max(np.max(d.timecodes) for d in data.values()))
     laps = [int(l) for l in laps]
 
     return base.LogFile(data,
                         [base.Lap(l, s, e) for l, (s, e) in enumerate(zip(laps[:-1], laps[1:]))],
                         metadata,
-                        ['Ground Speed', 'GPS Latitude', 'GPS Longitude', 'Altitude'],
+                        [k if k in data else None
+                         for k in ('Ground Speed', 'GPS Latitude', 'GPS Longitude', 'Altitude')],
                         fname)
