@@ -259,6 +259,8 @@ def _decode_sequence(s, progress=None):
     cdef vaccum * data_cat
     cdef accum * data_p
     gpsmsg: vector[cython.uchar]
+    last_gps_timecode: cython.int = -1
+    current_timecode: cython.int = -1 # approximation for last message's timecode.  Used to correct GPS timecodes on MXP
     show_all: cython.int = 0
     show_bad: cython.int = 0
     while pos < len_s:
@@ -282,6 +284,7 @@ def _decode_sequence(s, progress=None):
                         print('tc=%d %c idx=%d' % (msg.s.timecode, msg.s.op >> 8, msg.s.index))
                     if msg.s.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.s.timecode
+                        current_timecode = msg.s.timecode
                         data_p.data.insert(data_p.data.end(),
                                            <const cython.uchar *>&msg.s.timecode, last)
                 elif typ == ord_op_M:
@@ -299,6 +302,7 @@ def _decode_sequence(s, progress=None):
                               (msg.s.timecode, msg.s.index, msg.s.count, data_p.Mms))
                     if msg.s.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.s.timecode + (msg.s.count-1) * data_p.Mms
+                        current_timecode = msg.s.timecode
                         m_tc : cython.int
                         for m_tc in range(msg.s.count):
                             data_p.timecodes.push_back(msg.s.timecode + m_tc * data_p.Mms)
@@ -322,6 +326,7 @@ def _decode_sequence(s, progress=None):
                         print('tc=%d c idx=%d' % (msg.c.timecode, msg.c.channel >> 3))
                     if msg.c.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.c.timecode
+                        current_timecode = msg.c.timecode
                         data_p.data.insert(data_p.data.end(),
                                            <const cython.uchar *>&msg.c.timecode, last)
                 elif typ == ord_lt_h:
@@ -355,8 +360,26 @@ def _decode_sequence(s, progress=None):
                         tok -= 32 << 24 # rstrip(' ')
 
                     if tok == tok_GPS or tok == tok_GPS1:
-                        # fast path common case
-                        gpsmsg.insert(gpsmsg.end(), &sv[oldpos+12], &sv[pos-8])
+                        # fast path common GPS messages
+
+                        # certain old MXP firmware (and maybe others) would periodically butcher
+                        # the upper 16-bits of the timecode field.  Assume that the GPS timecode
+                        # is relatively close to current_timecode and use it to correct.
+                        gps_tc: cython.int = dereference(<const cython.int *>&sv[oldpos+12])
+                        if current_timecode != -1:
+                            mask: cython.int = 0xFFFFC000
+                            tc_delta: cython.short = (gps_tc & mask) - (current_timecode & mask)
+                            new_tc: cython.int = (current_timecode & mask) + tc_delta + (gps_tc & ~mask)
+                            if show_bad and new_tc != gps_tc:
+                                print("revised GPS: %x %x %x" % (gps_tc, new_tc, current_timecode))
+                            gps_tc = new_tc
+                        if gps_tc > last_gps_timecode:
+                            last_gps_timecode = gps_tc
+                            current_timecode = gps_tc
+                            if show_all:
+                                print('tc=%d GPS' % gps_tc)
+                            gpsmsg.insert(gpsmsg.end(), &sv[oldpos+12], &sv[pos-8])
+                            (<cython.int *>&gpsmsg[gpsmsg.size() - ((pos-8) - (oldpos+12))])[0] = gps_tc
                     else:
                         data = s[oldpos + 12 : pos - 8]
                         if tok == _tokdec('CNF'):
@@ -642,13 +665,6 @@ def _decode_gps(gpsmsg, time_offset):
     alldata = memoryview(gpsmsg)
     assert len(alldata) % 56 == 0
     timecodes = np.asarray(alldata[0:].cast('i')[::56//4])
-    # certain old MXP firmware (and maybe others) would periodically
-    # butcher the upper 16-bits of the timecode field.  If necessary,
-    # reconstruct it using only the bottom 16-bits and assuming time
-    # never skips ahead too far.
-    if np.any(timecodes[1:] < timecodes[:-1]):
-        timecodes = (timecodes & 65535) + (timecodes[0] - (timecodes[0] & 65535))
-        timecodes += 65536 * np.cumsum(np.concatenate(([0], timecodes[1:] < timecodes[:-1])))
     #itow_ms = alldata[4:].cast('I')[::56//4]
     #weekN = alldata[12:].cast('H')[::56//2]
     ecefX_cm = alldata[16:].cast('i')[::56//4]
