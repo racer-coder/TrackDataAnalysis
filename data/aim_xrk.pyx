@@ -275,13 +275,13 @@ def _decode_sequence(s, progress=None):
                     data_cat = &gc_data[typ == ord_op_S]
                     data_p = &dereference(data_cat)[msg.s.index]
                     if data_p >= &dereference(data_cat.end()):
-                        raise IndexError
+                        raise IndexError('index %d' % msg.s.index)
                     pos += data_p.add_helper
                     last = &sv[pos-1]
                     if last[0] != ord_cp:
                         raise ValueError("%c at %x" % (s[pos-1], pos-1))
                     if show_all:
-                        print('tc=%d %c idx=%d' % (msg.s.timecode, msg.s.op >> 8, msg.s.index))
+                        print('tc=%d %c idx=%d last=%d' % (msg.s.timecode, msg.s.op >> 8, msg.s.index, data_p.last_timecode))
                     if msg.s.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.s.timecode
                         current_timecode = msg.s.timecode
@@ -298,8 +298,9 @@ def _decode_sequence(s, progress=None):
                     if sv[pos] != ord_cp:
                         raise ValueError("%c at %x" % (s[pos], pos))
                     if show_all:
-                        print('tc=%d M idx=%d cnt=%d ms=%d' %
-                              (msg.s.timecode, msg.s.index, msg.s.count, data_p.Mms))
+                        print('tc=%d M idx=%d cnt=%d ms=%d last=%d' %
+                              (msg.s.timecode, msg.s.index, msg.s.count, data_p.Mms,
+                               data_p.last_timecode))
                     if msg.s.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.s.timecode + (msg.s.count-1) * data_p.Mms
                         current_timecode = msg.s.timecode
@@ -323,7 +324,8 @@ def _decode_sequence(s, progress=None):
                     if last[0] != ord_cp:
                         raise ValueError("%c at %x" % (s[pos-1], pos-1))
                     if show_all:
-                        print('tc=%d c idx=%d' % (msg.c.timecode, msg.c.channel >> 3))
+                        print('tc=%d c idx=%d last=%d' %
+                              (msg.c.timecode, msg.c.channel >> 3, data_p.last_timecode))
                     if msg.c.timecode > data_p.last_timecode:
                         data_p.last_timecode = msg.c.timecode
                         current_timecode = msg.c.timecode
@@ -359,6 +361,9 @@ def _decode_sequence(s, progress=None):
                     if (tok >> 24) == 32:
                         tok -= 32 << 24 # rstrip(' ')
 
+                    if show_all:
+                        print('h%s' % (_tokenc(tok)))
+
                     if tok == tok_GPS or tok == tok_GPS1:
                         # fast path common GPS messages
 
@@ -373,11 +378,11 @@ def _decode_sequence(s, progress=None):
                             if show_bad and new_tc != gps_tc:
                                 print("revised GPS: %x %x %x" % (gps_tc, new_tc, current_timecode))
                             gps_tc = new_tc
+                        if show_all:
+                            print('tc=%d GPS last=%d' % (gps_tc, last_gps_timecode))
                         if gps_tc > last_gps_timecode:
                             last_gps_timecode = gps_tc
                             current_timecode = gps_tc
-                            if show_all:
-                                print('tc=%d GPS' % gps_tc)
                             gpsmsg.insert(gpsmsg.end(), &sv[oldpos+12], &sv[pos-8])
                             (<cython.int *>&gpsmsg[gpsmsg.size() - ((pos-8) - (oldpos+12))])[0] = gps_tc
                     else:
@@ -397,9 +402,17 @@ def _decode_sequence(s, progress=None):
                                     gc_data[3][m.content.index].add_helper = m.content.size
                                     gc_data[3][m.content.index].Mms = _Mms_lookup(
                                         m.content.unknown[64] & 127)
-                                else:
-                                    assert channels[m.content.index].short_name == m.content.short_name, "%s vs %s" % (channels[m.content.index].short_name, m.content.short_name)
-                                    assert channels[m.content.index].long_name == m.content.long_name
+                                elif show_bad:
+                                    if channels[m.content.index].short_name != m.content.short_name:
+                                        print("Reassigning channel %d: %s vs %s" %
+                                              (m.content.index,
+                                               channels[m.content.index].short_name,
+                                               m.content.short_name))
+                                    if channels[m.content.index].long_name != m.content.long_name:
+                                        print("Reassigning channel %d: %s vs %s" % (
+                                            m.content.index,
+                                            channels[m.content.index].long_name,
+                                            m.content.long_name))
                             for m in data.get(_tokdec('GRP'), []):
                                 groups += [None] * (m.content.index - len(groups) + 1)
                                 groups[m.content.index] = m.content
