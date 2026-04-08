@@ -6,10 +6,11 @@ import math
 import re
 import sys
 
-from PySide2.QtCore import QAbstractTableModel, QRect, QSize, Qt
-from PySide2 import QtGui
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QAbstractTableModel, QRect, QSize, Qt
+from PySide6 import QtGui
+from PySide6.QtWidgets import (
     QAbstractItemDelegate,
+    QAbstractItemView,
     QDockWidget,
     QHeaderView,
     QLineEdit,
@@ -42,7 +43,7 @@ class FastTableModel(QAbstractTableModel):
         self.layoutChanged.emit()
 
     def headerData(self, section, orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self.heading[section]
         return None
 
@@ -66,14 +67,14 @@ class FastItemDelegate(QAbstractItemDelegate):
 
     def paint(self, painter, opt, index):
         (fg, bg, font, align), txt = self.model.present(index)
-        if bg and not (opt.state & QStyle.State_Selected):
+        if bg and not (opt.state & QStyle.StateFlag.State_Selected):
             painter.fillRect(opt.rect, bg)
         if txt:
             painter.setPen(fg)
             painter.setFont(font)
             rect = opt.rect.adjusted(self.margin, 0, -self.margin, 0)
             painter.drawText(rect, align,
-                             self.metrics.elidedText(txt, Qt.ElideRight, rect.width() + 1))
+                             self.metrics.elidedText(txt, Qt.TextElideMode.ElideRight, rect.width() + 1))
 
     def sizeHint(self):
         return QSize(1, 1) # who cares
@@ -89,16 +90,16 @@ class TempDockWidget(QDockWidget):
 
         self.mainwindow = mainwindow
         self.toolbar = toolbar
-        self.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea)
+        self.setAllowedAreas(Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea)
         self.button = widgets.RotatedPushButton(title, toolbar)
-        self.button.setFocusPolicy(Qt.NoFocus) # Undo setting from QAbstractButton / style
+        self.button.setFocusPolicy(Qt.FocusPolicy.NoFocus) # Undo setting from QAbstractButton / style
         self.button.setCheckable(True)
         self.button.clicked.connect(self.clicked)
         self.button_action = toolbar.addWidget(self.button)
         self.visibilityChanged.connect(self.button.setChecked)
         mainwindow.dockwidgets.append(self)
         self.mainwindow.addDockWidget(
-            Qt.LeftDockWidgetArea if prefer_float else Qt.RightDockWidgetArea, self)
+            Qt.DockWidgetArea.LeftDockWidgetArea if prefer_float else Qt.DockWidgetArea.RightDockWidgetArea, self)
         self.prefer_float = prefer_float
         self.hide()
 
@@ -156,10 +157,10 @@ class ChannelsDockWidget(TempDockWidget):
 
         self.chList = ChannelsListWidget(mainwindow.data_view)
         self.chList.setDragEnabled(True)
-        self.chList.setDragDropMode(self.chList.DragOnly)
+        self.chList.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.chList.itemActivated.connect(self.activateItem)
         self.chList.customContextMenuRequested.connect(self.context_menu)
-        self.chList.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.chList.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         self.matcher = TextMatcher('')
         self.recompute()
@@ -196,7 +197,7 @@ class ChannelsDockWidget(TempDockWidget):
             menu.addSeparator()
             act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
             act.triggered.connect(lambda: ac.addChannel(ch))
-        menu.exec_(self.mapToGlobal(pos))
+        menu.exec(self.mapToGlobal(pos))
 
     def update_hidden(self):
         for i in range(self.chList.count()):
@@ -215,7 +216,7 @@ class ChannelsDockWidget(TempDockWidget):
         self.chList.addItems(items)
         self.update_hidden()
         if current:
-            for it in self.chList.findItems(current, Qt.MatchExactly):
+            for it in self.chList.findItems(current, Qt.MatchFlag.MatchExactly):
                 self.chList.setCurrentItem(it)
                 break
 
@@ -226,11 +227,11 @@ class ChannelsDockWidget(TempDockWidget):
             chSet = set()
         for i in range(self.chList.count()):
             it = self.chList.item(i)
-            it.setFlags(it.flags() | Qt.ItemIsDragEnabled)
+            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsDragEnabled)
             if it.text() in chSet:
-                it.setBackgroundColor(QtGui.QColor(255, 255, 0))
+                it.setBackground(QtGui.QBrush(QtGui.QColor(255, 255, 0)))
             else:
-                it.setBackground(QtGui.QBrush(Qt.NoBrush))
+                it.setBackground(QtGui.QBrush(Qt.BrushStyle.NoBrush))
 
 
 @dataclass
@@ -310,15 +311,15 @@ class ValuesTableModel(FastTableModel):
         super().__init__()
         self.data_view = data_view
         self.section_style = [QtGui.QPen(QtGui.QColor(255, 255, 255)), QtGui.QColor(64, 64, 64),
-                              None, Qt.AlignTop | Qt.AlignLeft]
+                              None, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft]
         self.icon_style    = [QtGui.QColor(32, 32, 32),
-                              None, Qt.AlignTop | Qt.AlignHCenter]
+                              None, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter]
         self.channel_style = [QtGui.QPen(QtGui.QColor(192, 192, 192)), QtGui.QColor(32, 32, 32),
-                              None, Qt.AlignTop | Qt.AlignLeft]
+                              None, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft]
         self.value_style   = [QtGui.QPen(QtGui.QColor(192, 192, 192)), None,
-                              None, Qt.AlignTop | Qt.AlignRight]
+                              None, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight]
         self.delta_style   = [QtGui.QPen(QtGui.QColor(192, 192, 192)), QtGui.QColor(48, 48, 48),
-                              None, Qt.AlignTop | Qt.AlignRight]
+                              None, Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight]
         self.rows = []
         self.laps = []
         self.delta_idx = None
@@ -344,12 +345,12 @@ class ValuesTableModel(FastTableModel):
             None if self.delta_idx is None else self.laps[self.delta_idx])
 
     def supportedDragActions(self):
-        return Qt.CopyAction
+        return Qt.DropAction.CopyAction
 
     def flags(self, index):
         flags = super().flags(index)
         if type(self.rows[index.row()]) is ValuesTableChannel:
-            flags |= Qt.ItemIsDragEnabled
+            flags |= Qt.ItemFlag.ItemIsDragEnabled
         return flags
 
 
@@ -377,25 +378,25 @@ class ValuesDockWidget(TempDockWidget):
         self.deleg = FastItemDelegate(self.model, self.margin)
         self.table = ValuesTableView()
         self.table.setDragEnabled(True)
-        self.table.setDragDropMode(self.table.DragOnly)
+        self.table.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
         self.table.setShowGrid(False)
         self.table.setSelectionMode(QTableView.SingleSelection)
         self.table.setSelectionBehavior(QTableView.SelectRows)
-        self.table.setHorizontalScrollMode(self.table.ScrollPerPixel)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setMinimumSectionSize(10)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().sectionPressed.connect(self.section_pressed)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setMinimumSectionSize(5)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table.setEditTriggers(self.table.NoEditTriggers)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.activated.connect(self.activate_cell)
         self.table.customContextMenuRequested.connect(self.context_menu)
-        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         mainwindow.data_view.cursor_change.connect(self.update_cursor)
         mainwindow.data_view.values_change.connect(self.recompute)
@@ -410,7 +411,7 @@ class ValuesDockWidget(TempDockWidget):
         self.setWidget(widget)
 
         pal = self.table.palette()
-        pal.setColor(pal.Base, QtGui.QColor(0, 0, 0))
+        pal.setColor(pal.ColorRole.Base, QtGui.QColor(0, 0, 0))
         self.table.setPalette(pal)
 
         self.text_hints = TextMatcher('')
@@ -437,7 +438,7 @@ class ValuesDockWidget(TempDockWidget):
                 menu.addSeparator()
                 act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
                 act.triggered.connect(lambda: ac.addChannel(ch))
-            menu.exec_(self.table.mapToGlobal(pos))
+            menu.exec(self.table.mapToGlobal(pos))
 
     def activate_cell(self, index):
         ac = self.mainwindow.data_view.active_component

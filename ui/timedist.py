@@ -7,10 +7,10 @@ import math
 
 import numpy as np
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QRect, QRectF, QSize, Qt
-from PySide2.QtWidgets import (
-    QAction,
+from PySide6 import QtGui
+from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
     QApplication,
     QMenu,
 )
@@ -76,10 +76,10 @@ class TimeDist(widgets.MouseHelperWidget):
         self.zoom_highlight = None
 
         self.cursorClick = widgets.MouseHelperItem(
-            clicks=[widgets.MouseHelperClick(Qt.LeftButton,
+            clicks=[widgets.MouseHelperClick(Qt.MouseButton.LeftButton,
                                              state_capture=self.cursorJump,
                                              move=self.cursorDrag),
-                    widgets.MouseHelperClick(Qt.LeftButton, double=True,
+                    widgets.MouseHelperClick(Qt.MouseButton.LeftButton, double=True,
                                              state_capture=self.zoom_sel_start,
                                              move=self.zoom_sel_drag,
                                              release=self.zoom_sel_release)],
@@ -87,27 +87,27 @@ class TimeDist(widgets.MouseHelperWidget):
         self.addMouseHelperTop(self.cursorClick)
 
         self.xaxisClick = widgets.MouseHelperItem(
-            cursor=Qt.OpenHandCursor,
-            clicks=[widgets.MouseHelperClick(Qt.LeftButton,
+            cursor=Qt.CursorShape.OpenHandCursor,
+            clicks=[widgets.MouseHelperClick(Qt.MouseButton.LeftButton,
                                              state_capture=self.xaxisCapture,
                                              move=self.xaxisDrag)])
         if self.lapView:
             self.addMouseHelperTop(self.xaxisClick)
 
         self.offsetClick = widgets.MouseHelperItem(
-            cursor=Qt.OpenHandCursor,
-            clicks=[widgets.MouseHelperClick(Qt.LeftButton,
+            cursor=Qt.CursorShape.OpenHandCursor,
+            clicks=[widgets.MouseHelperClick(Qt.MouseButton.LeftButton,
                                              state_capture=self.offsetCapture,
                                              move=self.offsetDrag)])
         if self.lapView:
             self.addMouseHelperTop(self.offsetClick)
 
         self.leftClick = widgets.MouseHelperItem(
-            cursor = Qt.SizeHorCursor,
-            clicks=[widgets.MouseHelperClick(Qt.LeftButton, move=self.leftDrag)])
+            cursor = Qt.CursorShape.SizeHorCursor,
+            clicks=[widgets.MouseHelperClick(Qt.MouseButton.LeftButton, move=self.leftDrag)])
         self.rightClick = widgets.MouseHelperItem(
-            cursor = Qt.SizeHorCursor,
-            clicks=[widgets.MouseHelperClick(Qt.LeftButton, move=self.rightDrag)])
+            cursor = Qt.CursorShape.SizeHorCursor,
+            clicks=[widgets.MouseHelperClick(Qt.MouseButton.LeftButton, move=self.rightDrag)])
         if not self.lapView:
             self.addMouseHelperTop([self.leftClick, self.rightClick])
 
@@ -294,7 +294,7 @@ class TimeDist(widgets.MouseHelperWidget):
                           height / (dmin - dmax), y_offset)
         # set pen for grid
         pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
-        pen.setStyle(Qt.DotLine)
+        pen.setStyle(Qt.PenStyle.DotLine)
         ph.painter.setPen(pen)
         # draw x grid
         i = np.arange(math.ceil(self.x_axis.logical_min_val / self.x_axis.logical_tick_spacing),
@@ -371,7 +371,7 @@ class TimeDist(widgets.MouseHelperWidget):
                             QtGui.QColor(32, 32, 32, 160))
         # text for data
         pen2 = QtGui.QPen(state.lap_colors[1])
-        pen2.setStyle(Qt.SolidLine)
+        pen2.setStyle(Qt.PenStyle.SolidLine)
         next_y = y_offset
         for (color, ch, lap), d in zip(
                 [trip
@@ -396,11 +396,11 @@ class TimeDist(widgets.MouseHelperWidget):
             if graph_idx == self.current_channel[0] and ch == self.current_channel[1]:
                 ph.painter.drawText(self.graph_x + 6, y,
                                     self.channel_ind_width, fontMetrics.height(),
-                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                     '\u25aa')
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width, y,
                                 self.channel_name_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                 self.channelName(ch, d.units))
             if ch != 'Time Slip' or first_timeslip:
                 chh = max(len(self.time_slip_data) - 1, 1) if ch == 'Time Slip' else 1
@@ -408,7 +408,7 @@ class TimeDist(widgets.MouseHelperWidget):
                     widgets.MouseHelperItem(
                         geometry=QRectF(self.graph_x + 6 + self.channel_ind_width, y,
                                         self.channel_name_width, chh * fontMetrics.height()),
-                        clicks=[widgets.MouseHelperClick(button_type=Qt.LeftButton,
+                        clicks=[widgets.MouseHelperClick(button_type=Qt.MouseButton.LeftButton,
                                                          state_capture=self.selectChannel,
                                                          move=self.moveChannel)],
                         channel=(graph_idx, ch),
@@ -419,7 +419,7 @@ class TimeDist(widgets.MouseHelperWidget):
                 self.cursor_values.append(y_axis.calc(main_val))
                 ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y,
                                     self.channel_value_width, fontMetrics.height(),
-                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                     '%.*f' % (d.dec_pts, main_val))
 
                 # print min/max for zoom window
@@ -436,11 +436,11 @@ class TimeDist(widgets.MouseHelperWidget):
                                 lap, zoomsize + self.dataView.getTDValue(self.dataView.zoom_window[0])))]
                     ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax + 6,
                                         y, self.channel_value_width, fontMetrics.height(),
-                                        Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                        Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                         '\u25bc' + (' %.*f' % (d.dec_pts, np.min(drange)) if len(drange) else ''))
                     ph.painter.drawText(ph.size.width() - self.channel_minmax_width * nminmax / 2 + 6,
                                         y, self.channel_value_width, fontMetrics.height(),
-                                        Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                        Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                         '\u25b2' + (' %.*f' % (d.dec_pts, np.max(drange)) if len(drange) else ''))
             if not self.dataView.alt_lap or ch == 'Time Slip': continue
             d2 = self.dataView.get_channel_data(self.dataView.alt_lap, ch)
@@ -450,14 +450,14 @@ class TimeDist(widgets.MouseHelperWidget):
             ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                 + self.channel_name_width + self.channel_value_width,
                                 y, self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                 '%.*f' % (d.dec_pts, alt_val))
             if len(d.values):
                 ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width
                                     + self.channel_name_width + self.channel_value_width
                                     + self.channel_opt_width / 2,
                                     y, self.channel_value_width, fontMetrics.height(),
-                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                     '\u0394 %.*f' % (d.dec_pts, alt_val - main_val))
             if not self.lapView: continue
             zoomsize = self.dataView.windowSize2Mode()
@@ -475,11 +475,11 @@ class TimeDist(widgets.MouseHelperWidget):
             if len(drange):
                 ph.painter.drawText(ph.size.width() - self.channel_minmax_width * 3 + 6,
                                     y, self.channel_value_width, fontMetrics.height(),
-                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                     '%.*f' % (d.dec_pts, np.min(drange)))
                 ph.painter.drawText(ph.size.width() - self.channel_minmax_width + 6,
                                     y, self.channel_value_width, fontMetrics.height(),
-                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
                                     '%.*f' % (d.dec_pts, np.max(drange)))
 
         self.graph_mouse_helpers.append(
@@ -518,7 +518,7 @@ class TimeDist(widgets.MouseHelperWidget):
         for tc, y in zip(atc, y_axis.calc(atc)):
             if y + text_height / 2 <= y_offset + height:
                 ph.painter.drawText(0, y - 25, self.graph_x - 4, 50,
-                                    Qt.AlignVCenter | Qt.AlignRight | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight | Qt.TextFlag.TextSingleLine,
                                     '%.*f' % (exp, tc))
         spacing = y_axis.logical_tick_spacing / 5
         ai = np.arange(int(y_axis.logical_max_val / spacing) + 1,
@@ -546,7 +546,7 @@ class TimeDist(widgets.MouseHelperWidget):
         ax = x_axis.calc(atc)
         for tc, x in zip(atc, ax):
             ph.painter.drawText(x - 100, y_offset + 4, 200, 50,
-                                Qt.AlignHCenter | Qt.AlignTop | Qt.TextSingleLine,
+                                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextSingleLine,
                                 formatter %
                                 ((math.copysign(math.trunc(tc / 60000), tc),
                                   abs(tc) % 60000 / 1000) if self.dataView.mode_time else tc))
@@ -613,8 +613,8 @@ class TimeDist(widgets.MouseHelperWidget):
                     if metrics.horizontalAdvance(newtext) < allowed:
                         text = newtext
             ph.painter.drawText(last_x, graph_y, next_x - last_x, height,
-                                Qt.AlignVCenter | Qt.AlignHCenter,
-                                metrics.elidedText(text, Qt.ElideLeft, allowed))
+                                Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter,
+                                metrics.elidedText(text, Qt.TextElideMode.ElideLeft, allowed))
             last_x = next_x
             if next_x == ph.size.width() - 1:
                 break
@@ -715,7 +715,7 @@ class TimeDist(widgets.MouseHelperWidget):
                 if start_x + end_x - width < right_x:
                     continue
                 ph.painter.drawText((start_x + end_x - width) / 2, 1, width, graph_y,
-                                    Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextSingleLine,
                                     text)
                 right_x = start_x + end_x + width
 
@@ -736,7 +736,7 @@ class TimeDist(widgets.MouseHelperWidget):
 
         # separation lines
         pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
-        pen.setStyle(Qt.SolidLine)
+        pen.setStyle(Qt.PenStyle.SolidLine)
         ph.painter.setPen(pen)
         for i in range(1, len(groups)):
             cutoff = graph_y + i * separation + i * (y_div - graph_y - separation * (len(groups) - 1)) / len(groups)
@@ -747,7 +747,7 @@ class TimeDist(widgets.MouseHelperWidget):
 
         # draw lap boundaries
         pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
-        pen.setStyle(Qt.DashLine)
+        pen.setStyle(Qt.PenStyle.DashLine)
         ph.painter.setPen(pen)
         if self.x_axis:
             for lap in self.dataView.ref_lap.log.laps:
@@ -765,7 +765,7 @@ class TimeDist(widgets.MouseHelperWidget):
         # draw zoom window
         if not self.lapView and self.x_axis:
             pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
-            pen.setStyle(Qt.SolidLine)
+            pen.setStyle(Qt.PenStyle.SolidLine)
             pen.setWidth(2)
             ph.painter.setPen(pen)
             x1 = round(self.x_axis.calc(self.dataView.getTDValue(self.dataView.zoom_window[0])))
@@ -793,10 +793,10 @@ class TimeDist(widgets.MouseHelperWidget):
             b = QtGui.QColor(0, 0, 0)
             if not self.dataView.mode_time: f, b = b, f
             ph.painter.setBackground(QtGui.QBrush(b))
-            ph.painter.setBackgroundMode(Qt.OpaqueMode)
+            ph.painter.setBackgroundMode(Qt.BGMode.OpaqueMode)
             ph.painter.setPen(QtGui.QPen(f))
             ph.painter.drawText(0, y_div + 4, self.graph_x, 50,
-                                Qt.AlignTop | Qt.AlignRight | Qt.TextSingleLine,
+                                Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight | Qt.TextFlag.TextSingleLine,
                                 'm:s' if self.dataView.mode_time else 'meter')
             ph.painter.restore()
 
@@ -807,7 +807,7 @@ class TimeDist(widgets.MouseHelperWidget):
         # draw zoom selection, if in progress
         if self.zoom_highlight:
             ph.painter.save()
-            ph.painter.setCompositionMode(ph.painter.CompositionMode_Difference)
+            ph.painter.setCompositionMode(QtGui.QPainter.CompositionMode.CompositionMode_Difference)
 
             l = min(self.zoom_highlight)
             h = max(self.zoom_highlight)
@@ -821,7 +821,7 @@ class TimeDist(widgets.MouseHelperWidget):
             x = self.x_axis.calc(self.dataView.getTDValue(self.dataView.cursor_time))
             if x >= self.graph_x and x < ph.size.width():
                 pen = QtGui.QPen(QtGui.QColor(255, 255, 0))
-                pen.setStyle(Qt.SolidLine)
+                pen.setStyle(Qt.PenStyle.SolidLine)
                 ph.painter.setPen(pen)
                 ph.painter.drawLine(x, 0, x, y_div)
                 pen.setWidth(2)
@@ -864,7 +864,7 @@ class TimeDist(widgets.MouseHelperWidget):
     def addChannel(self, ch):
         # remove if channel already exists
         if not self.tryRemoveChannel(ch):
-            if ((QtGui.QGuiApplication.keyboardModifiers() & Qt.ControlModifier)
+            if ((QtGui.QGuiApplication.keyboardModifiers() & Qt.KeyboardModifier.ControlModifier)
                 or not self.tryAddChannelExistingGroup(ch)):
                 self.channelGroups.append([ch])
         self.dataView.data_change.emit()
@@ -991,7 +991,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                    lambda: channel_editor(self, self.dataView, ch[1]))
             menu.addSeparator()
             menu.addAction('Remove channel').triggered.connect(lambda: self.channelMenuRemove(ch))
-            menu.exec_(event.globalPos())
+            menu.exec(event.globalPosition().toPoint())
         else:
             # general widget context menu
-            QMenu.exec_(self.actions(), event.globalPos(), None, self)
+            QMenu.exec(self.actions(), event.globalPosition().toPoint(), None, self)

@@ -7,10 +7,10 @@ import urllib.request
 
 import numpy as np
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
-from PySide2.QtWidgets import (
-    QAction,
+from PySide6 import QtGui
+from PySide6.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
     QWidget,
 )
 
@@ -44,7 +44,7 @@ class MapBaseWidget(QWidget):
         self.satellite.setChecked(True)
         self.satellite.toggled.connect(self.update)
         self.addAction(self.satellite)
-        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
         self.setMinimumSize(100, 100) # arbitrary, prevents QT rendering bug with docks
 
@@ -128,11 +128,11 @@ class MapBaseWidget(QWidget):
         font.setPixelSize(widgets.deviceScale(self, 13))
         ph.painter.setFont(font)
         pen = QtGui.QPen(QtGui.QColor(224, 224, 224))
-        pen.setStyle(Qt.SolidLine)
+        pen.setStyle(Qt.PenStyle.SolidLine)
         pen.setWidth(1)
         ph.painter.setPen(pen)
         ph.painter.drawText(0, 0, ph.size.width(), ph.size.height(),
-                            Qt.AlignRight | Qt.AlignBottom,
+                            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom,
                             '\u00a9 MapTiler  \u00a9 OpenStreetMap contributors')
 
         return True
@@ -205,7 +205,7 @@ class MapWidget(MapBaseWidget):
         msize = widgets.deviceScale(self, 4)
         for lap, color, _idx in dv.get_laps()[::-1]:
             pen = QtGui.QPen(QtGui.QColor(0, 0, 0))
-            pen.setStyle(Qt.SolidLine)
+            pen.setStyle(Qt.PenStyle.SolidLine)
             ph.painter.setPen(pen)
             ph.painter.setBrush(QtGui.QBrush(color))
             key_channels = lap.log.log.get_key_channel_map()

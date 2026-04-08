@@ -5,10 +5,11 @@ import configparser
 
 import numpy as np
 
-from PySide2 import QtGui
-from PySide2.QtCore import QSize, Qt, Signal
-from PySide2.QtWidgets import (
-    QAction,
+from PySide6 import QtGui
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
+    QAbstractItemView,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -81,13 +82,13 @@ class ChannelEdit(QLineEdit):
         self.data_view = data_view
         self.setReadOnly(True)
 
-        icon = self.style().standardIcon(QStyle.SP_DialogOpenButton)
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton)
         action = self.addAction(icon, self.TrailingPosition)
         action.triggered.connect(self.selected)
 
     def selected(self):
         dia = ChannelSelect(self.data_view)
-        if dia.exec_():
+        if dia.exec():
             items = dia.chlist.selectedItems()
             if len(items) == 1:
                 self.setText(items[0].text())
@@ -174,8 +175,8 @@ class TableBuilder(QWidget):
         self.f_box.setLayout(form)
 
         self.table = QTableWidget()
-        self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
-        self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.table.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.table.setAlternatingRowColors(True)
 
         v_layout = QVBoxLayout()
@@ -189,7 +190,7 @@ class TableBuilder(QWidget):
         h_layout.addWidget(self.table, stretch=3)
         self.setLayout(h_layout)
 
-        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
         data_view.values_change.connect(self.recompute)
         self.recompute()
 
@@ -289,8 +290,8 @@ class TableBuilder(QWidget):
         # Iterate over res, setting text
         for row in res:
             item = QTableWidgetItem('%.3f\n%d samples' % (row[2], row[3]))
-            item.setTextAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
             self.table.setItem(yaxis[row[1]], xaxis[row[0]], item)
 
-        self.table.horizontalHeader().resizeSections(QHeaderView.ResizeToContents)
-        self.table.verticalHeader().resizeSections(QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
+        self.table.verticalHeader().resizeSections(QHeaderView.ResizeMode.ResizeToContents)

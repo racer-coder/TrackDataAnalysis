@@ -11,9 +11,10 @@ import threading
 import traceback
 import typing
 
-from PySide2.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
-from PySide2 import QtGui
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
+from PySide6 import QtGui
+from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -105,10 +106,10 @@ class DataDockModel(FastTableModel):
         super().__init__()
         self.data_view = data_view
         self.laps = []
-        self.right_style = [QtGui.QPen(QtGui.QColor(192, 192, 192)), None, None, Qt.AlignRight]
-        self.center_style = self.right_style[:3] + [Qt.AlignHCenter]
+        self.right_style = [QtGui.QPen(QtGui.QColor(192, 192, 192)), None, None, Qt.AlignmentFlag.AlignRight]
+        self.center_style = self.right_style[:3] + [Qt.AlignmentFlag.AlignHCenter]
         self.section_style = [QtGui.QPen(QtGui.QColor(255, 255, 255)), QtGui.QColor(64, 64, 64),
-                              None, Qt.AlignLeft]
+                              None, Qt.AlignmentFlag.AlignLeft]
 
     def set_data(self, laps, font, section_font):
         self.laps = laps
@@ -136,24 +137,24 @@ class DataDockWidget(TempDockWidget):
         self.table = QTableView()
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
-        self.table.setSelectionMode(self.table.SingleSelection)
-        self.table.setSelectionBehavior(self.table.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setShowGrid(False)
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setMinimumSectionSize(10)
-        self.table.setHorizontalScrollMode(self.table.ScrollPerPixel)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.table.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setMinimumSectionSize(5)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table.setEditTriggers(self.table.NoEditTriggers)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.pressed.connect(self.clickCell)
         self.table.customContextMenuRequested.connect(self.context_menu)
-        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         pal = self.table.palette()
-        pal.setColor(pal.Base, QtGui.QColor(0, 0, 0))
+        pal.setColor(pal.ColorRole.Base, QtGui.QColor(0, 0, 0))
         self.table.setPalette(pal)
 
         self.setWidget(self.table)
@@ -314,18 +315,18 @@ class DataDockWidget(TempDockWidget):
             button = QPushButton(text)
             filter_layout.addWidget(button)
             filter_order.append((button, text))
-        layout.addLayout(filter_layout, 0, 0, 2, 1, Qt.AlignTop)
+        layout.addLayout(filter_layout, 0, 0, 2, 1, Qt.AlignmentFlag.AlignTop)
 
         files = QTableWidget()
         files.setSortingEnabled(True)
-        files.setSelectionMode(files.ExtendedSelection)
-        files.setSelectionBehavior(files.SelectRows)
+        files.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        files.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         files.horizontalHeader().setHighlightSections(False)
-        files.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        files.setHorizontalScrollMode(files.ScrollPerPixel)
+        files.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        files.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         files.verticalHeader().hide()
-        files.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        files.setEditTriggers(files.NoEditTriggers)
+        files.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        files.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         dblist = [d for d in self.metadata_cache.values() if d['readable']]
         collist = ['Log Date', 'Log Time', 'Venue', 'Driver']
         files.setRowCount(len(dblist))
@@ -334,30 +335,30 @@ class DataDockWidget(TempDockWidget):
         for i, f in enumerate(dblist):
             for j, c in enumerate(collist):
                 item = QTableWidgetItem(f['metadata'].get(c, ''))
-                item.setData(Qt.UserRole, f)
+                item.setData(Qt.ItemDataRole.UserRole, f)
                 files.setItem(i, j, item)
         layout.addWidget(files, 1, 1, 1, 1)
 
         metadata = QTableWidget()
-        metadata.setSelectionMode(metadata.NoSelection)
+        metadata.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         metadata.setShowGrid(False)
         metadata.horizontalHeader().hide()
-        metadata.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        metadata.setHorizontalScrollMode(metadata.ScrollPerPixel)
+        metadata.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        metadata.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         metadata.verticalHeader().hide()
-        metadata.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        metadata.setEditTriggers(metadata.NoEditTriggers)
+        metadata.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        metadata.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         layout.addWidget(metadata, 0, 2, 2, 1)
 
         def update_matches():
             matcher = TextMatcher(search.text())
             for i in range(len(dblist)):
-                metadata = files.item(i, 0).data(Qt.UserRole)['metadata']
+                metadata = files.item(i, 0).data(Qt.ItemDataRole.UserRole)['metadata']
                 files.setRowHidden(
                     i, not (matcher.match(' '.join(str(d) for d in metadata.values()))
                             and all(metadata.get(f, None) in v for f, v in active_filters.items())))
-            files.horizontalHeader().resizeSections(QHeaderView.ResizeToContents)
-            files.verticalHeader().resizeSections(QHeaderView.ResizeToContents)
+            files.horizontalHeader().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
+            files.verticalHeader().resizeSections(QHeaderView.ResizeMode.ResizeToContents)
         search.textChanged.connect(update_matches)
         update_matches()
 
@@ -378,7 +379,7 @@ class DataDockWidget(TempDockWidget):
 
         def update_filter(ftype):
             chooser = QListWidget()
-            chooser.setSelectionMode(chooser.MultiSelection)
+            chooser.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
             choices = sorted({f['metadata'].get(ftype, None) for f in dblist} - {None, ''})
             for i, text in enumerate(choices):
                 chooser.addItem(text)
@@ -400,7 +401,7 @@ class DataDockWidget(TempDockWidget):
                 d2.accept()
             bbox.button(bbox.Reset).clicked.connect(reset)
 
-            if d2.exec_():
+            if d2.exec():
                 choices = {f.text(): True for f in chooser.selectedItems()}
                 if choices:
                     active_filters[ftype] = choices
@@ -413,7 +414,7 @@ class DataDockWidget(TempDockWidget):
             button.clicked.connect(closure(update_filter, text))
 
         def cell_selected():
-            f = files.currentItem().data(Qt.UserRole)['metadata']
+            f = files.currentItem().data(Qt.ItemDataRole.UserRole)['metadata']
             metadata.setRowCount(len(f))
             metadata.setColumnCount(2)
             for i, (k, v) in enumerate(sorted(f.items())):
@@ -442,11 +443,11 @@ class DataDockWidget(TempDockWidget):
         except configparser.NoOptionError:
             pass
 
-        if dia.exec_():
+        if dia.exec():
             selection = files.selectedItems()
             for item in selection:
                 if item.column() == 0: # only look at each row once
-                    self.open_file(item.data(Qt.UserRole)['path'])
+                    self.open_file(item.data(Qt.ItemDataRole.UserRole)['path'])
         self.config['main']['open_filters'] = json.dumps(active_filters)
         self.config['main']['open_search'] = search.text()
         self.config['main']['open_geometry'] = bytes(dia.saveGeometry()).hex()
@@ -484,7 +485,7 @@ class DataDockWidget(TempDockWidget):
 
     def open_file(self, file_name):
         try:
-            QApplication.setOverrideCursor(Qt.WaitCursor)
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             self.mainwindow.statusBar().showMessage('Opening ' + file_name)
             self.mainwindow.statusBar().repaint()
             return self.open_file_worker(file_name)
@@ -501,7 +502,7 @@ class DataDockWidget(TempDockWidget):
             return False
 
         progress = QProgressDialog('Processing file', 'Cancel', 0, 100, self)
-        progress.setWindowModality(Qt.WindowModal)
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
         progress.setMinimumDuration(1000)
         def update_progress(pos, total):
             progress.setMaximum(total)
@@ -588,7 +589,7 @@ class DataDockWidget(TempDockWidget):
             menu.addAction('Close all log files').triggered.connect(self.close_all_logs)
             (menu.addAction('Close log "%s"' % os.path.basename(lap.log.log.get_filename()))
              .triggered.connect(lambda: self.close_one_log(lap.log)))
-            menu.exec_(self.table.mapToGlobal(pos))
+            menu.exec(self.table.mapToGlobal(pos))
 
     def clickCell(self, index):
         row = index.row()

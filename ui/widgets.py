@@ -5,9 +5,9 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 import os.path
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPointF, QRect, QRectF, QSize, QSizeF, Qt
-from PySide2.QtWidgets import (
+from PySide6 import QtGui
+from PySide6.QtCore import QPointF, QRect, QRectF, QSize, QSizeF, Qt
+from PySide6.QtWidgets import (
     QPushButton,
     QStyle,
     QStylePainter,
@@ -56,7 +56,7 @@ class RotatedPushButton(QPushButton):
         painter = QStylePainter(self)
         painter.rotate(-90)
         painter.translate(-self.height(), 0)
-        painter.drawControl(QStyle.CE_PushButton, styleopt)
+        painter.drawControl(QStyle.ControlElement.CE_PushButton, styleopt)
 
     # don't override minimumSizeHint, it just calls sizeHint()
 
@@ -67,7 +67,7 @@ class RotatedPushButton(QPushButton):
 
 @dataclass
 class MouseHelperClick:
-    button_type: int = Qt.NoButton # Qt.MouseButton (Qt.LeftButton, Qt.RightButton)
+    button_type: int = Qt.MouseButton.NoButton # Qt.MouseButton (Qt.MouseButton.LeftButton, Qt.MouseButton.RightButton)
     modifier_type: int = 0 # Qt.Modifier (Qt.SHIFT, Qt.CTRL, Qt.ALT)
     double: bool = False # If for double clicks
     state_capture: object = None # (abs_pos (QPointF))
@@ -77,12 +77,12 @@ class MouseHelperClick:
 @dataclass
 class MouseHelperItem:
     geometry: QRectF = field(default_factory=QRectF) # QRectF
-    cursor: int = Qt.ArrowCursor # CursorShape
+    cursor: int = Qt.CursorShape.ArrowCursor # CursorShape
     clicks: list = field(default_factory=list) # list of MouseHelperClick
     wheel: object = None # (angle_delta)
     data: dict = field(default_factory=dict) # user settable data for this region
 
-    def __init__(self, geometry=None, cursor=Qt.ArrowCursor, clicks=None,
+    def __init__(self, geometry=None, cursor=Qt.CursorShape.ArrowCursor, clicks=None,
                  wheel=None, **kwargs):
         self.geometry = geometry or QRectF()
         self.cursor = cursor
@@ -106,7 +106,7 @@ class MouseHelperWidget(QWidget):
                 if obj.geometry.contains(self.__lastLocalPos):
                     self.setCursor(QtGui.QCursor(obj.cursor))
                     return True
-        self.setCursor(QtGui.QCursor(Qt.ArrowCursor))
+        self.setCursor(QtGui.QCursor(Qt.CursorShape.ArrowCursor))
         return False
 
     def addMouseHelperTop(self, mhi):
@@ -130,7 +130,7 @@ class MouseHelperWidget(QWidget):
         return self.getLastMouseHelperData(key, pos * self.devicePixelRatioF())
 
     def __handleClick(self, e: QtGui.QMouseEvent, dbl: bool):
-        self.__lastLocalPos = e.localPos() * self.devicePixelRatioF()
+        self.__lastLocalPos = e.position() * self.devicePixelRatioF()
         if self.__curClick:
             e.accept()
             return True # still processing first click
@@ -141,7 +141,7 @@ class MouseHelperWidget(QWidget):
                         if (clk.button_type == e.button() and
                             clk.modifier_type == e.modifiers() and
                             clk.double == dbl):
-                            self.__basePos = e.globalPos() * self.devicePixelRatioF()
+                            self.__basePos = e.globalPosition().toPoint() * self.devicePixelRatioF()
                             self.__curClick = clk
                             self.__savedState = clk.state_capture(self.__lastLocalPos) if clk.state_capture else None
                             QtGui.QGuiApplication.setOverrideCursor(self.cursor())
@@ -156,11 +156,11 @@ class MouseHelperWidget(QWidget):
         if not self.__handleClick(e, True): super().mouseDoubleClickEvent(e)
 
     def mouseMoveEvent(self, e: QtGui.QMouseEvent):
-        self.__lastLocalPos = e.localPos() * self.devicePixelRatioF()
+        self.__lastLocalPos = e.position() * self.devicePixelRatioF()
         if self.__curClick:
             if (self.__curClick.button_type == e.buttons() and
                 self.__curClick.modifier_type == e.modifiers()):
-                p = e.globalPos() * self.devicePixelRatioF()
+                p = e.globalPosition().toPoint() * self.devicePixelRatioF()
                 if self.__curClick.move:
                     self.__curClick.move(p - self.__basePos, self.__lastLocalPos,
                                          self.__savedState)
@@ -176,7 +176,7 @@ class MouseHelperWidget(QWidget):
         super().mouseMoveEvent(e)
 
     def mouseReleaseEvent(self, e: QtGui.QMouseEvent):
-        self.__lastLocalPos = e.localPos() * self.devicePixelRatioF()
+        self.__lastLocalPos = e.position() * self.devicePixelRatioF()
         if self.__curClick:
             if self.__curClick.release:
                 self.__curClick.release(self.__lastLocalPos - self.__basePos,
@@ -208,23 +208,23 @@ class LapWidget(MouseHelperWidget):
         dataView.values_change.connect(self.update)
 
         self.leftClick = MouseHelperItem(
-            cursor = Qt.SizeHorCursor,
-            clicks=[MouseHelperClick(Qt.LeftButton, move=self.leftDrag)])
+            cursor = Qt.CursorShape.SizeHorCursor,
+            clicks=[MouseHelperClick(Qt.MouseButton.LeftButton, move=self.leftDrag)])
         self.addMouseHelperBottom(self.leftClick)
 
         self.rightClick = MouseHelperItem(
-            cursor = Qt.SizeHorCursor,
-            clicks=[MouseHelperClick(Qt.LeftButton, move=self.rightDrag)])
+            cursor = Qt.CursorShape.SizeHorCursor,
+            clicks=[MouseHelperClick(Qt.MouseButton.LeftButton, move=self.rightDrag)])
         self.addMouseHelperBottom(self.rightClick)
 
         self.dragWindow = MouseHelperItem(
-            cursor = Qt.OpenHandCursor,
-            clicks=[MouseHelperClick(Qt.LeftButton, state_capture=self.windowDragCapture,
+            cursor = Qt.CursorShape.OpenHandCursor,
+            clicks=[MouseHelperClick(Qt.MouseButton.LeftButton, state_capture=self.windowDragCapture,
                                      move=self.windowDrag)])
         self.addMouseHelperBottom(self.dragWindow)
 
         self.dblClick = MouseHelperItem(
-            clicks=[MouseHelperClick(Qt.LeftButton, double=True, state_capture=self.selectLap)])
+            clicks=[MouseHelperClick(Qt.MouseButton.LeftButton, double=True, state_capture=self.selectLap)])
         self.addMouseHelperBottom(self.dblClick)
 
     def leftDrag(self, rel_pos, abs_pos, saved_state):
@@ -304,7 +304,7 @@ class LapWidget(MouseHelperWidget):
                 ph.painter.setFont(font)
                 ph.painter.setPen(c)
                 ph.painter.drawText(lapx, y, ph.size.width(), fh,
-                                    Qt.AlignTop | Qt.AlignLeft, chr(0x2789 + idx))
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft, chr(0x2789 + idx))
 
                 ph.painter.setPen(pen)
                 metadata = l.log.log.get_metadata()
@@ -316,7 +316,7 @@ class LapWidget(MouseHelperWidget):
                                         os.path.basename(l.log.log.get_filename()))
                 size = max(size, metrics.horizontalAdvance(txt))
                 ph.painter.drawText(lapx + icon_width, y, ph.size.width(), fh,
-                                    Qt.AlignTop | Qt.AlignLeft, txt)
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft, txt)
                 if y:
                     lapx += icon_width + size + metrics.horizontalAdvance('MMMMM')
 
@@ -348,12 +348,12 @@ class LapWidget(MouseHelperWidget):
                     continue
                 ph.painter.drawText((start_x + end_x - width) / 2, 1 + lapy,
                                     width, ph.size.height() - lapy,
-                                    Qt.AlignTop | Qt.AlignHCenter | Qt.TextSingleLine,
+                                    Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter | Qt.TextFlag.TextSingleLine,
                                     text)
                 right_x = start_x + end_x + width
             # draw lap boundaries
             pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
-            pen.setStyle(Qt.DashLine)
+            pen.setStyle(Qt.PenStyle.DashLine)
             ph.painter.setPen(pen)
             for lap in self.dataView.ref_lap.log.laps:
                 x = self.modeCalc(lap.start)
@@ -363,14 +363,14 @@ class LapWidget(MouseHelperWidget):
 
             # draw cursor
             pen = QtGui.QPen(QtGui.QColor(255, 255, 0))
-            pen.setStyle(Qt.SolidLine)
+            pen.setStyle(Qt.PenStyle.SolidLine)
             ph.painter.setPen(pen)
             x = self.timeCalc(self.dataView.ref_lap.start.time + self.dataView.cursor_time.time)
             ph.painter.drawLine(x, 1 + lapy, x, ph.size.height() - 2)
 
             # draw zoom window
             pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
-            pen.setStyle(Qt.SolidLine)
+            pen.setStyle(Qt.PenStyle.SolidLine)
             ph.painter.setPen(pen)
             x1 = self.timeCalc(self.dataView.ref_lap.start.time + self.dataView.zoom_window[0].time)
             self.leftClick.geometry.setRect(x1 - 3, lapy, 7, ph.size.height() - lapy)

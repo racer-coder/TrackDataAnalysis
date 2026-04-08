@@ -8,9 +8,9 @@ import json
 import os
 import time
 
-from PySide2.QtCore import QAbstractItemModel, QModelIndex, QPoint, QRectF, QStandardPaths, Qt, Signal
-from PySide2.QtGui import QColor, QPen
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, QPoint, QRectF, QStandardPaths, Qt, Signal
+from PySide6.QtGui import QColor, QPen
+from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -284,7 +284,7 @@ class TrackTreeModel(QAbstractItemModel):
 
     def data(self, index, role):
         child = self.child(index)
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             if index.column() == 0:
                 return child.name
             if index.column() == 1 and isinstance(child.obj, state.Marker):
@@ -292,7 +292,7 @@ class TrackTreeModel(QAbstractItemModel):
 
     HEADINGS = ('Name', 'Type')
     def headerData(self, section, orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self.HEADINGS[section]
 
     def index(self, row, col, parent):
@@ -333,7 +333,7 @@ class TrackSectorsMapWidget(MapBaseWidget):
     def mouseMoveEvent(self, e):
         if self.current_marker:
             coords = np.array(self.data_view.track.coords)
-            eyx = np.array([[e.localPos().y(), e.localPos().x()]])
+            eyx = np.array([[e.position().y(), e.position().x()]])
             yx = ((coords[:,:2] - np.array([[self.lat_base, self.long_base]]))
                   * np.array([[self.lat_scale, self.long_scale]]))
             v = yx[1:] - yx[:-1]
@@ -374,8 +374,8 @@ class TrackSectorsMapWidget(MapBaseWidget):
             self.current_marker_idx = min(
                 range(len(markers)),
                 key=lambda idx: np.linalg.norm(
-                    [e.localPos().x() - (markers[idx].lon - self.long_base) * self.long_scale,
-                     e.localPos().y() - (markers[idx].lat - self.lat_base) * self.lat_scale]))
+                    [e.position().x() - (markers[idx].lon - self.long_base) * self.long_scale,
+                     e.position().y() - (markers[idx].lat - self.lat_base) * self.lat_scale]))
             self.current_marker = markers[self.current_marker_idx]
             self.mouseMoveEvent(e)
             self.marker_select.emit(self.current_marker_idx)
@@ -622,7 +622,7 @@ def track_editor(parent, data_view):
     if data_view.track:
         orig_track = copy.deepcopy(data_view.track)
         dia = TrackDialog(data_view)
-        if dia.exec_():
+        if dia.exec():
             save_track(data_view.track)
         else:
             data_view.track = orig_track

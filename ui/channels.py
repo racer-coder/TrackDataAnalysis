@@ -1,9 +1,9 @@
 
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
-from PySide2.QtCore import QMimeData, QSize, Qt
-from PySide2.QtGui import QColor, QDrag, QFont, QFontMetrics, QIcon, QPainter, QPixmap
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QMimeData, QSize, Qt
+from PySide6.QtGui import QColor, QDrag, QFont, QFontMetrics, QIcon, QPainter, QPixmap
+from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -95,7 +95,7 @@ def channel_editor(_parent, data_view, channel):
 
     def adder(name, widget):
         row = layout.rowCount()
-        layout.addWidget(QLabel(name), row, 0, Qt.AlignRight)
+        layout.addWidget(QLabel(name), row, 0, Qt.AlignmentFlag.AlignRight)
         layout.addWidget(widget, row, 2)
 
     unit_combo = QComboBox()
@@ -143,7 +143,7 @@ def channel_editor(_parent, data_view, channel):
     bbox.accepted.connect(dia.accept)
     bbox.rejected.connect(dia.reject)
 
-    if dia.exec_():
+    if dia.exec():
         units = unit_combo.currentData()
         if units:
             overrides['units'] = units
@@ -194,9 +194,9 @@ def initiate_drag(parent, data_view, channel):
     painter.begin(pixmap)
     painter.setFont(font)
     painter.setPen(colors[prop.color])
-    painter.drawText(pixmap.rect(), Qt.AlignVCenter | Qt.AlignHCenter, text)
+    painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter, text)
     painter.end()
     drag.setPixmap(pixmap)
 
     drag.setMimeData(mime)
-    drag.exec_(Qt.MoveAction)
+    drag.exec(Qt.DropAction.MoveAction)

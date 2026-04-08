@@ -9,9 +9,10 @@ import os
 import sys
 import types
 
-from PySide2.QtCore import QAbstractItemModel, QFileSystemWatcher, QMimeData, QModelIndex, Qt
-from PySide2.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QAbstractItemModel, QFileSystemWatcher, QMimeData, QModelIndex, Qt
+from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtWidgets import (
+    QAbstractItemView,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -253,7 +254,7 @@ class MathTreeModel(QAbstractItemModel):
 
     def data(self, index, role):
         child = self.child(index)
-        if role == Qt.DisplayRole or role == Qt.EditRole:
+        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if index.column() == 0:
                 return child.name
             if index.column() == 1:
@@ -261,13 +262,13 @@ class MathTreeModel(QAbstractItemModel):
                     return child.obj.expression.replace('\n', ' ')
             if index.column() == 2:
                 return child.obj.comment.replace('\n', ' ')
-        if role == Qt.CheckStateRole and index.column() == 0:
-            return Qt.Checked if child.obj.enabled else Qt.Unchecked
+        if role == Qt.ItemDataRole.CheckStateRole and index.column() == 0:
+            return Qt.CheckState.Checked if child.obj.enabled else Qt.CheckState.Unchecked
 
     def setData(self, index, value, role):
         child = self.child(index)
         if index.column() == 0:
-            if role == Qt.EditRole:
+            if role == Qt.ItemDataRole.EditRole:
                 if isinstance(child.src_obj, dict):
                     if value in child.src_obj: # whether no name change or whether renaming to a dup
                         return False
@@ -280,7 +281,7 @@ class MathTreeModel(QAbstractItemModel):
                     self.dataChanged.emit(index, index)
                 redo_math(self.data_view) # reordering groups can cause many effects
                 return True
-            if role == Qt.CheckStateRole:
+            if role == Qt.ItemDataRole.CheckStateRole:
                 child.obj.enabled = bool(value)
                 self.dataChanged.emit(index, index, [role])
                 redo_math(self.data_view)
@@ -290,19 +291,19 @@ class MathTreeModel(QAbstractItemModel):
     def flags(self, index):
         if not index.isValid():
             return super().flags(index)
-        f = Qt.ItemIsSelectable | Qt.ItemIsEnabled
+        f = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
         if index.column() == 0:
-            f |= Qt.ItemIsUserCheckable
+            f |= Qt.ItemFlag.ItemIsUserCheckable
             child = self.child(index)
             if isinstance(child.obj, state.MathExpr):
-                f |= Qt.ItemIsDragEnabled
+                f |= Qt.ItemFlag.ItemIsDragEnabled
             else:
-                f |= Qt.ItemIsDropEnabled | Qt.ItemIsEditable
+                f |= Qt.ItemFlag.ItemIsDropEnabled | Qt.ItemFlag.ItemIsEditable
         return f
 
     HEADINGS = ('Name', 'Summary', 'Comment')
     def headerData(self, section, orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             return self.HEADINGS[section]
         return None
 
@@ -334,7 +335,7 @@ class MathTreeModel(QAbstractItemModel):
         return 3
 
     def supportedDropActions(self):
-        return Qt.MoveAction
+        return Qt.DropAction.MoveAction
 
     def mimeTypes(self):
         return ['text/plain']
@@ -400,7 +401,7 @@ class MathEditor(QDialog):
         self.tree_model = MathTreeModel(data_view)
         self.tree_view.setModel(self.tree_model)
         self.tree_view.expandAll()
-        self.tree_view.setDragDropMode(self.tree_view.InternalMove)
+        self.tree_view.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.tree_view.setDragEnabled(True)
         self.tree_view.setAcceptDrops(True)
         self.tree_view.setDropIndicatorShown(True)
@@ -505,7 +506,7 @@ class MathEditor(QDialog):
         else:
             dlg = ExpressionEditor(self, self.data_view, child.obj)
             try:
-                if dlg.exec_():
+                if dlg.exec():
                     self.tree_model.layoutAboutToBeChanged.emit()
                     self.tree_model.layoutChanged.emit()
             finally:
@@ -549,7 +550,7 @@ class MathEditor(QDialog):
             return # ??
         dlg = ExpressionEditor(self, self.data_view)
         try:
-            if dlg.exec_():
+            if dlg.exec():
                 self.tree_model.layoutAboutToBeChanged.emit()
                 group.expressions.append(dlg.new_expr)
                 self.tree_model.layoutChanged.emit()
@@ -560,7 +561,7 @@ class MathEditor(QDialog):
 def math_editor(parent, data_view):
     dlg = MathEditor(parent, data_view)
     try:
-        dlg.exec_()
+        dlg.exec()
     finally:
         dlg.deleteLater()
 
@@ -574,7 +575,7 @@ def channel_editor(parent, data_view, channel):
     if channel in data_view.maths.channel_map:
         dlg = ExpressionEditor(parent, data_view, data_view.maths.channel_map[channel][0])
         try:
-            if dlg.exec_():
+            if dlg.exec():
                 redo_math(data_view)
         finally:
             dlg.deleteLater()

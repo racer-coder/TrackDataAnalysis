@@ -10,15 +10,15 @@ import platform
 import traceback
 
 import glfw
-from PySide2 import QtGui
-from PySide2.QtCore import QSize, Qt, Signal
-from PySide2.QtWidgets import (
-    QAction,
+from PySide6 import QtGui
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
-    QOpenGLWidget,
     QWidget,
 )
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
 # Might need to add current dir to path to find mpv dll/so
 os.environ['PATH'] = os.path.dirname(__file__) + os.pathsep + os.environ['PATH']
@@ -97,7 +97,7 @@ class OneVideo(QOpenGLWidget):
         self.onUpdate.connect(self.process_update)
         self.ctx = None
 
-        self.mpv_result.connect(self.process_result, Qt.QueuedConnection)
+        self.mpv_result.connect(self.process_result, Qt.ConnectionType.QueuedConnection)
         self.async_outstanding = 0
         self.last_seek_exact = True
         self.last_seek_time = 0
@@ -241,8 +241,8 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         self.data_view = data_view
         self.zoom_window = 60000
         self.xaxis_click = widgets.MouseHelperItem(
-            cursor=Qt.OpenHandCursor,
-            clicks=[widgets.MouseHelperClick(Qt.LeftButton,
+            cursor=Qt.CursorShape.OpenHandCursor,
+            clicks=[widgets.MouseHelperClick(Qt.MouseButton.LeftButton,
                                              state_capture=self.xaxis_capture,
                                              move=self.xaxis_drag)])
         self.addMouseHelperTop(self.xaxis_click)
@@ -290,14 +290,14 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         fontMetrics = QtGui.QFontMetrics(font)
 
         pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
-        pen.setStyle(Qt.SolidLine)
+        pen.setStyle(Qt.PenStyle.SolidLine)
         ph.painter.setPen(pen)
 
         y_offset = fontMetrics.height() + 4
 
         tc = session_time
         ph.painter.drawText(0, 0, ph.size.width(), fontMetrics.height(),
-                            Qt.AlignHCenter | Qt.AlignBottom | Qt.TextSingleLine,
+                            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignBottom | Qt.TextFlag.TextSingleLine,
                             '%.0f:%06.3f' % (math.copysign(math.trunc(tc / 60000), tc),
                                              abs(tc) % 60000 / 1000))
         ph.painter.drawLine(ph.size.width() / 2, y_offset, ph.size.width() / 2, y_offset - 4)
@@ -310,7 +310,7 @@ class AlignmentSlider(widgets.MouseHelperWidget):
             tc = i * self.x_axis.logical_tick_spacing
             x = self.x_axis.calc(tc)
             ph.painter.drawText(x - 100, y_offset + 4, 200, 50,
-                                Qt.AlignHCenter | Qt.AlignTop | Qt.TextSingleLine,
+                                Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextSingleLine,
                                 formatter %
                                 (math.copysign(math.trunc(tc / 60000), tc),
                                  abs(tc) % 60000 / 1000))
@@ -366,7 +366,7 @@ class Video(QWidget):
 
         self.layout.setRowStretch(0, 1)
         self.setLayout(self.layout)
-        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
     def save_state(self):
         return {'type': 'video',

@@ -5,8 +5,9 @@ import configparser
 from dataclasses import dataclass
 import typing
 
-from PySide2.QtCore import Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
+    QAbstractItemView,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -59,11 +60,11 @@ class LayoutTree(QTreeWidget):
     reordered = Signal()
 
     def setItemDropEnabled(self, i, e):
-        i.setFlags((i.flags() & ~Qt.ItemIsDropEnabled) | (Qt.ItemIsDropEnabled if e else 0))
+        i.setFlags((i.flags() & ~Qt.ItemFlag.ItemIsDropEnabled) | (Qt.ItemFlag.ItemIsDropEnabled if e else 0))
 
     def dragEnterEvent(self, e):
         if len(self.selectedItems()) == 1:
-            is_wb = type(self.selectedItems()[0].data(0, Qt.UserRole)) is Workbook
+            is_wb = type(self.selectedItems()[0].data(0, Qt.ItemDataRole.UserRole)) is Workbook
             self.setItemDropEnabled(self.invisibleRootItem(), is_wb)
             for i in range(self.topLevelItemCount()):
                 self.setItemDropEnabled(self.topLevelItem(i), not is_wb)
@@ -86,10 +87,10 @@ class LayoutEditor(QDialog):
         self.tree = LayoutTree()
         self.tree.setColumnCount(1)
         self.tree.setItemsExpandable(False)
-        self.tree.setDragDropMode(self.tree.InternalMove)
-        self.tree.setDefaultDropAction(Qt.IgnoreAction)
-        self.tree.setEditTriggers(self.tree.DoubleClicked | self.tree.SelectedClicked |
-                                  self.tree.EditKeyPressed)
+        self.tree.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.tree.setDefaultDropAction(Qt.DropAction.IgnoreAction)
+        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked | QAbstractItemView.EditTrigger.SelectedClicked |
+                                  QAbstractItemView.EditTrigger.EditKeyPressed)
         self.tree.header().hide()
         current = None
         for wb in parent.workspace:
@@ -143,18 +144,18 @@ class LayoutEditor(QDialog):
 
     def insertWorksheet(self, wbitem, ws):
         shitem = QTreeWidgetItem(wbitem)
-        shitem.setFlags((shitem.flags() | Qt.ItemIsEditable) & ~Qt.ItemIsDropEnabled)
+        shitem.setFlags((shitem.flags() | Qt.ItemFlag.ItemIsEditable) & ~Qt.ItemFlag.ItemIsDropEnabled)
         shitem.setText(0, ws.name)
-        shitem.setData(0, Qt.UserRole, ws)
+        shitem.setData(0, Qt.ItemDataRole.UserRole, ws)
         return shitem
 
     def insertWorkbook(self, wb):
         current = None
         wbitem = QTreeWidgetItem(self.tree)
-        wbitem.setFlags(wbitem.flags() | Qt.ItemIsEditable)
+        wbitem.setFlags(wbitem.flags() | Qt.ItemFlag.ItemIsEditable)
         wbitem.setExpanded(True)
         wbitem.setText(0, wb.name)
-        wbitem.setData(0, Qt.UserRole, wb)
+        wbitem.setData(0, Qt.ItemDataRole.UserRole, wb)
         for sh in wb.sheets:
             shitem = self.insertWorksheet(wbitem, sh)
             if sh == self.parent().current_sheet:
@@ -164,7 +165,7 @@ class LayoutEditor(QDialog):
     def selectionChanged(self):
         sel = self.tree.selectedItems()
         if len(sel) != 1: return
-        sel = sel[0].data(0, Qt.UserRole)
+        sel = sel[0].data(0, Qt.ItemDataRole.UserRole)
         self.parent().selectSheet(sel if type(sel) == Worksheet else sel.last_sheet)
 
     def reordered(self):
@@ -172,8 +173,8 @@ class LayoutEditor(QDialog):
         parent.workspace = []
         for i in range(self.tree.topLevelItemCount()):
             it = self.tree.topLevelItem(i)
-            wb = it.data(0, Qt.UserRole)
-            wb.sheets = [it.child(j).data(0, Qt.UserRole) for j in range(it.childCount())]
+            wb = it.data(0, Qt.ItemDataRole.UserRole)
+            wb.sheets = [it.child(j).data(0, Qt.ItemDataRole.UserRole) for j in range(it.childCount())]
             if not wb.sheets: continue # skip empty Workbooks
             if wb.last_sheet not in wb.sheets:
                 wb.last_sheet = wb.sheets[0]
@@ -181,8 +182,8 @@ class LayoutEditor(QDialog):
         parent.workspaceUpdated()
 
     def itemChanged(self, it, c):
-        if it.data(0, Qt.UserRole):
-            it.data(0, Qt.UserRole).name = it.text(0) # propogate name change to underlying workspace
+        if it.data(0, Qt.ItemDataRole.UserRole):
+            it.data(0, Qt.ItemDataRole.UserRole).name = it.text(0) # propogate name change to underlying workspace
             self.parent().workspaceUpdated() # update tabbar/combo box as needed
 
     def addWorkbook(self):
@@ -218,7 +219,7 @@ class LayoutEditor(QDialog):
         sel = sel[0]
         ret = QMessageBox.warning(self.parent(), 'Warning',
                                   'Are you sure you want to delete %s "%s?"' %
-                                  (self.worktypemap[type(sel.data(0, Qt.UserRole))],
+                                  (self.worktypemap[type(sel.data(0, Qt.ItemDataRole.UserRole))],
                                    sel.text(0)),
                                   QMessageBox.Yes | QMessageBox.No,
                                   QMessageBox.No)
@@ -231,12 +232,12 @@ class LayoutEditor(QDialog):
         sel = self.tree.selectedItems()
         if len(sel) != 1: return
         sel = sel[0]
-        t = self.worktypemap[type(sel.data(0, Qt.UserRole))]
+        t = self.worktypemap[type(sel.data(0, Qt.ItemDataRole.UserRole))]
         new_name, ok = QInputDialog.getText(self.parent(), 'Rename',
                                             'Enter a new name for %s "%s"' % (t, sel.text(0)))
         if ok and new_name:
             sel.setText(0, new_name)
-            sel.data(0, Qt.UserRole).name = new_name
+            sel.data(0, Qt.ItemDataRole.UserRole).name = new_name
             self.parent().workspaceUpdated()
 
 
@@ -248,7 +249,7 @@ class LayoutManager(QWidget):
         self.data_view = data_view
 
         self.workbook_selector = QComboBox()
-        self.workbook_selector.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.workbook_selector.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.workbook_selector.activated.connect(self.comboActivated)
         self.workbook_selector.currentIndexChanged.connect(self.comboChange)
         self.current_book = None
@@ -258,7 +259,7 @@ class LayoutManager(QWidget):
         self.tabbar.tabMoved.connect(self.tabMoved)
         self.tabbar.tabBarClicked.connect(self.tabClicked)
         self.tabbar.currentChanged.connect(self.tabSelected)
-        self.tabbar.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tabbar.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tabbar.customContextMenuRequested.connect(self.tab_context_menu)
 
         self.new_layout()
@@ -301,7 +302,7 @@ class LayoutManager(QWidget):
         if idx < 0: act.setEnabled(False)
         menu.addSeparator()
         menu.addAction('Layout Editor...').triggered.connect(self.layoutEditor)
-        menu.exec_(self.tabbar.mapToGlobal(pos))
+        menu.exec(self.tabbar.mapToGlobal(pos))
 
     def new_layout(self):
         ws = Worksheet('Worksheet', True, [])
@@ -313,7 +314,7 @@ class LayoutManager(QWidget):
     def layoutEditor(self):
         self.saveCurrentTab()
         dlg = LayoutEditor(self)
-        dlg.exec_()
+        dlg.exec()
         dlg.deleteLater()
         # XXX cancel button for dialog to revert to previous design
 

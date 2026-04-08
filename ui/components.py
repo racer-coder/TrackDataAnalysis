@@ -3,10 +3,10 @@
 
 import enum
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
-from PySide2.QtWidgets import (
-    QAction,
+from PySide6 import QtGui
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
@@ -37,7 +37,7 @@ class ComponentManager(QWidget):
         act = QAction('Paste', self)
         act.triggered.connect(self.paste_component)
         self.addAction(act)
-        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
 
         self.component_clipboard = None
 
@@ -150,11 +150,11 @@ class ComponentBase(QWidget):
     def __init__(self, parent, g, data_view, cWidget):
         super().__init__(parent=parent)
 
-        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.setVisible(True)
         self.setAutoFillBackground(True)
         self.setMouseTracking(True)
-        self.setFocusPolicy(Qt.ClickFocus)
+        self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         if g:
             # g[0] -> maximize?
             self.fracGeometry = QRectF(g[1], g[2], g[3], g[4])
@@ -247,13 +247,13 @@ class ComponentBase(QWidget):
     #    if e.key() == Qt.Key_Delete:
     #        self.deleteLater()
     #    # Moving container with arrows
-    #    elif QApplication.keyboardModifiers() == Qt.ControlModifier:
+    #    elif QApplication.keyboardModifiers() == Qt.KeyboardModifier.ControlModifier:
     #        if   e.key() == Qt.Key_Up:    self.move(self.x(),     self.y() - 1)
     #        elif e.key() == Qt.Key_Down:  self.move(self.x(),     self.y() + 1)
     #        elif e.key() == Qt.Key_Left:  self.move(self.x() - 1, self.y())
     #        elif e.key() == Qt.Key_Right: self.move(self.x() + 1, self.y())
     #        else: return
-    #    elif QApplication.keyboardModifiers() == Qt.ShiftModifier:
+    #    elif QApplication.keyboardModifiers() == Qt.KeyboardModifier.ShiftModifier:
     #        if   e.key() == Qt.Key_Up:    self.resize(self.width(),     self.height() - 1)
     #        elif e.key() == Qt.Key_Down:  self.resize(self.width(),     self.height() + 1)
     #        elif e.key() == Qt.Key_Left:  self.resize(self.width() - 1, self.height())
@@ -274,20 +274,20 @@ class ComponentBase(QWidget):
         if e_pos.x() >= self.width() - diff:  flags |= ResizerMode.RIGHT
 
         if not flags:
-            self.setCursor(QtGui.QCursor(Qt.ArrowCursor))
+            self.setCursor(QtGui.QCursor(Qt.CursorShape.ArrowCursor))
         elif flags == ResizerMode.LEFT or flags == ResizerMode.RIGHT:
-            self.setCursor(QtGui.QCursor(Qt.SizeHorCursor))
+            self.setCursor(QtGui.QCursor(Qt.CursorShape.SizeHorCursor))
         elif flags == ResizerMode.TOP or flags == ResizerMode.BOTTOM:
-            self.setCursor(QtGui.QCursor(Qt.SizeVerCursor))
+            self.setCursor(QtGui.QCursor(Qt.CursorShape.SizeVerCursor))
         elif bool(flags & ResizerMode.TOP) == bool(flags & ResizerMode.LEFT):
-            self.setCursor(QtGui.QCursor(Qt.SizeFDiagCursor))
+            self.setCursor(QtGui.QCursor(Qt.CursorShape.SizeFDiagCursor))
         else:
-            self.setCursor(QtGui.QCursor(Qt.SizeBDiagCursor))
+            self.setCursor(QtGui.QCursor(Qt.CursorShape.SizeBDiagCursor))
         self.mode = flags
 
     def mousePressEvent(self, e: QtGui.QMouseEvent):
-        self.pressedGeometry = self.geometry().translated(-e.globalPos())
-        if self.m_isEditing and e.button() == Qt.LeftButton:
+        self.pressedGeometry = self.geometry().translated(-e.globalPosition().toPoint())
+        if self.m_isEditing and e.button() == Qt.MouseButton.LeftButton:
             e.accept()
         else:
             super().mousePressEvent(e)
@@ -300,13 +300,13 @@ class ComponentBase(QWidget):
         if not self.m_isEditing:
             super().mouseMoveEvent(e)
             return
-        if not (e.buttons() & Qt.LeftButton) or not self.pressedGeometry:
-            self.setCursorShape(e.pos())
+        if not (e.buttons() & Qt.MouseButton.LeftButton) or not self.pressedGeometry:
+            self.setCursorShape(e.position().toPoint())
             e.accept()
             return
 
         if self.mode == ResizerMode.MOVE:
-            toMove = e.globalPos() + self.pressedGeometry.topLeft()
+            toMove = e.globalPosition().toPoint() + self.pressedGeometry.topLeft()
             self.move(
                 QPoint(min(max(toMove.x(), 0), self.parentWidget().width() - self.width()),
                        min(max(toMove.y(), 0), self.parentWidget().height() - self.height())))
@@ -314,19 +314,19 @@ class ComponentBase(QWidget):
             newGeo = self.geometry()
             minSize = self.minimumSizeHint()
             if self.mode & ResizerMode.TOP:
-                newGeo.setTop(max(min(e.globalPos().y() + self.pressedGeometry.top(),
+                newGeo.setTop(max(min(e.globalPosition().toPoint().y() + self.pressedGeometry.top(),
                                       newGeo.bottom() - minSize.height()),
                                   0))
             if self.mode & ResizerMode.BOTTOM:
-                newGeo.setBottom(min(max(e.globalPos().y() + self.pressedGeometry.bottom(),
+                newGeo.setBottom(min(max(e.globalPosition().toPoint().y() + self.pressedGeometry.bottom(),
                                          newGeo.top() + minSize.height()),
                                      self.parentWidget().height()))
             if self.mode & ResizerMode.LEFT:
-                newGeo.setLeft(max(min(e.globalPos().x() + self.pressedGeometry.left(),
+                newGeo.setLeft(max(min(e.globalPosition().toPoint().x() + self.pressedGeometry.left(),
                                        newGeo.right() - minSize.width()),
                                    0))
             if self.mode & ResizerMode.RIGHT:
-                newGeo.setRight(min(max(e.globalPos().x() + self.pressedGeometry.right(),
+                newGeo.setRight(min(max(e.globalPosition().toPoint().x() + self.pressedGeometry.right(),
                                         newGeo.left() + minSize.width()),
                                     self.parentWidget().width()))
             m = self.parentWidget().invertLambda()

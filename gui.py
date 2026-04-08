@@ -8,8 +8,9 @@ import json
 import os
 import sys
 
-from PySide2.QtCore import QSize, QStandardPaths, Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QSize, QStandardPaths, Qt, Signal
+from PySide6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -144,7 +145,7 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar()
         toolbar.setObjectName('DockerBar')
         toolbar.setMovable(False)
-        self.addToolBar(Qt.LeftToolBarArea, toolbar)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, toolbar)
         self.dockwidgets = []
 
         ui.dockers.ChannelsDockWidget(self, toolbar)
@@ -229,7 +230,8 @@ class MainWindow(QMainWindow):
         # Can't use clear(), it may delete the actions
         for a in self.comp_menu.actions():
             self.comp_menu.removeAction(a)
-        self.comp_menu.addActions(self.data_view.active_component.actions())
+        if self.data_view.active_component is not None:
+            self.comp_menu.addActions(self.data_view.active_component.actions())
 
     def show_details(self):
         if not self.data_view.ref_lap:
@@ -242,12 +244,12 @@ class MainWindow(QMainWindow):
                          os.path.basename(self.data_view.ref_lap.log.log.get_filename())))
         metadata.append(('Dirname', os.path.dirname(self.data_view.ref_lap.log.log.get_filename())))
         table = QTableWidget(len(metadata), 2)
-        table.setSelectionMode(table.NoSelection)
-        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         table.horizontalHeader().hide()
-        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         table.verticalHeader().hide()
-        table.setEditTriggers(table.NoEditTriggers)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         row = 0
         for name, val in metadata:
             table.setItem(row, 0, QTableWidgetItem(name))
@@ -263,7 +265,7 @@ class MainWindow(QMainWindow):
         dia.setLayout(layout)
 
         bbox.rejected.connect(dia.accept)
-        dia.exec_()
+        dia.exec()
 
     def toggle_time_dist(self):
         self.data_view.mode_time = not self.data_view.mode_time
@@ -323,7 +325,7 @@ class MainWindow(QMainWindow):
             if d:
                 userfuncpath.setText(d)
         userfuncbutton.clicked.connect(userfunc_dialog)
-        userfuncbutton.setIcon(self.style().standardIcon(QStyle.SP_DirIcon))
+        userfuncbutton.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
         ulayout.addWidget(userfuncbutton)
         layout.addRow('Path for user math functions', ulayout)
 
@@ -366,7 +368,7 @@ class MainWindow(QMainWindow):
         bbox.accepted.connect(dia.accept)
         bbox.rejected.connect(dia.reject)
 
-        if dia.exec_():
+        if dia.exec():
             self.data_view.maps_key = ['maptiler', maptiler_key.text()]
             self.config['main']['user_func_path'] = userfuncpath.text()
             ui.math.set_user_func_dir(self.data_view, userfuncpath.text())
@@ -464,4 +466,4 @@ window = MainWindow()
 window.show()
 
 # Start the event loop.
-app.exec_()
+app.exec()
