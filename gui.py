@@ -9,6 +9,7 @@ import os
 import sys
 
 from PySide6.QtCore import QSize, QStandardPaths, Qt, Signal
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -114,6 +115,8 @@ class MainWindow(QMainWindow):
 
                                            config=self.config)
 
+        self.setAcceptDrops(True)
+
         try:
             ui.math.set_user_func_dir(self.data_view, self.config.get('main', 'user_func_path'))
         except configparser.NoOptionError:
@@ -173,14 +176,27 @@ class MainWindow(QMainWindow):
         dummy.setLayout(vbox)
         self.setCentralWidget(dummy)
 
-        file_menu.addAction('Open from db...').triggered.connect(self.datamgr.open_from_db)
-        file_menu.addAction('Open from file...').triggered.connect(self.datamgr.open_from_file)
+        act = file_menu.addAction('Open from file...')
+        act.setShortcut(QKeySequence('Ctrl+O'))
+        act.triggered.connect(self.datamgr.open_from_file)
+        act = file_menu.addAction('Open from db...')
+        act.setShortcut(QKeySequence('Ctrl+D'))
+        act.triggered.connect(self.datamgr.open_from_db)
         file_menu.addAction('Close all log files').triggered.connect(self.datamgr.close_all_logs)
         file_menu.addSeparator()
-        file_menu.addAction('New Workspace').triggered.connect(self.new_workspace)
+        self.recent_menu = file_menu.addMenu('Recent Files')
+        self._build_recent_menu()
+        file_menu.addSeparator()
+        act = file_menu.addAction('New Workspace')
+        act.setShortcut(QKeySequence('Ctrl+N'))
+        act.triggered.connect(self.new_workspace)
         file_menu.addAction('Open Workspace...').triggered.connect(self.open_workspace)
-        file_menu.addAction('Save Workspace').triggered.connect(self.save_workspace)
-        file_menu.addAction('Save Workspace As...').triggered.connect(self.save_as_workspace)
+        act = file_menu.addAction('Save Workspace')
+        act.setShortcut(QKeySequence('Ctrl+S'))
+        act.triggered.connect(self.save_workspace)
+        act = file_menu.addAction('Save Workspace As...')
+        act.setShortcut(QKeySequence('Ctrl+Shift+S'))
+        act.triggered.connect(self.save_as_workspace)
         file_menu.addSeparator()
         file_menu.addAction('Preferences...').triggered.connect(self.preferences)
         file_menu.addSeparator()
@@ -199,7 +215,9 @@ class MainWindow(QMainWindow):
         data_menu.addSeparator()
         data_menu.addAction('Zoom to default').triggered.connect(self.zoom_default)
         data_menu.addSeparator()
-        data_menu.addAction('Export to CSV...').triggered.connect(self.export_csv)
+        act = data_menu.addAction('Export to CSV...')
+        act.setShortcut(QKeySequence('Ctrl+E'))
+        act.triggered.connect(self.export_csv)
 
         tools_menu.addAction('Track editor...').triggered.connect(self.track_editor)
         tools_menu.addAction('Math channels...').triggered.connect(self.math_editor)
@@ -515,6 +533,57 @@ class MainWindow(QMainWindow):
         self.workspace_fname = file_name
         self.update_title()
         return self.save_workspace()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                path = url.toLocalFile()
+                if self.datamgr.get_builder(path):
+                    event.acceptProposedAction()
+                    return
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if self.datamgr.get_builder(path):
+                self.datamgr.open_file_worker(path)
+                self._update_recent_files(path)
+
+    def _update_recent_files(self, path):
+        try:
+            recent = json.loads(self.config.get('main', 'recent_files'))
+        except (configparser.NoOptionError, json.JSONDecodeError):
+            recent = []
+        path = os.path.normpath(path)
+        if path in recent:
+            recent.remove(path)
+        recent.insert(0, path)
+        recent = recent[:10]
+        self.config['main']['recent_files'] = json.dumps(recent)
+        self._build_recent_menu()
+
+    def _build_recent_menu(self):
+        self.recent_menu.clear()
+        try:
+            recent = json.loads(self.config.get('main', 'recent_files'))
+        except (configparser.NoOptionError, json.JSONDecodeError):
+            recent = []
+        if not recent:
+            act = self.recent_menu.addAction('(empty)')
+            act.setEnabled(False)
+        else:
+            for path in recent:
+                act = self.recent_menu.addAction(os.path.basename(path))
+                act.setToolTip(path)
+                act.triggered.connect(lambda checked=False, p=path: self._open_recent(p))
+
+    def _open_recent(self, path):
+        if os.path.exists(path):
+            self.datamgr.open_file(path)
+            self._update_recent_files(path)
+        else:
+            QMessageBox.warning(self, 'File not found',
+                                'File not found: %s' % path)
 
     def closeEvent(self, e):
         e.ignore()

@@ -816,6 +816,40 @@ class TimeDist(widgets.MouseHelperWidget):
 
             ph.painter.restore()
 
+        # paint lap legend
+        if self.x_axis and self.lapView:
+            legend_font = self.axis_font
+            legend_fm = QtGui.QFontMetrics(legend_font)
+            legend_entries = []
+            if self.dataView.ref_lap:
+                legend_entries.append(('R: Lap %s' % self.dataView.ref_lap.num, state.lap_colors[0]))
+            if self.dataView.alt_lap:
+                legend_entries.append(('A: Lap %s' % self.dataView.alt_lap.num, state.lap_colors[1]))
+            for idx, (lap, color) in enumerate(self.dataView.extra_laps):
+                legend_entries.append(('%d: Lap %s' % (idx + 3, lap.num), color))
+            if legend_entries:
+                swatch_w = 14
+                swatch_h = 3
+                entry_h = legend_fm.height()
+                padding = 6
+                text_widths = [legend_fm.horizontalAdvance(t) for t, c in legend_entries]
+                legend_w = padding * 2 + swatch_w + 6 + max(text_widths)
+                legend_h = padding * 2 + entry_h * len(legend_entries)
+                lx = ph.size.width() - legend_w - 10
+                ly = graph_y + 10
+                ph.painter.fillRect(QRect(lx, ly, legend_w, legend_h),
+                                    QtGui.QColor(20, 20, 20, 180))
+                ph.painter.setFont(legend_font)
+                for ei, (text, color) in enumerate(legend_entries):
+                    ey = ly + padding + ei * entry_h
+                    ph.painter.fillRect(QRect(lx + padding, ey + entry_h // 2 - swatch_h // 2,
+                                              swatch_w, swatch_h), color)
+                    ph.painter.setPen(QtGui.QPen(QtGui.QColor(220, 220, 220)))
+                    ph.painter.drawText(lx + padding + swatch_w + 6, ey,
+                                        legend_w, entry_h,
+                                        Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft | Qt.TextFlag.TextSingleLine,
+                                        text)
+
         # paint cursor
         if self.x_axis:
             x = self.x_axis.calc(self.dataView.getTDValue(self.dataView.cursor_time))

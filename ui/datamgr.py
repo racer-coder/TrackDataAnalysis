@@ -545,6 +545,11 @@ class DataDockWidget(TempDockWidget):
 
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
+
+        # Update recent files in the main window
+        if hasattr(self.mainwindow, '_update_recent_files'):
+            self.mainwindow._update_recent_files(file_name)
+
         return True
 
     def _auto_setup_default_view(self):

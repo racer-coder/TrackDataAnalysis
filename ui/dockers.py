@@ -18,6 +18,8 @@ from PySide6.QtWidgets import (
     QMenu,
     QStyle,
     QTableView,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -136,15 +138,35 @@ class TextMatcher:
                        for piece in other.lower().replace('_', ' ').split())
                    for h in self.text_hints)
 
-class ChannelsListWidget(QListWidget):
+CHANNEL_CATEGORIES = [
+    ("Engine", ["RPM", "Gear", "TPS", "PPS", "Lambda", "MAP", "Baro", "ClutchSw"]),
+    ("GPS", ["GPS", "Latitude", "Longitude", "Altitude", "Heading"]),
+    ("Speed", ["Speed", "WheelSpd"]),
+    ("Temperature", ["Temp", "ECT", "OilTemp", "IntakeAirT", "Ambient", "CAT1", "EGT"]),
+    ("Acceleration", ["Acc", "InlineAcc", "LateralAcc", "VerticalAcc", "Roll", "Pitch", "Yaw"]),
+    ("Brakes", ["Brake"]),
+    ("Suspension", ["Shock", "Steer"]),
+    ("Timing", ["Predictive", "Best Run", "Best Today", "Prev Lap", "Ref Lap", "Luminosity"]),
+    ("Voltage", ["Voltage", "External"]),
+]
+
+def _categorize_channel(name):
+    name_lower = name.lower()
+    for cat, keywords in CHANNEL_CATEGORIES:
+        for kw in keywords:
+            if kw.lower() in name_lower:
+                return cat
+    return "Other"
+
+class ChannelsTreeWidget(QTreeWidget):
     def __init__(self, data_view):
         super().__init__()
         self.data_view = data_view
 
     def startDrag(self, actions):
         item = self.currentItem()
-        if not item: return
-        channels.initiate_drag(self, self.data_view, item.text())
+        if not item or item.childCount() > 0: return
+        channels.initiate_drag(self, self.data_view, item.text(0))
 
 class ChannelsDockWidget(TempDockWidget):
     def __init__(self, mainwindow, toolbar):
@@ -155,7 +177,8 @@ class ChannelsDockWidget(TempDockWidget):
         self.edit.setPlaceholderText('Channel search')
         self.edit.textChanged.connect(self.textChanged)
 
-        self.chList = ChannelsListWidget(mainwindow.data_view)
+        self.chList = ChannelsTreeWidget(mainwindow.data_view)
+        self.chList.setHeaderHidden(True)
         self.chList.setDragEnabled(True)
         self.chList.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
         self.chList.itemDoubleClicked.connect(self.activateItem)
@@ -175,6 +198,9 @@ class ChannelsDockWidget(TempDockWidget):
         self.setWidget(widget)
 
     def activateItem(self, item):
+        # Ignore double-click on category (parent) items
+        if item.childCount() > 0:
+            return
         ac = self.mainwindow.data_view.active_component
         if ac is None:
             # Fallback: find first component if none was ever focused
@@ -184,14 +210,17 @@ class ChannelsDockWidget(TempDockWidget):
                 ac = child.childWidget
                 break
         if ac and hasattr(ac, 'addChannel'):
-            ac.addChannel(item.text())
+            ac.addChannel(item.text(0))
 
     def textChanged(self, txt):
         self.matcher = TextMatcher(txt)
         self.update_hidden()
 
     def context_menu(self, pos):
-        ch = self.chList.itemAt(pos).text()
+        item = self.chList.itemAt(pos)
+        if not item or item.childCount() > 0:
+            return
+        ch = item.text(0)
         # channel specific context menu
         menu = QMenu()
         menu.addAction(ch) # dummy entry so the user knows exactly what we're operating on
@@ -207,38 +236,71 @@ class ChannelsDockWidget(TempDockWidget):
         menu.exec(self.mapToGlobal(pos))
 
     def update_hidden(self):
-        for i in range(self.chList.count()):
-            it = self.chList.item(i)
-            hide = not self.matcher.match(it.text())
-            if hide != it.isHidden():
-                it.setHidden(hide)
+        for i in range(self.chList.topLevelItemCount()):
+            cat_item = self.chList.topLevelItem(i)
+            any_visible = False
+            for j in range(cat_item.childCount()):
+                child = cat_item.child(j)
+                hide = not self.matcher.match(child.text(0))
+                if hide != child.isHidden():
+                    child.setHidden(hide)
+                if not hide:
+                    any_visible = True
+            cat_item.setHidden(not any_visible)
 
     def recompute(self):
         current = self.chList.currentItem()
-        if current: current = current.text()
+        if current and current.childCount() == 0:
+            current = current.text(0)
+        else:
+            current = None
+
         items = [ch
                  for logfile in self.mainwindow.data_view.log_files
                  for ch in logfile.log.get_channels()]
-        self.chList.clear()
-        self.chList.addItems(items)
-        self.update_hidden()
-        if current:
-            for it in self.chList.findItems(current, Qt.MatchFlag.MatchExactly):
-                self.chList.setCurrentItem(it)
-                break
 
+        self.chList.clear()
+
+        # Group channels by category
+        grouped = {}
+        for ch in items:
+            cat = _categorize_channel(ch)
+            grouped.setdefault(cat, []).append(ch)
+
+        # Build tree in category order
+        cat_order = [c[0] for c in CHANNEL_CATEGORIES] + ["Other"]
+        for cat in cat_order:
+            ch_list = grouped.get(cat)
+            if not ch_list:
+                continue
+            cat_item = QTreeWidgetItem([cat])
+            cat_item.setFlags(cat_item.flags() & ~Qt.ItemFlag.ItemIsDragEnabled)
+            for ch in ch_list:
+                child = QTreeWidgetItem([ch])
+                child.setFlags(child.flags() | Qt.ItemFlag.ItemIsDragEnabled)
+                cat_item.addChild(child)
+            self.chList.addTopLevelItem(cat_item)
+            cat_item.setExpanded(True)
+
+        self.update_hidden()
+
+        # Restore selection
+        if current:
+            found = self.chList.findItems(current, Qt.MatchFlag.MatchExactly | Qt.MatchFlag.MatchRecursive, 0)
+            if found:
+                self.chList.setCurrentItem(found[0])
+
+        # Highlight channels in the active component
         ac = self.mainwindow.data_view.active_component
-        if ac:
-            chSet = ac.channels()
-        else:
-            chSet = set()
-        for i in range(self.chList.count()):
-            it = self.chList.item(i)
-            it.setFlags(it.flags() | Qt.ItemFlag.ItemIsDragEnabled)
-            if it.text() in chSet:
-                it.setBackground(QtGui.QBrush(QtGui.QColor(255, 255, 0)))
-            else:
-                it.setBackground(QtGui.QBrush(Qt.BrushStyle.NoBrush))
+        chSet = ac.channels() if ac else set()
+        for i in range(self.chList.topLevelItemCount()):
+            cat_item = self.chList.topLevelItem(i)
+            for j in range(cat_item.childCount()):
+                child = cat_item.child(j)
+                if child.text(0) in chSet:
+                    child.setBackground(0, QtGui.QBrush(QtGui.QColor(255, 255, 0)))
+                else:
+                    child.setBackground(0, QtGui.QBrush(Qt.BrushStyle.NoBrush))
 
 
 @dataclass
