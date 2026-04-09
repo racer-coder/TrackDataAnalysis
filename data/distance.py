@@ -101,7 +101,13 @@ class DistanceWrapper:
         gs = np.interp(tc, distdata.timecodes, converted) * (1. / 100) # account for samplerate
 
         # adjust distances of each lap to match the median, if within a certain percentage
-        dividers = [int(round(l.start_time / 10)) for l in self.laps]
+        max_idx = len(gs) - 1
+        dividers = [min(int(round(l.start_time / 10)), max_idx) for l in self.laps]
+        # Remove out-of-range or duplicate dividers
+        dividers = sorted(set(d for d in dividers if 0 <= d <= max_idx))
+        if len(dividers) < 3:
+            ds = np.cumsum(gs)
+            return memoryview(tc), memoryview(ds), expected_len or 0
         lap_len = np.add.reduceat(gs, dividers)[1:-1]  # ignore in/out laps
         if not expected_len:
             expected_len = np.median(lap_len)
