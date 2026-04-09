@@ -539,9 +539,41 @@ class DataDockWidget(TempDockWidget):
 
         channels.update_channel_properties(self.data_view)
 
+        # Auto-create a default view when opening the first file into an empty workspace
+        if len(self.data_view.log_files) == 1:
+            self._auto_setup_default_view()
+
         self.data_view.values_change.emit()
         self.data_view.data_change.emit()
         return True
+
+    def _auto_setup_default_view(self):
+        """Create a Time/Distance graph with Speed + RPM when opening first file."""
+        from . import components, timedist
+        manager = self.mainwindow.centralWidget()
+        if not isinstance(manager, components.ComponentManager):
+            return
+        # Only auto-setup if no components exist yet
+        if manager.findChildren(components.ComponentBase):
+            return
+
+        td = timedist.TimeDist(self.data_view, True)
+        components.ComponentBase(manager, None, self.data_view, td)
+
+        # Find and add speed channel
+        ch_names = list(self.data_view.channel_properties.keys())
+        speed_candidates = ['GPS Speed', 'Speed', 'SpeedAverage', 'GPS_Speed']
+        for candidate in speed_candidates:
+            if candidate in ch_names:
+                td.addChannel(candidate)
+                break
+
+        # Find and add RPM channel
+        rpm_candidates = ['RPM', 'Engine RPM', 'Engine Speed', 'EngineSpeed']
+        for candidate in rpm_candidates:
+            if candidate in ch_names:
+                td.addChannel(candidate)
+                break
 
     def update_lap_ref(self, lap):
         return [l for l in lap.log.laps if l.num == lap.num][0] if lap else None

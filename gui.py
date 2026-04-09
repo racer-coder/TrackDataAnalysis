@@ -153,6 +153,8 @@ class MainWindow(QMainWindow):
         ui.dockers.ValuesDockWidget(self, toolbar)
         ui.dockers.MapDockWidget(self, toolbar)
 
+        self.data_view.data_change.connect(self.update_title)
+
         lapwidget = ui.widgets.LapWidget(self.data_view)
 
         measures = ui.components.ComponentManager(self.data_view, add_menu)
@@ -218,13 +220,17 @@ class MainWindow(QMainWindow):
         return QSize(ui.widgets.deviceScale(self, 800), ui.widgets.deviceScale(self, 600))
 
     def update_title(self):
+        parts = ["Track Data Analysis %s" % version]
         if self.workspace_fname:
             self.config['main']['workspace'] = self.workspace_fname
-            self.setWindowTitle("Track Data Analysis %s - %s" % (
-                version, os.path.splitext(os.path.basename(self.workspace_fname))[0]))
+            parts.append(os.path.splitext(os.path.basename(self.workspace_fname))[0])
         else:
             self.config.remove_option('main', 'workspace')
-            self.setWindowTitle("Track Data Analysis")
+        if self.data_view.log_files:
+            fnames = [os.path.basename(lr.log.get_filename())
+                      for lr in self.data_view.log_files[:3]]
+            parts.append(', '.join(fnames))
+        self.setWindowTitle(' — '.join(parts))
 
     def setup_component_menu(self):
         # Can't use clear(), it may delete the actions

@@ -57,13 +57,29 @@ class ComponentManager(QWidget):
 
     def paintEvent(self, e: QtGui.QPaintEvent):
         ph = widgets.makePaintHelper(self, e)
-        x1, y1, x2, y2 = ph.rect.getCoords()
-        sz = int(100 * widgets.deviceScaleFactor(self))
-        for cx in range(int(x1 / sz), int(x2 / sz) + 1):
-            for cy in range(int(y1 / sz), int(y2 / sz) + 1):
-                bright = 0 if (cx ^ cy) & 1 else 24
-                ph.painter.fillRect(QRect(cx * sz, cy * sz, sz, sz),
-                                    QtGui.QColor(bright, bright, bright))
+        # Dark background
+        ph.painter.fillRect(ph.rect, QtGui.QColor(12, 12, 12))
+
+        # Show help text if no components exist
+        if not self.findChildren(ComponentBase):
+            font = ph.painter.font()
+            font.setPixelSize(int(18 * ph.scale))
+            ph.painter.setFont(font)
+            ph.painter.setPen(QtGui.QColor(100, 100, 100))
+            lines = [
+                "Open a data file to get started",
+                "",
+                "File > Open from file...  or  File > Open from db...",
+                "Then use the Add menu to create graphs",
+            ]
+            line_h = int(24 * ph.scale)
+            cy = ph.size.height() // 2 - (len(lines) * line_h) // 2
+            for line in lines:
+                ph.painter.drawText(
+                    0, cy, ph.size.width(), line_h,
+                    Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+                    line)
+                cy += line_h
 
     def resizeLambda(self):
         return lambda p: QPointF(p.x() * self.size().width(),

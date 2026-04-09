@@ -158,7 +158,7 @@ class ChannelsDockWidget(TempDockWidget):
         self.chList = ChannelsListWidget(mainwindow.data_view)
         self.chList.setDragEnabled(True)
         self.chList.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
-        self.chList.itemActivated.connect(self.activateItem)
+        self.chList.itemDoubleClicked.connect(self.activateItem)
         self.chList.customContextMenuRequested.connect(self.context_menu)
         self.chList.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
@@ -176,7 +176,14 @@ class ChannelsDockWidget(TempDockWidget):
 
     def activateItem(self, item):
         ac = self.mainwindow.data_view.active_component
-        if ac:
+        if ac is None:
+            # Fallback: find first component if none was ever focused
+            from . import components
+            manager = self.mainwindow.centralWidget()
+            for child in manager.findChildren(components.ComponentBase):
+                ac = child.childWidget
+                break
+        if ac and hasattr(ac, 'addChannel'):
             ac.addChannel(item.text())
 
     def textChanged(self, txt):
