@@ -1025,7 +1025,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                    lambda: channel_editor(self, self.dataView, ch[1]))
             menu.addSeparator()
             menu.addAction('Remove channel').triggered.connect(lambda: self.channelMenuRemove(ch))
-            menu.exec(event.globalPosition().toPoint())
+            menu.exec(event.globalPos())
         else:
             # general widget context menu
-            QMenu.exec(self.actions(), event.globalPosition().toPoint(), None, self)
+            QMenu.exec(self.actions(), event.globalPos(), None, self)
