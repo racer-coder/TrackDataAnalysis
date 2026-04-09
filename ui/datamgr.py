@@ -555,8 +555,10 @@ class DataDockWidget(TempDockWidget):
     def _auto_setup_default_view(self):
         """Create a Time/Distance graph with Speed + RPM when opening first file."""
         from . import components, timedist
-        manager = self.mainwindow.centralWidget()
-        if not isinstance(manager, components.ComponentManager):
+        # ComponentManager is nested inside the central widget's layout
+        managers = self.mainwindow.findChildren(components.ComponentManager)
+        manager = managers[0] if managers else None
+        if manager is None:
             return
         # Only auto-setup if no components exist yet
         if manager.findChildren(components.ComponentBase):

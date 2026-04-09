@@ -205,8 +205,7 @@ class ChannelsDockWidget(TempDockWidget):
         if ac is None:
             # Fallback: find first component if none was ever focused
             from . import components
-            manager = self.mainwindow.centralWidget()
-            for child in manager.findChildren(components.ComponentBase):
+            for child in self.mainwindow.findChildren(components.ComponentBase):
                 ac = child.childWidget
                 break
         if ac and hasattr(ac, 'addChannel'):
