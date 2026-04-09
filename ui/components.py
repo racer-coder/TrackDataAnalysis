@@ -12,7 +12,11 @@ from PySide6.QtWidgets import (
 )
 
 from . import widgets
+from . import channel_report
+from . import histogram
 from . import lap_chart
+from . import map_component
+from . import scatter
 from . import sector_table
 from . import table_builder
 from . import timedist
@@ -20,7 +24,11 @@ from . import video
 
 class ComponentManager(QWidget):
     factory = {
+        'channel_report': channel_report.ChannelReport,
+        'histogram': histogram.Histogram,
         'lap_chart': lap_chart.LapChart,
+        'map_component': map_component.MapComponent,
+        'scatter': scatter.Scatter,
         'sector_table': sector_table.SectorTable,
         'table_builder': table_builder.TableBuilder,
         'timedist': timedist.TimeDist,
@@ -39,6 +47,10 @@ class ComponentManager(QWidget):
         addMenu.addAction('Lap Chart').triggered.connect(self.newLapChart)
         addMenu.addAction('Video').triggered.connect(self.newVideo)
         addMenu.addAction('Table Builder').triggered.connect(self.newTableBuilder)
+        addMenu.addAction('Map').triggered.connect(self.newMapComponent)
+        addMenu.addAction('Histogram').triggered.connect(self.newHistogram)
+        addMenu.addAction('XY Scatter').triggered.connect(self.newScatter)
+        addMenu.addAction('Channel Report').triggered.connect(self.newChannelReport)
 
         act = QAction('Paste', self)
         act.triggered.connect(self.paste_component)
@@ -66,6 +78,18 @@ class ComponentManager(QWidget):
 
     def newTableBuilder(self):
         ComponentBase(self, None, self.dataView, table_builder.TableBuilder(self.dataView))
+
+    def newMapComponent(self):
+        ComponentBase(self, None, self.dataView, map_component.MapComponent(self.dataView))
+
+    def newHistogram(self):
+        ComponentBase(self, None, self.dataView, histogram.Histogram(self.dataView))
+
+    def newScatter(self):
+        ComponentBase(self, None, self.dataView, scatter.Scatter(self.dataView))
+
+    def newChannelReport(self):
+        ComponentBase(self, None, self.dataView, channel_report.ChannelReport(self.dataView))
 
     def paintEvent(self, e: QtGui.QPaintEvent):
         ph = widgets.makePaintHelper(self, e)
