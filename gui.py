@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMainWindow,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QStyle,
     QTableWidget,
@@ -197,6 +198,8 @@ class MainWindow(QMainWindow):
         data_menu.addAction('Swap Ref/Alt Laps').triggered.connect(self.swap_ref_alt)
         data_menu.addSeparator()
         data_menu.addAction('Zoom to default').triggered.connect(self.zoom_default)
+        data_menu.addSeparator()
+        data_menu.addAction('Export to CSV...').triggered.connect(self.export_csv)
 
         tools_menu.addAction('Track editor...').triggered.connect(self.track_editor)
         tools_menu.addAction('Math channels...').triggered.connect(self.math_editor)
@@ -288,6 +291,80 @@ class MainWindow(QMainWindow):
         self.data_view.zoom_window=(ui.state.TimeDistRef(0., 0.),
                                     ui.state.TimeDistRef(0., 0.))
         self.data_view.values_change.emit()
+
+    def export_csv(self):
+        import csv
+        import numpy as np
+
+        lap = self.data_view.ref_lap
+        if not lap:
+            QMessageBox.information(self, 'Export', 'No reference lap selected.')
+            return
+
+        file_name = QFileDialog.getSaveFileName(
+            self, 'Export to CSV', '', 'CSV files (*.csv)')[0]
+        if not file_name:
+            return
+
+        # Get all channel names
+        ch_names = sorted(self.data_view.channel_properties.keys())
+
+        # Find highest sample rate timecodes from any channel
+        best_timecodes = None
+        for ch_name in ch_names:
+            try:
+                cd = lap.get_channel_data(ch_name, None, self.data_view.maths)
+                if cd and (best_timecodes is None or len(cd.timecodes) > len(best_timecodes)):
+                    best_timecodes = np.array(cd.timecodes)
+            except:
+                pass
+
+        if best_timecodes is None or len(best_timecodes) == 0:
+            QMessageBox.warning(self, 'Export', 'No channel data available.')
+            return
+
+        # Filter timecodes to this lap's range
+        mask = (best_timecodes >= lap.start.time) & (best_timecodes <= lap.end.time)
+        timecodes = best_timecodes[mask]
+
+        progress = QProgressDialog('Exporting...', 'Cancel', 0, len(ch_names), self)
+        progress.setMinimumDuration(500)
+
+        with open(file_name, 'w', newline='') as f:
+            writer = csv.writer(f)
+            # Metadata header
+            writer.writerow(['# Lap', lap.num])
+            writer.writerow(['# Duration (s)', lap.duration() / 1000.0])
+            if self.data_view.log_files:
+                writer.writerow(['# File', self.data_view.log_files[0].log.get_filename()])
+            writer.writerow([])
+
+            # Build data columns
+            headers = ['Time (ms)']
+            columns = [timecodes - lap.start.time]  # relative to lap start
+
+            for i, ch_name in enumerate(ch_names):
+                progress.setValue(i)
+                if progress.wasCanceled():
+                    return
+                try:
+                    cd = lap.get_channel_data(ch_name, None, self.data_view.maths)
+                    if cd:
+                        props = self.data_view.channel_properties.get(ch_name)
+                        unit = props.units if props else ''
+                        headers.append(f'{ch_name} ({unit})' if unit else ch_name)
+                        values = cd.interp_many(timecodes, True)
+                        columns.append(values)
+                except:
+                    pass
+
+            writer.writerow(headers)
+            for row_idx in range(len(timecodes)):
+                writer.writerow([col[row_idx] if row_idx < len(col) else ''
+                                for col in columns])
+
+        progress.setValue(len(ch_names))
+        QMessageBox.information(self, 'Export', f'Exported {len(timecodes)} rows, {len(headers)-1} channels to:\n{file_name}')
 
     def math_editor(self):
         ui.math.math_editor(self, self.data_view)
