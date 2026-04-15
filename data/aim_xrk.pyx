@@ -651,7 +651,10 @@ def _get_metadata(msg_by_type):
                       (_tokdec('NTE'), 'Long Comment'),
                       ]:
         if msg in msg_by_type:
-            ret[name] = msg_by_type[msg][-1].content
+            # AIM translates time using timezones... but if you happen
+            # to cross midnight GMT, it will reemit the time in GMT,
+            # thus screwing up the reported date/time.
+            ret[name] = msg_by_type[msg][0 if name in ('Log Date', 'Log Time') else -1].content
     if _tokdec('TRK') in msg_by_type:
         ret['Venue'] = msg_by_type[_tokdec('TRK')][-1].content['name']
         # ignore the start/finish line?
