@@ -5,8 +5,8 @@ import configparser
 from dataclasses import dataclass
 import typing
 
-from PySide2.QtCore import Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -301,7 +301,7 @@ class LayoutManager(QWidget):
         if idx < 0: act.setEnabled(False)
         menu.addSeparator()
         menu.addAction('Layout Editor...').triggered.connect(self.layoutEditor)
-        menu.exec_(self.tabbar.mapToGlobal(pos))
+        menu.exec(self.tabbar.mapToGlobal(pos))
 
     def new_layout(self):
         ws = Worksheet('Worksheet', True, [])
@@ -313,7 +313,7 @@ class LayoutManager(QWidget):
     def layoutEditor(self):
         self.saveCurrentTab()
         dlg = LayoutEditor(self)
-        dlg.exec_()
+        dlg.exec()
         dlg.deleteLater()
         # XXX cancel button for dialog to revert to previous design
 

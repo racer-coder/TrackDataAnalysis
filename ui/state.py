@@ -8,9 +8,9 @@ import math
 import os
 import typing
 
-from PySide2.QtCore import Signal
-from PySide2 import QtGui
-from PySide2.QtWidgets import QWidget
+from PySide6.QtCore import Signal
+from PySide6 import QtGui
+from PySide6.QtWidgets import QWidget
 
 import numpy as np
 

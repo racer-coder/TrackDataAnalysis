@@ -7,10 +7,18 @@ import math
 
 import numpy as np
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QRect, QRectF, QSize, Qt
-from PySide2.QtWidgets import (
+from PySide6.QtGui import (
     QAction,
+    QBrush,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QGuiApplication,
+    QPainter,
+    QPen,
+)
+from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
+from PySide6.QtWidgets import (
     QApplication,
     QMenu,
 )
@@ -125,7 +133,7 @@ class TimeDist(widgets.MouseHelperWidget):
 
         self.setAcceptDrops(True) # for reordering channels
 
-        self.axis_pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
+        self.axis_pen = QPen(QColor(192, 192, 192))
         self.drop_indicator = None
 
     def save_state(self):
@@ -239,7 +247,7 @@ class TimeDist(widgets.MouseHelperWidget):
 
     def selectFont(self, why):
         stats = self.font_map[why]
-        font = QtGui.QFont(stats[0])
+        font = QFont(stats[0])
         font.setPixelSize(widgets.deviceScale(self, stats[1]))
         return font
 
@@ -293,7 +301,7 @@ class TimeDist(widgets.MouseHelperWidget):
                           roundUpHumanNumber((dmax-dmin) / (height / ph.scale / 14)),
                           height / (dmin - dmax), y_offset)
         # set pen for grid
-        pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
+        pen = QPen(QColor(64, 64, 64))
         pen.setStyle(Qt.DotLine)
         ph.painter.setPen(pen)
         # draw x grid
@@ -322,7 +330,7 @@ class TimeDist(widgets.MouseHelperWidget):
                     d = self.dataView.get_channel_data(lap, ch)
                 if not len(d.values): continue
                 # set pen for data
-                pen = QtGui.QPen(color if color else channels.colors[d.color])
+                pen = QPen(color if color else channels.colors[d.color])
                 ph.painter.setPen(pen)
 
                 xa = d.timecodes if self.dataView.mode_time else d.distances
@@ -357,20 +365,20 @@ class TimeDist(widgets.MouseHelperWidget):
         # font for data stats
         font = self.selectFont('channel')
         ph.painter.setFont(font)
-        fontMetrics = QtGui.QFontMetrics(font)
+        fontMetrics = QFontMetrics(font)
         # color background for text
         ph.painter.fillRect(QRect(QPoint(self.graph_x, y_offset),
                                   QSize(self.channel_ind_width + self.channel_name_width + self.channel_value_width + self.channel_opt_width,
                                         12 + fontMetrics.height() * len(channel_list))),
-                            QtGui.QColor(32, 32, 32, 160))
+                            QColor(32, 32, 32, 160))
         nminmax = 4 if self.dataView.alt_lap else 2
         ph.painter.fillRect(QRect(QPoint(ph.size.width() - self.channel_minmax_width * nminmax,
                                          y_offset),
                                   QSize(self.channel_minmax_width * nminmax,
                                         12 + fontMetrics.height() * len(channel_list))),
-                            QtGui.QColor(32, 32, 32, 160))
+                            QColor(32, 32, 32, 160))
         # text for data
-        pen2 = QtGui.QPen(state.lap_colors[1])
+        pen2 = QPen(state.lap_colors[1])
         pen2.setStyle(Qt.SolidLine)
         next_y = y_offset
         for (color, ch, lap), d in zip(
@@ -390,7 +398,7 @@ class TimeDist(widgets.MouseHelperWidget):
             y = next_y
             next_y += fontMetrics.height()
 
-            pen = QtGui.QPen(color)
+            pen = QPen(color)
             ph.painter.setPen(pen)
 
             if graph_idx == self.current_channel[0] and ch == self.current_channel[1]:
@@ -505,7 +513,7 @@ class TimeDist(widgets.MouseHelperWidget):
             return # nothing to do
 
         ph.painter.setFont(self.axis_font)
-        text_height = QtGui.QFontMetrics(self.axis_font).height()
+        text_height = QFontMetrics(self.axis_font).height()
         ph.painter.setPen(self.axis_pen)
 
         ph.painter.drawLine(self.graph_x, y_offset, self.graph_x, y_offset + height)
@@ -593,15 +601,15 @@ class TimeDist(widgets.MouseHelperWidget):
                                                                            dist))),
                          ph.size.width() - 1) # don't overwrite boundary box
             if sectors[i].typ == 'Straight':
-                color = QtGui.QColor(0, 0, 0)
+                color = QColor(0, 0, 0)
             elif sectors[i].typ == 'Left':
-                color = QtGui.QColor(0, 0, 192)
+                color = QColor(0, 0, 192)
             elif sectors[i].typ == 'Right':
-                color = QtGui.QColor(160, 0, 0)
+                color = QColor(160, 0, 0)
             elif i & 1:
-                color = QtGui.QColor(32, 32, 32)
+                color = QColor(32, 32, 32)
             else:
-                color = QtGui.QColor(0, 0, 0)
+                color = QColor(0, 0, 0)
             ph.painter.fillRect(last_x, graph_y + 1, next_x - last_x, height - 2, color)
             # XXX colorize rest of graph
             # XXX only draw if room
@@ -631,7 +639,7 @@ class TimeDist(widgets.MouseHelperWidget):
         if self.time_slip.isChecked():
             self.calc_time_slip(self.dataView.get_laps(), self.time_slip_data)
 
-        channel_font_metrics = QtGui.QFontMetrics(self.selectFont('channel'))
+        channel_font_metrics = QFontMetrics(self.selectFont('channel'))
         M_space = channel_font_metrics.horizontalAdvance('\u25bc ')
         self.channel_name_width = max(
             [channel_font_metrics.horizontalAdvance(self.channelName(ch)) + 2 * M_space
@@ -685,17 +693,17 @@ class TimeDist(widgets.MouseHelperWidget):
             start_x = self.x_axis.calc(0)
             if start_x > self.graph_x:
                 ph.painter.fillRect(QRect(self.graph_x, 0, start_x - self.graph_x, y_div),
-                                    QtGui.QColor(48, 48, 48))
+                                    QColor(48, 48, 48))
             end_x = self.x_axis.calc(
                 self.dataView.lapTime2Mode(self.dataView.ref_lap, self.dataView.ref_lap.duration()))
             if end_x < ph.size.width():
                 ph.painter.fillRect(QRect(end_x, 0, ph.size.width() - end_x, y_div),
-                                    QtGui.QColor(48, 48, 48))
+                                    QColor(48, 48, 48))
 
         # lap window
         font = self.axis_font
         ph.painter.setFont(font)
-        fontMetrics = QtGui.QFontMetrics(font)
+        fontMetrics = QFontMetrics(font)
         graph_y = 4 + fontMetrics.height()
         ph.painter.setPen(self.axis_pen)
         # draw outline
@@ -735,7 +743,7 @@ class TimeDist(widgets.MouseHelperWidget):
             last_cutoff = next_cutoff + separation
 
         # separation lines
-        pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
+        pen = QPen(QColor(64, 64, 64))
         pen.setStyle(Qt.SolidLine)
         ph.painter.setPen(pen)
         for i in range(1, len(groups)):
@@ -746,7 +754,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                 ph.size.width(), cutoff - separation)
 
         # draw lap boundaries
-        pen = QtGui.QPen(QtGui.QColor(255, 0, 0))
+        pen = QPen(QColor(255, 0, 0))
         pen.setStyle(Qt.DashLine)
         ph.painter.setPen(pen)
         if self.x_axis:
@@ -764,7 +772,7 @@ class TimeDist(widgets.MouseHelperWidget):
 
         # draw zoom window
         if not self.lapView and self.x_axis:
-            pen = QtGui.QPen(QtGui.QColor(0, 255, 0))
+            pen = QPen(QColor(0, 255, 0))
             pen.setStyle(Qt.SolidLine)
             pen.setWidth(2)
             ph.painter.setPen(pen)
@@ -789,12 +797,12 @@ class TimeDist(widgets.MouseHelperWidget):
             for idx, axis in enumerate(self.shift_axis):
                 self.paintXAxis(ph, y_div + 16 * ph.scale * (1 + idx), axis[1])
             ph.painter.save()
-            f = QtGui.QColor(192, 192, 192)
-            b = QtGui.QColor(0, 0, 0)
+            f = QColor(192, 192, 192)
+            b = QColor(0, 0, 0)
             if not self.dataView.mode_time: f, b = b, f
-            ph.painter.setBackground(QtGui.QBrush(b))
+            ph.painter.setBackground(QBrush(b))
             ph.painter.setBackgroundMode(Qt.OpaqueMode)
-            ph.painter.setPen(QtGui.QPen(f))
+            ph.painter.setPen(QPen(f))
             ph.painter.drawText(0, y_div + 4, self.graph_x, 50,
                                 Qt.AlignTop | Qt.AlignRight | Qt.TextSingleLine,
                                 'm:s' if self.dataView.mode_time else 'meter')
@@ -802,17 +810,17 @@ class TimeDist(widgets.MouseHelperWidget):
 
         # draw drag and drop indicator, if in progress
         if self.drop_indicator:
-            ph.painter.fillRect(self.drop_indicator, QtGui.QColor(64, 64, 255, 192))
+            ph.painter.fillRect(self.drop_indicator, QColor(64, 64, 255, 192))
 
         # draw zoom selection, if in progress
         if self.zoom_highlight:
             ph.painter.save()
-            ph.painter.setCompositionMode(ph.painter.CompositionMode_Difference)
+            ph.painter.setCompositionMode(QPainter.CompositionMode_Difference)
 
             l = min(self.zoom_highlight)
             h = max(self.zoom_highlight)
             ph.painter.fillRect(QRect(QPoint(l, 0), QPoint(h, y_div)),
-                                QtGui.QColor(255, 255, 255))
+                                QColor(255, 255, 255))
 
             ph.painter.restore()
 
@@ -820,7 +828,7 @@ class TimeDist(widgets.MouseHelperWidget):
         if self.x_axis:
             x = self.x_axis.calc(self.dataView.getTDValue(self.dataView.cursor_time))
             if x >= self.graph_x and x < ph.size.width():
-                pen = QtGui.QPen(QtGui.QColor(255, 255, 0))
+                pen = QPen(QColor(255, 255, 0))
                 pen.setStyle(Qt.SolidLine)
                 ph.painter.setPen(pen)
                 ph.painter.drawLine(x, 0, x, y_div)
@@ -864,7 +872,7 @@ class TimeDist(widgets.MouseHelperWidget):
     def addChannel(self, ch):
         # remove if channel already exists
         if not self.tryRemoveChannel(ch):
-            if ((QtGui.QGuiApplication.keyboardModifiers() & Qt.ControlModifier)
+            if ((QGuiApplication.keyboardModifiers() & Qt.ControlModifier)
                 or not self.tryAddChannelExistingGroup(ch)):
                 self.channelGroups.append([ch])
         self.dataView.data_change.emit()
@@ -991,7 +999,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                    lambda: channel_editor(self, self.dataView, ch[1]))
             menu.addSeparator()
             menu.addAction('Remove channel').triggered.connect(lambda: self.channelMenuRemove(ch))
-            menu.exec_(event.globalPos())
+            menu.exec(event.globalPos())
         else:
             # general widget context menu
-            QMenu.exec_(self.actions(), event.globalPos(), None, self)
+            QMenu.exec(self.actions(), event.globalPos(), None, self)

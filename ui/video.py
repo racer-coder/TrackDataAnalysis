@@ -10,15 +10,22 @@ import platform
 import traceback
 
 import glfw
-from PySide2 import QtGui
-from PySide2.QtCore import QSize, Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtGui import (
     QAction,
+    QColor,
+    QFont,
+    QFontMetrics,
+    QOffscreenSurface,
+    QOpenGLContext,
+    QPen,
+)
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
-    QOpenGLWidget,
     QWidget,
 )
+from PySide6.QtOpenGLWidgets import QOpenGLWidget
 
 # Might need to add current dir to path to find mpv dll/so
 os.environ['PATH'] = os.path.dirname(__file__) + os.pathsep + os.environ['PATH']
@@ -35,7 +42,7 @@ class GetProcAddressGetter:
     """
 
     def __init__(self):
-        self.surface = QtGui.QOffscreenSurface()
+        self.surface = QOffscreenSurface()
         self.surface.create()
 
         if not glfw.init():
@@ -45,7 +52,7 @@ class GetProcAddressGetter:
         window = glfw.create_window(1, 1, "tda-OpenGL", None, None)
 
         glfw.make_context_current(window)
-        QtGui.QOpenGLContext.currentContext().makeCurrent(self.surface)
+        QOpenGLContext.currentContext().makeCurrent(self.surface)
 
     def wrap(self, _, name: bytes):
         return ctypes.cast(glfw.get_proc_address(name.decode('utf8')), ctypes.c_void_p).value
@@ -248,7 +255,7 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         self.addMouseHelperTop(self.xaxis_click)
 
     def sizeHint(self):
-        metrics = QtGui.QFontMetrics(self.select_font())
+        metrics = QFontMetrics(self.select_font())
         return QSize(200, 2 * (4 + metrics.height()))
 
     def xaxis_capture(self, absPos):
@@ -263,7 +270,7 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         self.data_view.cursor_change.emit(None)
 
     def select_font(self):
-        font = QtGui.QFont('Tahoma')
+        font = QFont('Tahoma')
         font.setPixelSize(widgets.deviceScale(self, 11.25))
         return font
 
@@ -287,9 +294,9 @@ class AlignmentSlider(widgets.MouseHelperWidget):
 
         font = self.select_font()
         ph.painter.setFont(font)
-        fontMetrics = QtGui.QFontMetrics(font)
+        fontMetrics = QFontMetrics(font)
 
-        pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
+        pen = QPen(QColor(192, 192, 192))
         pen.setStyle(Qt.SolidLine)
         ph.painter.setPen(pen)
 

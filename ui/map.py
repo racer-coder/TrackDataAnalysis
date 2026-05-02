@@ -7,10 +7,16 @@ import urllib.request
 
 import numpy as np
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtGui import (
     QAction,
+    QBrush,
+    QColor,
+    QFont,
+    QPen,
+    QPixmap,
+)
+from PySide6.QtCore import QPoint, QPointF, QRectF, QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QWidget,
 )
 
@@ -49,7 +55,7 @@ class MapBaseWidget(QWidget):
         self.setMinimumSize(100, 100) # arbitrary, prevents QT rendering bug with docks
 
     def handle_update(self, k, fut):
-        pm = QtGui.QPixmap()
+        pm = QPixmap()
         try:
             if not pm.loadFromData(fut.result()):
                 print('failed to load data for tile', k)
@@ -120,14 +126,14 @@ class MapBaseWidget(QWidget):
                     sx = (lo - long_base) * long_scale
                     tgt_rect = QRectF(QPointF(sx[0], sy[0]), QPointF(sx[1], sy[1]))
                     pm = tile_cache[k]
-                    if isinstance(pm, QtGui.QPixmap): # might still be a future
+                    if isinstance(pm, QPixmap): # might still be a future
                         ph.painter.drawPixmap(tgt_rect, pm, pm.rect())
 
         # map attribution
-        font = QtGui.QFont('Tahoma')
+        font = QFont('Tahoma')
         font.setPixelSize(widgets.deviceScale(self, 13))
         ph.painter.setFont(font)
-        pen = QtGui.QPen(QtGui.QColor(224, 224, 224))
+        pen = QPen(QColor(224, 224, 224))
         pen.setStyle(Qt.SolidLine)
         pen.setWidth(1)
         ph.painter.setPen(pen)
@@ -143,7 +149,7 @@ class MapWidget(MapBaseWidget):
         ph = widgets.makePaintHelper(self, event)
 
         ph.painter.fillRect(QRectF(QPoint(0, 0), ph.size),
-                            QtGui.QColor(0, 0, 0))
+                            QColor(0, 0, 0))
 
         dv = self.data_view
         lap = dv.ref_lap
@@ -184,7 +190,7 @@ class MapWidget(MapBaseWidget):
         zoom_x = memoryview((zoom_long - self.long_base) * self.long_scale)
 
         # Background track outline
-        pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
+        pen = QPen(QColor(192, 192, 192))
         pen.setWidth(widgets.deviceScale(self, 1.25))
         ph.painter.setPen(pen)
         if start_idx < zoom_start:
@@ -195,7 +201,7 @@ class MapWidget(MapBaseWidget):
                 ph.painter.drawLine(lap_x[i-1], lap_y[i-1], lap_x[i], lap_y[i])
 
         # Zoom window track outline
-        pen = QtGui.QPen(QtGui.QColor(255, 255, 255))
+        pen = QPen(QColor(255, 255, 255))
         pen.setWidth(widgets.deviceScale(self, 2))
         ph.painter.setPen(pen)
         for i in range(1, len(zoom_x)):
@@ -204,10 +210,10 @@ class MapWidget(MapBaseWidget):
         # track position
         msize = widgets.deviceScale(self, 4)
         for lap, color, _idx in dv.get_laps()[::-1]:
-            pen = QtGui.QPen(QtGui.QColor(0, 0, 0))
+            pen = QPen(QColor(0, 0, 0))
             pen.setStyle(Qt.SolidLine)
             ph.painter.setPen(pen)
-            ph.painter.setBrush(QtGui.QBrush(color))
+            ph.painter.setBrush(QBrush(color))
             key_channels = lap.log.log.get_key_channel_map()
             gps_lat = lap.log.log.get_channel_data(key_channels[1], unit='deg')
             gps_long = lap.log.log.get_channel_data(key_channels[2], unit='deg')

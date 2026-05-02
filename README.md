@@ -49,7 +49,7 @@ Every data acquisition tool comes with their own software, so why make another t
   logs at 100Hz on a 10+ year old computer (i5-2500 with integrated
   graphics running 1600x1200).
 
-- Cross platform (Windows 8+, Ubuntu 22.04+, Mac Arm)
+- Cross platform (Windows 10+, Ubuntu 22.04+, Mac Arm)
 
 - Opens AiM XRK, MoTeC LD, ECUMaster ADULOG, Autosport Lab LOG,
   RaceLogic VBOX, Race Technology RUN, MegaLogViewer MLG, and iRacing
@@ -81,7 +81,7 @@ Every data acquisition tool comes with their own software, so why make another t
 
 ## Installation (from binary)
 
-Windows x86_64 and Mac Arm images can be found at
+Windows x86_64/Arm and Mac Arm images can be found at
 [Releases](https://github.com/racer-coder/TrackDataAnalysis/releases).
 
 On Windows, it will install a start menu shortcut for "Track Data
@@ -89,10 +89,8 @@ Analysis" (just press the windows key and start typing Track).
 
 ## Installation (from source)
 
-Track Data Analysis relies on the `PySide2` package in order to
-support the widest list of operating systems.  However it places some
-odd constraints on how you source certain packages.  Please follow the
-instructions below as closely as reasonable.
+Track Data Analysis relies on the `PySide6` package for the UI.  This
+precludes Windows versions before 10.
 
 ### Linux / Ubuntu
 

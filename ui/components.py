@@ -3,10 +3,16 @@
 
 import enum
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtGui import (
     QAction,
+    QColor,
+    QCursor,
+    QMouseEvent,
+    QPaintEvent,
+    QPen,
+)
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, Qt, Signal
+from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
@@ -55,7 +61,7 @@ class ComponentManager(QWidget):
     def newTableBuilder(self):
         ComponentBase(self, None, self.dataView, table_builder.TableBuilder(self.dataView))
 
-    def paintEvent(self, e: QtGui.QPaintEvent):
+    def paintEvent(self, e: QPaintEvent):
         ph = widgets.makePaintHelper(self, e)
         x1, y1, x2, y2 = ph.rect.getCoords()
         sz = int(100 * widgets.deviceScaleFactor(self))
@@ -63,7 +69,7 @@ class ComponentManager(QWidget):
             for cy in range(int(y1 / sz), int(y2 / sz) + 1):
                 bright = 0 if (cx ^ cy) & 1 else 24
                 ph.painter.fillRect(QRect(cx * sz, cy * sz, sz, sz),
-                                    QtGui.QColor(bright, bright, bright))
+                                    QColor(bright, bright, bright))
 
     def resizeLambda(self):
         return lambda p: QPointF(p.x() * self.size().width(),
@@ -227,22 +233,22 @@ class ComponentBase(QWidget):
         self.m_infocus = False
         self.update()
 
-    def paintEvent(self, e: QtGui.QPaintEvent):
+    def paintEvent(self, e: QPaintEvent):
         ph = widgets.makePaintHelper(self, e)
 
         box = QRectF(QPoint(0, 0), ph.size)
 
-        ph.painter.fillRect(box, QtGui.QColor(0, 0, 0))
+        ph.painter.fillRect(box, QColor(0, 0, 0))
 
         pen_width = int(ph.scale + 0.5)
-        pen = QtGui.QPen(QtGui.QColor(255, 0, 0)
-                         if self.m_infocus else QtGui.QColor(64, 64, 64))
+        pen = QPen(QColor(255, 0, 0)
+                   if self.m_infocus else QColor(64, 64, 64))
         pen.setWidth(pen_width)
         rect = box.adjusted(pen_width / 2, pen_width / 2, -pen_width/2, -pen_width/2)
         ph.painter.setPen(pen)
         ph.painter.drawRect(rect)
 
-    #def keyPressEvent(self, e: QtGui.QKeyEvent):
+    #def keyPressEvent(self, e: QKeyEvent):
     #    if not self.m_isEditing: return
     #    if e.key() == Qt.Key_Delete:
     #        self.deleteLater()
@@ -274,29 +280,29 @@ class ComponentBase(QWidget):
         if e_pos.x() >= self.width() - diff:  flags |= ResizerMode.RIGHT
 
         if not flags:
-            self.setCursor(QtGui.QCursor(Qt.ArrowCursor))
+            self.setCursor(QCursor(Qt.ArrowCursor))
         elif flags == ResizerMode.LEFT or flags == ResizerMode.RIGHT:
-            self.setCursor(QtGui.QCursor(Qt.SizeHorCursor))
+            self.setCursor(QCursor(Qt.SizeHorCursor))
         elif flags == ResizerMode.TOP or flags == ResizerMode.BOTTOM:
-            self.setCursor(QtGui.QCursor(Qt.SizeVerCursor))
+            self.setCursor(QCursor(Qt.SizeVerCursor))
         elif bool(flags & ResizerMode.TOP) == bool(flags & ResizerMode.LEFT):
-            self.setCursor(QtGui.QCursor(Qt.SizeFDiagCursor))
+            self.setCursor(QCursor(Qt.SizeFDiagCursor))
         else:
-            self.setCursor(QtGui.QCursor(Qt.SizeBDiagCursor))
+            self.setCursor(QCursor(Qt.SizeBDiagCursor))
         self.mode = flags
 
-    def mousePressEvent(self, e: QtGui.QMouseEvent):
+    def mousePressEvent(self, e: QMouseEvent):
         self.pressedGeometry = self.geometry().translated(-e.globalPos())
         if self.m_isEditing and e.button() == Qt.LeftButton:
             e.accept()
         else:
             super().mousePressEvent(e)
 
-    def mouseReleaseEvent(self, e: QtGui.QMouseEvent):
+    def mouseReleaseEvent(self, e: QMouseEvent):
         self.pressedGeometry = None
         super().mouseReleaseEvent(e)
 
-    def mouseMoveEvent(self, e: QtGui.QMouseEvent):
+    def mouseMoveEvent(self, e: QMouseEvent):
         if not self.m_isEditing:
             super().mouseMoveEvent(e)
             return

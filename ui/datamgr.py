@@ -11,9 +11,9 @@ import threading
 import traceback
 import typing
 
-from PySide2.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
-from PySide2 import QtGui
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QFileSystemWatcher, QSize, QStandardPaths, Qt, Signal
+from PySide6 import QtGui
+from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -136,24 +136,24 @@ class DataDockWidget(TempDockWidget):
         self.table = QTableView()
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
-        self.table.setSelectionMode(self.table.SingleSelection)
-        self.table.setSelectionBehavior(self.table.SelectRows)
+        self.table.setSelectionMode(self.table.SelectionMode.SingleSelection)
+        self.table.setSelectionBehavior(self.table.SelectionBehavior.SelectRows)
         self.table.setShowGrid(False)
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setMinimumSectionSize(10)
-        self.table.setHorizontalScrollMode(self.table.ScrollPerPixel)
+        self.table.setHorizontalScrollMode(self.table.ScrollMode.ScrollPerPixel)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setMinimumSectionSize(5)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table.setEditTriggers(self.table.NoEditTriggers)
+        self.table.setEditTriggers(self.table.EditTrigger.NoEditTriggers)
         self.table.pressed.connect(self.clickCell)
         self.table.customContextMenuRequested.connect(self.context_menu)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
 
         pal = self.table.palette()
-        pal.setColor(pal.Base, QtGui.QColor(0, 0, 0))
+        pal.setColor(pal.ColorRole.Base, QtGui.QColor(0, 0, 0))
         self.table.setPalette(pal)
 
         self.setWidget(self.table)
@@ -318,14 +318,14 @@ class DataDockWidget(TempDockWidget):
 
         files = QTableWidget()
         files.setSortingEnabled(True)
-        files.setSelectionMode(files.ExtendedSelection)
-        files.setSelectionBehavior(files.SelectRows)
+        files.setSelectionMode(files.SelectionMode.ExtendedSelection)
+        files.setSelectionBehavior(files.SelectionBehavior.SelectRows)
         files.horizontalHeader().setHighlightSections(False)
         files.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        files.setHorizontalScrollMode(files.ScrollPerPixel)
+        files.setHorizontalScrollMode(files.ScrollMode.ScrollPerPixel)
         files.verticalHeader().hide()
         files.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        files.setEditTriggers(files.NoEditTriggers)
+        files.setEditTriggers(files.EditTrigger.NoEditTriggers)
         dblist = [d for d in self.metadata_cache.values() if d['readable']]
         collist = ['Log Date', 'Log Time', 'Venue', 'Driver']
         files.setRowCount(len(dblist))
@@ -339,14 +339,14 @@ class DataDockWidget(TempDockWidget):
         layout.addWidget(files, 1, 1, 1, 1)
 
         metadata = QTableWidget()
-        metadata.setSelectionMode(metadata.NoSelection)
+        metadata.setSelectionMode(metadata.SelectionMode.NoSelection)
         metadata.setShowGrid(False)
         metadata.horizontalHeader().hide()
         metadata.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        metadata.setHorizontalScrollMode(metadata.ScrollPerPixel)
+        metadata.setHorizontalScrollMode(metadata.ScrollMode.ScrollPerPixel)
         metadata.verticalHeader().hide()
         metadata.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        metadata.setEditTriggers(metadata.NoEditTriggers)
+        metadata.setEditTriggers(metadata.EditTrigger.NoEditTriggers)
         layout.addWidget(metadata, 0, 2, 2, 1)
 
         def update_matches():
@@ -400,7 +400,7 @@ class DataDockWidget(TempDockWidget):
                 d2.accept()
             bbox.button(bbox.Reset).clicked.connect(reset)
 
-            if d2.exec_():
+            if d2.exec():
                 choices = {f.text(): True for f in chooser.selectedItems()}
                 if choices:
                     active_filters[ftype] = choices
@@ -442,7 +442,7 @@ class DataDockWidget(TempDockWidget):
         except configparser.NoOptionError:
             pass
 
-        if dia.exec_():
+        if dia.exec():
             selection = files.selectedItems()
             for item in selection:
                 if item.column() == 0: # only look at each row once
@@ -588,7 +588,7 @@ class DataDockWidget(TempDockWidget):
             menu.addAction('Close all log files').triggered.connect(self.close_all_logs)
             (menu.addAction('Close log "%s"' % os.path.basename(lap.log.log.get_filename()))
              .triggered.connect(lambda: self.close_one_log(lap.log)))
-            menu.exec_(self.table.mapToGlobal(pos))
+            menu.exec(self.table.mapToGlobal(pos))
 
     def clickCell(self, index):
         row = index.row()

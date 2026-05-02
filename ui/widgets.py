@@ -5,9 +5,9 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 import os.path
 
-from PySide2 import QtGui
-from PySide2.QtCore import QPointF, QRect, QRectF, QSize, QSizeF, Qt
-from PySide2.QtWidgets import (
+from PySide6 import QtGui
+from PySide6.QtCore import QPointF, QRect, QRectF, QSize, QSizeF, Qt
+from PySide6.QtWidgets import (
     QPushButton,
     QStyle,
     QStylePainter,

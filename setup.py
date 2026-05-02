@@ -10,7 +10,7 @@ from Cython.Build import cythonize
 build_exe_options = {
     "excludes": ["tkinter", "unittest"],
     'zip_include_packages': ['*'],
-    'zip_exclude_packages': ['PySide2',
+    'zip_exclude_packages': ['PySide6',
                              'glfw',
                              'numpy',
                              'numpy.libs',

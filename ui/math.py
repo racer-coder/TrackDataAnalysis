@@ -9,9 +9,9 @@ import os
 import sys
 import types
 
-from PySide2.QtCore import QAbstractItemModel, QFileSystemWatcher, QMimeData, QModelIndex, Qt
-from PySide2.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QAbstractItemModel, QFileSystemWatcher, QMimeData, QModelIndex, Qt
+from PySide6.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat
+from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -400,7 +400,7 @@ class MathEditor(QDialog):
         self.tree_model = MathTreeModel(data_view)
         self.tree_view.setModel(self.tree_model)
         self.tree_view.expandAll()
-        self.tree_view.setDragDropMode(self.tree_view.InternalMove)
+        self.tree_view.setDragDropMode(self.tree_view.DragDropMode.InternalMove)
         self.tree_view.setDragEnabled(True)
         self.tree_view.setAcceptDrops(True)
         self.tree_view.setDropIndicatorShown(True)
@@ -505,7 +505,7 @@ class MathEditor(QDialog):
         else:
             dlg = ExpressionEditor(self, self.data_view, child.obj)
             try:
-                if dlg.exec_():
+                if dlg.exec():
                     self.tree_model.layoutAboutToBeChanged.emit()
                     self.tree_model.layoutChanged.emit()
             finally:
@@ -549,7 +549,7 @@ class MathEditor(QDialog):
             return # ??
         dlg = ExpressionEditor(self, self.data_view)
         try:
-            if dlg.exec_():
+            if dlg.exec():
                 self.tree_model.layoutAboutToBeChanged.emit()
                 group.expressions.append(dlg.new_expr)
                 self.tree_model.layoutChanged.emit()
@@ -560,7 +560,7 @@ class MathEditor(QDialog):
 def math_editor(parent, data_view):
     dlg = MathEditor(parent, data_view)
     try:
-        dlg.exec_()
+        dlg.exec()
     finally:
         dlg.deleteLater()
 
@@ -574,7 +574,7 @@ def channel_editor(parent, data_view, channel):
     if channel in data_view.maths.channel_map:
         dlg = ExpressionEditor(parent, data_view, data_view.maths.channel_map[channel][0])
         try:
-            if dlg.exec_():
+            if dlg.exec():
                 redo_math(data_view)
         finally:
             dlg.deleteLater()

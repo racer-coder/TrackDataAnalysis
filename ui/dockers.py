@@ -6,9 +6,9 @@ import math
 import re
 import sys
 
-from PySide2.QtCore import QAbstractTableModel, QRect, QSize, Qt
-from PySide2 import QtGui
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QAbstractTableModel, QRect, QSize, Qt
+from PySide6 import QtGui
+from PySide6.QtWidgets import (
     QAbstractItemDelegate,
     QDockWidget,
     QHeaderView,
@@ -156,7 +156,7 @@ class ChannelsDockWidget(TempDockWidget):
 
         self.chList = ChannelsListWidget(mainwindow.data_view)
         self.chList.setDragEnabled(True)
-        self.chList.setDragDropMode(self.chList.DragOnly)
+        self.chList.setDragDropMode(self.chList.DragDropMode.DragOnly)
         self.chList.itemActivated.connect(self.activateItem)
         self.chList.customContextMenuRequested.connect(self.context_menu)
         self.chList.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -196,7 +196,7 @@ class ChannelsDockWidget(TempDockWidget):
             menu.addSeparator()
             act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
             act.triggered.connect(lambda: ac.addChannel(ch))
-        menu.exec_(self.mapToGlobal(pos))
+        menu.exec(self.mapToGlobal(pos))
 
     def update_hidden(self):
         for i in range(self.chList.count()):
@@ -228,7 +228,7 @@ class ChannelsDockWidget(TempDockWidget):
             it = self.chList.item(i)
             it.setFlags(it.flags() | Qt.ItemIsDragEnabled)
             if it.text() in chSet:
-                it.setBackgroundColor(QtGui.QColor(255, 255, 0))
+                it.setBackground(QtGui.QBrush(QtGui.QColor(255, 255, 0)))
             else:
                 it.setBackground(QtGui.QBrush(Qt.NoBrush))
 
@@ -377,13 +377,13 @@ class ValuesDockWidget(TempDockWidget):
         self.deleg = FastItemDelegate(self.model, self.margin)
         self.table = ValuesTableView()
         self.table.setDragEnabled(True)
-        self.table.setDragDropMode(self.table.DragOnly)
+        self.table.setDragDropMode(self.table.DragDropMode.DragOnly)
         self.table.setModel(self.model)
         self.table.setItemDelegate(self.deleg)
         self.table.setShowGrid(False)
-        self.table.setSelectionMode(QTableView.SingleSelection)
-        self.table.setSelectionBehavior(QTableView.SelectRows)
-        self.table.setHorizontalScrollMode(self.table.ScrollPerPixel)
+        self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.table.setHorizontalScrollMode(self.table.ScrollMode.ScrollPerPixel)
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.horizontalHeader().setMinimumSectionSize(10)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
@@ -392,7 +392,7 @@ class ValuesDockWidget(TempDockWidget):
         self.table.verticalHeader().hide()
         self.table.verticalHeader().setMinimumSectionSize(5)
         self.table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.table.setEditTriggers(self.table.NoEditTriggers)
+        self.table.setEditTriggers(self.table.EditTrigger.NoEditTriggers)
         self.table.activated.connect(self.activate_cell)
         self.table.customContextMenuRequested.connect(self.context_menu)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -410,7 +410,7 @@ class ValuesDockWidget(TempDockWidget):
         self.setWidget(widget)
 
         pal = self.table.palette()
-        pal.setColor(pal.Base, QtGui.QColor(0, 0, 0))
+        pal.setColor(pal.ColorRole.Base, QtGui.QColor(0, 0, 0))
         self.table.setPalette(pal)
 
         self.text_hints = TextMatcher('')
@@ -437,7 +437,7 @@ class ValuesDockWidget(TempDockWidget):
                 menu.addSeparator()
                 act = menu.addAction('Remove channel' if ch in ac.channels() else 'Add channel')
                 act.triggered.connect(lambda: ac.addChannel(ch))
-            menu.exec_(self.table.mapToGlobal(pos))
+            menu.exec(self.table.mapToGlobal(pos))
 
     def activate_cell(self, index):
         ac = self.mainwindow.data_view.active_component

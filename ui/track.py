@@ -8,9 +8,9 @@ import json
 import os
 import time
 
-from PySide2.QtCore import QAbstractItemModel, QModelIndex, QPoint, QRectF, QStandardPaths, Qt, Signal
-from PySide2.QtGui import QColor, QPen
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QAbstractItemModel, QModelIndex, QPoint, QRectF, QStandardPaths, Qt, Signal
+from PySide6.QtGui import QColor, QPen
+from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
@@ -622,7 +622,7 @@ def track_editor(parent, data_view):
     if data_view.track:
         orig_track = copy.deepcopy(data_view.track)
         dia = TrackDialog(data_view)
-        if dia.exec_():
+        if dia.exec():
             save_track(data_view.track)
         else:
             data_view.track = orig_track

@@ -3,8 +3,7 @@ dacite
 glfw
 numpy
 pyyaml
-# For Mac, install pyside@2 via homebrew
-PySide2 ; sys_platform != 'darwin'
+PySide6
 
 # Packager for Windows
 # need to install on all platforms as it's part of seutp.py # ; sys_platform == 'win32'

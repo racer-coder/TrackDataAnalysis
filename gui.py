@@ -8,8 +8,8 @@ import json
 import os
 import sys
 
-from PySide2.QtCore import QSize, QStandardPaths, Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtCore import QSize, QStandardPaths, Qt, Signal
+from PySide6.QtWidgets import (
     QApplication,
     QDialog,
     QDialogButtonBox,
@@ -264,7 +264,7 @@ class MainWindow(QMainWindow):
         dia.setLayout(layout)
 
         bbox.rejected.connect(dia.accept)
-        dia.exec_()
+        dia.exec()
 
     def toggle_time_dist(self):
         self.data_view.mode_time = not self.data_view.mode_time
@@ -368,7 +368,7 @@ class MainWindow(QMainWindow):
         bbox.accepted.connect(dia.accept)
         bbox.rejected.connect(dia.reject)
 
-        if dia.exec_():
+        if dia.exec():
             self.data_view.maps_key = ['maptiler', maptiler_key.text()]
             self.config['main']['user_func_path'] = userfuncpath.text()
             ui.math.set_user_func_dir(self.data_view, userfuncpath.text())
@@ -466,4 +466,4 @@ window = MainWindow()
 window.show()
 
 # Start the event loop.
-app.exec_()
+app.exec()

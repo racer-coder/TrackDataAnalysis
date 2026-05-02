@@ -5,10 +5,12 @@ import configparser
 
 import numpy as np
 
-from PySide2 import QtGui
-from PySide2.QtCore import QSize, Qt, Signal
-from PySide2.QtWidgets import (
+from PySide6.QtGui import (
     QAction,
+    QColor,
+)
+from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -82,12 +84,12 @@ class ChannelEdit(QLineEdit):
         self.setReadOnly(True)
 
         icon = self.style().standardIcon(QStyle.SP_DialogOpenButton)
-        action = self.addAction(icon, self.TrailingPosition)
+        action = self.addAction(icon, self.ActionPosition.TrailingPosition)
         action.triggered.connect(self.selected)
 
     def selected(self):
         dia = ChannelSelect(self.data_view)
-        if dia.exec_():
+        if dia.exec():
             items = dia.chlist.selectedItems()
             if len(items) == 1:
                 self.setText(items[0].text())
@@ -174,8 +176,8 @@ class TableBuilder(QWidget):
         self.f_box.setLayout(form)
 
         self.table = QTableWidget()
-        self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
-        self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
+        self.table.setHorizontalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
+        self.table.setVerticalScrollMode(QTableWidget.ScrollMode.ScrollPerPixel)
         self.table.setAlternatingRowColors(True)
 
         v_layout = QVBoxLayout()
@@ -212,7 +214,7 @@ class TableBuilder(QWidget):
     def paintEvent(self, event):
         ph = widgets.makePaintHelper(self, event)
         ph.painter.fillRect(ph.rect,
-                            QtGui.QColor(224, 224, 224))
+                            QColor(224, 224, 224))
 
     def clear_table(self, reason):
         print('CLEAR TABLE:', reason)
