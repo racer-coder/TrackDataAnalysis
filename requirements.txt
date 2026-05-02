@@ -1,3 +1,4 @@
+Cython
 dacite
 glfw
 numpy
@@ -6,7 +7,8 @@ pyyaml
 PySide2 ; sys_platform != 'darwin'
 
 # Packager for Windows
-cx_freeze ; sys_platform == 'win32'
+# need to install on all platforms as it's part of seutp.py # ; sys_platform == 'win32'
+cx_freeze
 
 # Packager for Mac, because I can't get cx_freeze to work properly...
 pyinstaller ; sys_platform == 'darwin'
