@@ -21,17 +21,16 @@ jobs:
           - os: windows-latest
             parch: win64
             march: x86_64
-# Windows arm requires Python >= 3.11
-#          - os: windows-11-arm
-#            parch: warch64
-#            march: aarch64
+          - os: windows-11-arm
+            parch: warch64
+            march: aarch64
 
     steps:
     - uses: actions/checkout@v6
-    - name: Set up Python 3.10
+    - name: Set up Python 3.11
       uses: actions/setup-python@v6
       with:
-        python-version: "3.10"
+        python-version: "3.11"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -61,18 +60,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v6
-    - name: Set up Python 3.10
+    - name: Set up Python 3.11
       uses: actions/setup-python@v6
       with:
-        python-version: "3.10"
+        python-version: "3.11"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         brew install mpv
-# need newer pyside for mac
-#        brew install pyside@2
-#        brew link pyside@2
+        brew --prefix mpv
+        ls -la `brew --prefix mpv`/lib
+        find `brew --prefix mpv`/
 #    - name: Install libmpv
 #      run: |
 #        mkdir mpv-artifacts
@@ -83,12 +82,12 @@ jobs:
     - name: Build extension
       run: |
         python setup.py build_ext --inplace
-#    - name: Build MSI
-#      run: |
-#        python setup.py bdist_msi
-#        dir dist
-#    - name: Upload MSI
-#      uses: actions/upload-artifact@v7
-#      with:
-#        archive: false
-#        path: dist/*.msi
+    - name: Build DMG
+      run: |
+        devtools/build_mac
+        ls dist
+    - name: Upload DMG
+      uses: actions/upload-artifact@v7
+      with:
+        archive: false
+        path: dist/*.dmg
