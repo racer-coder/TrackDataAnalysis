@@ -476,6 +476,7 @@ class ValuesDockWidget(TempDockWidget):
         section_font = QtGui.QFont(font)
         section_font.setBold(True)
         self.model.section_style[2] = section_font
+        self.model.icon_style[1] = font
         self.model.channel_style[2] = font
         self.model.value_style[2] = font
         self.model.delta_style[2] = font
