@@ -87,7 +87,9 @@ def parse_mp4(m):
             metadatalength += samplecount * duration
             if samplecount > 1 or num_samples == 1 or basemetadataduration == 0:
                 basemetadataduration = metadatalength / samples # really we should trac all the sample sets, but it turns out there's usually just one
-        assert num_samples <= 1 # otherwise we should improve basemetadataduration support
+        assert num_samples <= 1 or (num_samples == 2 and
+                                    samplecount == 1 and
+                                    duration < basemetadataduration) # otherwise we should improve basemetadataduration support
 
         equal_sample_size, num_samples = struct.unpack_from('>4xII', stbl.get_one('stsz'), 0)
         assert num_samples < 5184000 # sanity check
