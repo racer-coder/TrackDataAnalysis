@@ -68,7 +68,7 @@ class RotatedPushButton(QPushButton):
 @dataclass
 class MouseHelperClick:
     button_type: int = Qt.NoButton # Qt.MouseButton (Qt.LeftButton, Qt.RightButton)
-    modifier_type: int = 0 # Qt.Modifier (Qt.SHIFT, Qt.CTRL, Qt.ALT)
+    modifier_type: int = Qt.NoModifier # Qt.Modifier (Qt.SHIFT, Qt.CTRL, Qt.ALT)
     double: bool = False # If for double clicks
     state_capture: object = None # (abs_pos (QPointF))
     move: object = None # (delta_pos (QPointF), abs_pos (QPointF), state)
