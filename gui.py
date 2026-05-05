@@ -229,7 +229,8 @@ class MainWindow(QMainWindow):
         # Can't use clear(), it may delete the actions
         for a in self.comp_menu.actions():
             self.comp_menu.removeAction(a)
-        self.comp_menu.addActions(self.data_view.active_component.actions())
+        if self.data_view.active_component:
+            self.comp_menu.addActions(self.data_view.active_component.actions())
 
     def show_details(self):
         if not self.data_view.ref_lap:
@@ -290,7 +291,8 @@ class MainWindow(QMainWindow):
     def toggle_data_offsets(self, flag):
         if flag:
             self.data_view.mode_offset = flag
-            self.data_view.active_component.update()
+            if self.data_view.active_component:
+                self.data_view.active_component.update()
         else:
             laps = [lap for log in self.data_view.log_files for lap in log.laps]
             if any(lap.offset.time != 0 for lap in laps if lap):
