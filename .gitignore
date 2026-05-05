@@ -1,0 +1,11 @@
+__pycache__/
+*~
+*.dll
+*.pyc
+*.pyd
+*.pyo
+*.so
+*.o
+*.cpp
+build/
+dist/
