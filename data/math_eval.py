@@ -35,6 +35,7 @@ func_map = {
     ('if', 3): np.where,
     ('min', 2): np.minimum,
     ('max', 2): np.maximum,
+    ('log', 1): np.log,
 }
 
 class ExprLex(Lexer):
