@@ -892,7 +892,9 @@ class TimeDist(widgets.MouseHelperWidget):
         old_cursor_x = self.x_axis.calc(self.dataView.getTDValue(old_cursor))
         new_cursor_x = self.x_axis.calc(self.dataView.getTDValue(self.dataView.cursor_time))
         ratio = self.devicePixelRatioF()
-        minx = int((min(old_cursor_x, new_cursor_x) - self.CURSOR_WIDTH) / ratio)
+        # Not sure why -1 is needed for minx, something to do with the
+        # new highdpi passthrough mode for pyside6?
+        minx = int((min(old_cursor_x, new_cursor_x) - self.CURSOR_WIDTH) / ratio) - 1
         maxx = int((max(old_cursor_x, new_cursor_x) + self.CURSOR_WIDTH) / ratio) + 1
         self.update(minx, 0, maxx - minx + 1, self.height())
         self.update(
