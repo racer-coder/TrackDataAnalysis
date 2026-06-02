@@ -37,11 +37,15 @@ class ComponentManager(QWidget):
         dataView.cursor_change.connect(self.updateCursor)
         dataView.values_change.connect(self.updateValues)
 
-        addMenu.addAction('Time/Distance Graph').triggered.connect(self.newTDGraph)
-        addMenu.addAction('Session Graph').triggered.connect(self.newSessionGraph)
-        addMenu.addAction('Sector Table').triggered.connect(self.newSectorTable)
-        addMenu.addAction('Video').triggered.connect(self.newVideo)
-        addMenu.addAction('Table Builder').triggered.connect(self.newTableBuilder)
+        addMenu.addAction('Time/Distance Graph').triggered.connect(
+            self.graphMaker(timedist.TimeDist, True))
+        addMenu.addAction('Session Graph').triggered.connect(
+            self.graphMaker(timedist.TimeDist, False))
+        addMenu.addAction('Sector Table').triggered.connect(
+            self.graphMaker(sector_table.SectorTable))
+        addMenu.addAction('Video').triggered.connect(self.graphMaker(video.Video))
+        addMenu.addAction('Table Builder').triggered.connect(
+            self.graphMaker(table_builder.TableBuilder))
 
         act = QAction('Paste', self)
         act.triggered.connect(self.paste_component)
@@ -50,22 +54,9 @@ class ComponentManager(QWidget):
 
         self.component_clipboard = None
 
-    def newTDGraph(self):
-        ComponentBase(self, None, self.dataView,
-                      timedist.TimeDist(self.dataView, True))
-
-    def newSessionGraph(self):
-        ComponentBase(self, None, self.dataView,
-                      timedist.TimeDist(self.dataView, False))
-
-    def newVideo(self):
-        ComponentBase(self, None, self.dataView, video.Video(self.dataView))
-
-    def newSectorTable(self):
-        ComponentBase(self, None, self.dataView, sector_table.SectorTable(self.dataView))
-
-    def newTableBuilder(self):
-        ComponentBase(self, None, self.dataView, table_builder.TableBuilder(self.dataView))
+    def graphMaker(self, cls, *args, **kwargs):
+        return lambda: ComponentBase(self, None, self.dataView,
+                                     cls(self.dataView, *args, **kwargs))
 
     def paintEvent(self, e: QPaintEvent):
         ph = widgets.makePaintHelper(self, e)
