@@ -211,6 +211,7 @@ class ComponentBase(QWidget):
 
             self.childWidget = cWidget
             self.childWidget.setMouseTracking(True)
+            self.childWidget.setCursor(QCursor(Qt.ArrowCursor))
             self.vLayout.addWidget(cWidget)
 
     def parentResize(self, m):

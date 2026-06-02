@@ -19,7 +19,7 @@ from . import state
 class SectorTable(QWidget):
     """Component showing a table of sector times per lap with delta coloring."""
 
-    def __init__(self, data_view, st=None):
+    def __init__(self, data_view, state=None):
         super().__init__()
         self.data_view = data_view
 
@@ -53,12 +53,14 @@ class SectorTable(QWidget):
         layout.addWidget(self.table)
         self.setLayout(layout)
 
+        self.setContextMenuPolicy(Qt.ActionsContextMenu)
+
         data_view.values_change.connect(self.recompute)
         data_view.data_change.connect(self.recompute)
         self.recompute()
 
     def save_state(self):
-        return {'type': 'sector_table', 'base': {}}
+        return {'type': 'sector_table', 'base': self.parentWidget().save_state()}
 
     def channels(self):
         return set()
@@ -75,13 +77,13 @@ class SectorTable(QWidget):
         self.table.setRowCount(0)
         self.table.setColumnCount(0)
 
+        if not self.data_view.log_files:
+            self.label.setText("No data loaded.")
+            return
+
         track = self.data_view.track
         if not track or not track.sector_sets:
             self.label.setText("No sectors defined. Use Tools > Track editor to define sectors.")
-            return
-
-        if not self.data_view.log_files:
-            self.label.setText("No data loaded.")
             return
 
         # Get the first sector set
@@ -116,7 +118,8 @@ class SectorTable(QWidget):
 
         # Build table: rows = laps, columns = [Lap, Total] + sectors
         num_sectors = len(sector_names)
-        col_headers = ["Lap", "Total"] + sector_names
+        col_headers = ["Total"] + sector_names
+        row_headers = []
         self.table.setColumnCount(len(col_headers))
         self.table.setHorizontalHeaderLabels(col_headers)
         self.table.setRowCount(len(laps))
@@ -167,9 +170,7 @@ class SectorTable(QWidget):
             duration = lap_totals[lap_idx]
 
             # Lap number
-            lap_item = QTableWidgetItem(str(lap.num))
-            lap_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table.setItem(lap_idx, 0, lap_item)
+            row_headers.append('Lap %d' % lap_idx)
 
             # Total time
             total_item = QTableWidgetItem(_format_time(duration))
@@ -177,7 +178,7 @@ class SectorTable(QWidget):
             if best_total and duration > 0:
                 delta = duration - best_total
                 _color_item(total_item, delta)
-            self.table.setItem(lap_idx, 1, total_item)
+            self.table.setItem(lap_idx, 0, total_item)
 
             # Sector times
             for si in range(num_sectors):
@@ -190,7 +191,7 @@ class SectorTable(QWidget):
                 else:
                     item = QTableWidgetItem("—")
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(lap_idx, 2 + si, item)
+                self.table.setItem(lap_idx, 1 + si, item)
 
             # Highlight reference lap row
             if ref_lap and lap.num == ref_lap.num and lap.log == ref_lap.log:
@@ -201,7 +202,8 @@ class SectorTable(QWidget):
                         font.setBold(True)
                         cell.setFont(font)
 
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.setVerticalHeaderLabels(row_headers)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.label.setText(f"Sectors: {sector_set_name} ({num_sectors} sectors, {len(laps)} laps)")
 
     def _on_cell_clicked(self, row, col):
