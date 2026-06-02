@@ -113,6 +113,8 @@ class MainWindow(QMainWindow):
 
                                            config=self.config)
 
+        self.setAcceptDrops(True)
+
         try:
             ui.math.set_user_func_dir(self.data_view, self.config.get('main', 'user_func_path'))
         except configparser.NoOptionError:
@@ -437,6 +439,20 @@ class MainWindow(QMainWindow):
         self.workspace_fname = file_name
         self.update_title()
         return self.save_workspace()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                path = url.toLocalFile()
+                if self.datamgr.get_builder(path):
+                    event.acceptProposedAction()
+                    return
+
+    def dropEvent(self, event):
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if self.datamgr.get_builder(path):
+                self.datamgr.open_file(path)
 
     def closeEvent(self, e):
         e.ignore()
