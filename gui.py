@@ -9,6 +9,7 @@ import os
 import sys
 
 from PySide6.QtCore import QSize, QStandardPaths, Qt, Signal
+from PySide6.QtGui import QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -169,9 +170,13 @@ class MainWindow(QMainWindow):
         dummy.setLayout(vbox)
         self.setCentralWidget(dummy)
 
-        file_menu.addAction('Open from db...').triggered.connect(self.datamgr.open_from_db)
+        act = file_menu.addAction('Open from db...')
+        act.setShortcut(QKeySequence('Ctrl+O'))
+        act.triggered.connect(self.datamgr.open_from_db)
         file_menu.addAction('Open from file...').triggered.connect(self.datamgr.open_from_file)
-        file_menu.addAction('Close all log files').triggered.connect(self.datamgr.close_all_logs)
+        act = file_menu.addAction('Close all log files')
+        act.setShortcut(QKeySequence('Ctrl+Alt+A'))
+        act.triggered.connect(self.datamgr.close_all_logs)
         file_menu.addSeparator()
         file_menu.addAction('New Workspace').triggered.connect(self.new_workspace)
         file_menu.addAction('Open Workspace...').triggered.connect(self.open_workspace)
