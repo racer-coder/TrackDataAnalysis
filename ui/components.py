@@ -18,12 +18,14 @@ from PySide6.QtWidgets import (
 )
 
 from . import widgets
+from . import sector_table
 from . import table_builder
 from . import timedist
 from . import video
 
 class ComponentManager(QWidget):
     factory = {
+        'sector_table': sector_table.SectorTable,
         'table_builder': table_builder.TableBuilder,
         'timedist': timedist.TimeDist,
         'video': video.Video,
@@ -37,6 +39,7 @@ class ComponentManager(QWidget):
 
         addMenu.addAction('Time/Distance Graph').triggered.connect(self.newTDGraph)
         addMenu.addAction('Session Graph').triggered.connect(self.newSessionGraph)
+        addMenu.addAction('Sector Table').triggered.connect(self.newSectorTable)
         addMenu.addAction('Video').triggered.connect(self.newVideo)
         addMenu.addAction('Table Builder').triggered.connect(self.newTableBuilder)
 
@@ -57,6 +60,9 @@ class ComponentManager(QWidget):
 
     def newVideo(self):
         ComponentBase(self, None, self.dataView, video.Video(self.dataView))
+
+    def newSectorTable(self):
+        ComponentBase(self, None, self.dataView, sector_table.SectorTable(self.dataView))
 
     def newTableBuilder(self):
         ComponentBase(self, None, self.dataView, table_builder.TableBuilder(self.dataView))
