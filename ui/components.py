@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 from . import widgets
 from . import histogram
 from . import sector_table
+from . import scatter
 from . import table_builder
 from . import timedist
 from . import video
@@ -27,6 +28,7 @@ from . import video
 class ComponentManager(QWidget):
     factory = {
         'histogram': histogram.Histogram,
+        'scatter': scatter.Scatter,
         'sector_table': sector_table.SectorTable,
         'table_builder': table_builder.TableBuilder,
         'timedist': timedist.TimeDist,
@@ -44,6 +46,7 @@ class ComponentManager(QWidget):
         addMenu.addAction('Session Graph').triggered.connect(
             self.graphMaker(timedist.TimeDist, False))
         addMenu.addAction('Histogram').triggered.connect(self.graphMaker(histogram.Histogram))
+        addMenu.addAction('XY Scatter').triggered.connect(self.graphMaker(scatter.Scatter))
         addMenu.addAction('Sector Table').triggered.connect(
             self.graphMaker(sector_table.SectorTable))
         addMenu.addAction('Video').triggered.connect(self.graphMaker(video.Video))
