@@ -99,8 +99,9 @@ class Scatter(widgets.MouseHelperWidget):
                 continue
 
             # Align on timecodes: interpolate Y onto X timecodes
-            vals_x = cd_x.values[start_idx:end_idx]
-            vals_y = np.interp(cd_x.timecodes[start_idx:end_idx], cd_y.timecodes, cd_y.values)
+            step = max(1, (end_idx - start_idx) // 10000)
+            vals_x = cd_x.values[start_idx:end_idx:step]
+            vals_y = np.interp(cd_x.timecodes[start_idx:end_idx:step], cd_y.timecodes, cd_y.values)
 
             data.append((color if idx != 1 else channels.colors[cd_y.color],
                          vals_x, vals_y))
@@ -123,10 +124,8 @@ class Scatter(widgets.MouseHelperWidget):
             ph.painter.setBrush(QtGui.QBrush(
                 QtGui.QColor(color.red(), color.green(), color.blue(), 128)))
 
-            step = max(1, len(vals_x) // 10000)
-
-            vals_x = gh.x_axis.calc(vals_x[::step]).data
-            vals_y = gh.y_axis.calc(vals_y[::step]).data
+            vals_x = gh.x_axis.calc(vals_x).data
+            vals_y = gh.y_axis.calc(vals_y).data
 
             for x, y in zip(vals_x, vals_y):
                 ph.painter.drawEllipse(QPointF(x, y), dot_size, dot_size)
