@@ -143,8 +143,9 @@ class GraphHelper:
         self.ph.painter.drawLine(self.full_graph_area.left(), y_offset,
                                  self.full_graph_area.right(), y_offset)
 
-        exp = int(math.floor(math.log10(x_axis.logical_tick_spacing) + .01)) - 3
+        exp = int(math.floor(math.log10(x_axis.logical_tick_spacing) + .01))
         if time_format:
+            exp -= 3
             formatter = '%.0f:%02d' if exp >= 0 else ('%%.0f:%%0%d.%df' % (3 - exp, -exp))
         else:
             formatter = '%%.%df' % max(-exp, 0)
