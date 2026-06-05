@@ -126,7 +126,7 @@ class Histogram(widgets.MouseHelperWidget):
             prop = self.data_view.get_channel_prop(ch)
             ph.painter.setFont(gh.channel_font)
             ph.painter.setPen(channels.colors[prop.color])
-            label = f"{ch} ({prop.units})" if prop.units else ch
+            label = f"{ch} [{prop.units}]" if prop.units else ch
             ph.painter.drawText(
                 int(gh.graph_area.left() + ci * 150 * scale), legend_y,
                 int(150 * scale), int(18 * scale),
@@ -156,12 +156,5 @@ class Histogram(widgets.MouseHelperWidget):
         gh.paintXAxis(subtick=1)
 
         # Y-axis label
-        ph.painter.setFont(gh.axis_font)
-        ph.painter.setPen(gh.axis_pen)
-        ph.painter.drawText(
-            0, int(gh.graph_area.top()),
-            int(gh.graph_area.left() - 5 * scale), int(gh.graph_area.height()),
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop,
-            "Percent")
-
+        gh.paintYLabel('Percent')
         gh.paintYAxis()
