@@ -34,6 +34,7 @@ class AxisGrid:
     logical_tick_spacing: float
     pixel_val_spacing: float
     pixel_offset: float
+    logical_zero: float
 
     def calc(self, logical):
         return (logical - self.logical_min_val) * self.pixel_val_spacing + self.pixel_offset
@@ -44,17 +45,23 @@ class AxisGrid:
     def invertRelative(self, physical):
         return physical / self.pixel_val_spacing
 
-    def tickCoords(self):
-        i = np.arange(math.ceil(self.logical_min_val / self.logical_tick_spacing),
-                      math.ceil(self.logical_max_val / self.logical_tick_spacing))
-        return memoryview(self.calc(i * self.logical_tick_spacing))
+    def tickIndices(self, subtick=1):
+        spacing = self.logical_tick_spacing / subtick
+        return np.arange(math.ceil((self.logical_min_val - self.logical_zero) / spacing),
+                         math.floor((self.logical_max_val - self.logical_zero) / spacing + 1)) / subtick
 
-def makeAxisGrid(ph, min_val, max_val, pixel_base, pixel_range, tick_factor):
+    def tickVals(self, subtick=1):
+        return self.logical_zero + self.logical_tick_spacing * self.tickIndices(subtick=subtick)
+
+    def tickCoords(self, subtick=1):
+        return memoryview(self.calc(self.tickVals(subtick=subtick)))
+
+def makeAxisGrid(ph, min_val, max_val, pixel_base, pixel_range, tick_factor, zero_val=0):
     pixel_per_val = pixel_range / (max_val - min_val)
     return AxisGrid(
         min_val, max_val,
         roundUpHumanNumber(ph.scale * tick_factor / abs(pixel_per_val)),
-        pixel_per_val, pixel_base)
+        pixel_per_val, pixel_base, zero_val)
 
 class GraphHelper:
     def __init__(self, widget, ph):
@@ -79,14 +86,14 @@ class GraphHelper:
         self.graph_area = self.full_graph_area
 
 
-    def setXAxis(self, min_val, max_val):
+    def setXAxis(self, min_val, max_val, zero_val=0):
         self.x_axis = makeAxisGrid(self.ph, min_val, max_val,
-                                   self.graph_area.left(), self.graph_area.width(), 60)
+                                   self.graph_area.left(), self.graph_area.width(), 60, zero_val)
 
-    def setYAxis(self, min_val, max_val):
+    def setYAxis(self, min_val, max_val, zero_val=0):
         self.y_axis = makeAxisGrid(self.ph, min_val, max_val,
                                    self.graph_area.top() + self.graph_area.height(),
-                                   -self.graph_area.height(), 14)
+                                   -self.graph_area.height(), 14, zero_val)
 
     def paintGraphFrame(self):
         self.ph.painter.setPen(self.axis_pen)
@@ -114,22 +121,19 @@ class GraphHelper:
 
         exp = int(math.floor(math.log10(self.y_axis.logical_tick_spacing) + .01))
         exp = max(0, -exp)
-        i = np.arange(int(self.y_axis.logical_min_val / self.y_axis.logical_tick_spacing),
-                      int(self.y_axis.logical_max_val / self.y_axis.logical_tick_spacing) + 1)
-        atc = i * self.y_axis.logical_tick_spacing
+        atc = self.y_axis.tickVals()
         for tc, y in zip(atc, self.y_axis.calc(atc)):
             if y + text_height / 2 <= self.graph_area.bottom():
                 self.ph.painter.drawText(0, y - 25, self.graph_area.left() - 4, 50,
                                          Qt.AlignVCenter | Qt.AlignRight | Qt.TextSingleLine,
                                          '%.*f' % (exp, tc))
-        spacing = self.y_axis.logical_tick_spacing / 5
-        ai = np.arange(int(self.y_axis.logical_min_val / spacing) + 1,
-                       int(self.y_axis.logical_max_val / spacing) + 1)
-        for i, y in zip(ai.data, self.y_axis.calc(ai * spacing).data):
+        ai = self.y_axis.tickIndices(subtick=5)
+        for i, y in zip(ai.data, self.y_axis.calc(ai * self.y_axis.logical_tick_spacing +
+                                                  self.y_axis.logical_zero).data):
             self.ph.painter.drawLine(self.graph_area.left(), y,
-                                     self.graph_area.left() - (2 if i % 5 else 4), y)
+                                     self.graph_area.left() - (2 if i % 1 else 4), y)
 
-    def paintXAxis(self, x_axis=None, index=0, time_format=False):
+    def paintXAxis(self, x_axis=None, index=0, time_format=False, subtick=5):
         if not x_axis: x_axis = self.x_axis
         y_offset = self.full_graph_area.bottom() + 16 * self.ph.scale * index
 
@@ -144,22 +148,16 @@ class GraphHelper:
             formatter = '%.0f:%02d' if exp >= 0 else ('%%.0f:%%0%d.%df' % (3 - exp, -exp))
         else:
             formatter = '%%.%df' % max(-exp, 0)
-        ai = np.arange(int(math.ceil(x_axis.logical_min_val / x_axis.logical_tick_spacing)),
-                       int(math.ceil(x_axis.logical_max_val / x_axis.logical_tick_spacing)) + 1)
-        atc = ai * x_axis.logical_tick_spacing
-        ax = x_axis.calc(atc)
-        for tc, x in zip(atc, ax):
+        atc = x_axis.tickVals()
+        for tc, x in zip(atc, x_axis.calc(atc)):
             self.ph.painter.drawText(x - 100, y_offset + 4, 200, 50,
                                      Qt.AlignHCenter | Qt.AlignTop | Qt.TextSingleLine,
                                      formatter %
                                      ((math.copysign(math.trunc(tc / 60000), tc),
                                        abs(tc) % 60000 / 1000) if time_format else tc))
 
-        spacing = x_axis.logical_tick_spacing / 5
-        ai = np.arange(int(math.ceil(x_axis.logical_min_val / spacing)),
-                       int(math.ceil(x_axis.logical_max_val / spacing)))
-        atc = ai * spacing
-        ax = x_axis.calc(atc)
-        for i, tc, x in zip(ai.data, atc.data, ax.data):
+        ai = x_axis.tickIndices(subtick=subtick)
+        ax = x_axis.calc(ai * x_axis.logical_tick_spacing + x_axis.logical_zero)
+        for i, x in zip(ai.data, ax.data):
             self.ph.painter.drawLine(x, y_offset,
-                                     x, y_offset + (2 if i % 5 else 4))
+                                     x, y_offset + (2 if i % 1 else 4))

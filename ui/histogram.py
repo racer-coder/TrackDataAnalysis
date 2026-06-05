@@ -4,13 +4,15 @@
 """Histogram chart: value distribution for selected channels."""
 
 import bisect
+import math
 
 import numpy as np
 
 from PySide6 import QtGui
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, Qt
 
 from . import channels
+from . import graphhelper
 from . import state
 from . import widgets
 
@@ -80,12 +82,10 @@ class Histogram(widgets.MouseHelperWidget):
         ph.painter.fillRect(ph.rect, QtGui.QColor(12, 12, 12))
         ph.painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
 
-        chfont = QtGui.QFont('Tahoma')
-        chfont.setPixelSize(widgets.deviceScale(self, 13))
-        ph.painter.setFont(chfont)
+        gh = graphhelper.GraphHelper(self, ph)
+        gh.setArea(QRectF(QPointF(0, 0), ph.size).adjusted(0, 25 * ph.scale, 0, 0), 1, 1)
 
-        axfont = QtGui.QFont('Tahoma')
-        axfont.setPixelSize(widgets.deviceScale(self, 11.25))
+        ph.painter.setFont(gh.channel_font)
 
         dv = self.data_view
         if not dv.ref_lap or not self.channel_list:
@@ -95,15 +95,6 @@ class Histogram(widgets.MouseHelperWidget):
             return
 
         scale = ph.scale
-        margin_left = int(50 * scale)
-        margin_right = int(10 * scale)
-        margin_top = int(25 * scale)
-        margin_bottom = int(30 * scale)
-
-        chart_w = ph.size.width() - margin_left - margin_right
-        chart_h = ph.size.height() - margin_top - margin_bottom
-        if chart_w < 40 or chart_h < 20:
-            return
 
         # Gather all the raw data (channel lap data)
         data = list(self._datasets())
@@ -113,44 +104,31 @@ class Histogram(widgets.MouseHelperWidget):
                                            bins=self.NUM_BINS)
 
         # Y Axis scaling
-        max_count = 100
+        gh.setYAxis(0, 100)
+
+        # Custom built X axis using bins
+        gh.x_axis = graphhelper.AxisGrid(bin_edges[0], bin_edges[-1], bin_edges[1] - bin_edges[0],
+                                         gh.graph_area.width() / (bin_edges[-1] - bin_edges[0]),
+                                         gh.graph_area.left(),
+                                         bin_edges[0])
 
         n_channels = len(data)
-        bar_width_per_ch = max(1, chart_w / self.NUM_BINS / max(1, n_channels))
-
-        # Axis pen
-        axis_color = QtGui.QColor(192, 192, 192)
-        axis_pen = QtGui.QPen(axis_color)
-        axis_pen.setWidth(max(1, int(scale)))
-        ph.painter.setPen(axis_pen)
-        ph.painter.drawLine(
-            int(margin_left), int(margin_top + chart_h),
-            int(margin_left + chart_w), int(margin_top + chart_h))
-        ph.painter.drawLine(
-            int(margin_left), int(margin_top),
-            int(margin_left), int(margin_top + chart_h))
+        bar_width_per_ch = max(1, gh.graph_area.width() / self.NUM_BINS / max(1, n_channels))
 
         # Draw dotted grid lines
-        grid_pen = QtGui.QPen(QtGui.QColor(64, 64, 64))
-        grid_pen.setStyle(Qt.DotLine)
-        ph.painter.setPen(grid_pen)
-        for bi in range(1, len(bin_edges) - 1):
-            bx = margin_left + bi * n_channels * bar_width_per_ch
-            ph.painter.drawLine(bx, margin_top, bx, margin_top + chart_h)
-        for i in range(10, 100, 10):
-            by = margin_top + i / 100. * chart_h
-            ph.painter.drawLine(margin_left, by, margin_left + chart_w, by)
+        gh.paintXGrid()
+        gh.paintYGrid()
 
         legend_y = int(5 * scale)
 
         for ci, ch in enumerate(self.channel_list):
             # Legend entry
             prop = self.data_view.get_channel_prop(ch)
-            ph.painter.setFont(chfont)
+            ph.painter.setFont(gh.channel_font)
             ph.painter.setPen(channels.colors[prop.color])
             label = f"{ch} ({prop.units})" if prop.units else ch
             ph.painter.drawText(
-                int(margin_left + ci * 150 * scale), legend_y,
+                int(gh.graph_area.left() + ci * 150 * scale), legend_y,
                 int(150 * scale), int(18 * scale),
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                 label)
@@ -164,29 +142,26 @@ class Histogram(widgets.MouseHelperWidget):
             for bi, count in enumerate(counts):
                 if count == 0:
                     continue
-                bar_h = (count / max_count) * chart_h
-                bx = margin_left + (bi * n_channels + ci) * bar_width_per_ch
-                by = margin_top + chart_h - bar_h
-                ph.painter.fillRect(QRectF(bx, by, bar_width_per_ch, bar_h), alpha_color)
+                bx = gh.graph_area.left() + (bi * n_channels + ci) * bar_width_per_ch
+                ph.painter.fillRect(QRectF(QPointF(bx, gh.y_axis.calc(count)),
+                                           QPointF(bx + bar_width_per_ch, gh.graph_area.bottom())),
+                                    alpha_color)
 
-        # X-axis labels (min and max)
-        ph.painter.setFont(axfont)
-        ph.painter.setPen(axis_color)
-        ph.painter.drawText(
-            int(margin_left), int(margin_top + chart_h + 2 * scale),
-            int(chart_w / 2), int(margin_bottom),
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-            f"{bin_edges[0]:.1f}")
-        ph.painter.drawText(
-            int(margin_left + chart_w / 2), int(margin_top + chart_h + 2 * scale),
-            int(chart_w / 2), int(margin_bottom),
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop,
-            f"{bin_edges[-1]:.1f}")
+
+        gh.paintGraphFrame()
+
+        # X-axis labels
+        gh.x_axis.logical_tick_spacing *= math.ceil(
+            60 * ph.scale / (gh.x_axis.logical_tick_spacing * gh.x_axis.pixel_val_spacing))
+        gh.paintXAxis(subtick=1)
 
         # Y-axis label
-        ph.painter.setFont(axfont)
-        ph.painter.setPen(axis_color)
+        ph.painter.setFont(gh.axis_font)
+        ph.painter.setPen(gh.axis_pen)
         ph.painter.drawText(
-            0, int(margin_top), int(margin_left - 5 * scale), int(chart_h),
+            0, int(gh.graph_area.top()),
+            int(gh.graph_area.left() - 5 * scale), int(gh.graph_area.height()),
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop,
             "Percent")
+
+        gh.paintYAxis()
