@@ -81,6 +81,8 @@ class Scatter(widgets.MouseHelperWidget):
         data = []
         # Traverse laps in reverse order so main lap is on top, also
         # cd_x/cd_y will represent the reference lap.
+        ref_lap_x = None
+        alt_lap_x = None
         for lap, color, idx in self.data_view.get_laps()[::-1]:
             try:
                 cd_x = self.data_view.get_channel_data(lap, ch_x)
@@ -106,6 +108,8 @@ class Scatter(widgets.MouseHelperWidget):
                          vals_x, vals_y,
                          cd_x.interp(self.data_view.cursor2outTime(lap)),
                          cd_y.interp(self.data_view.cursor2outTime(lap))))
+            if idx == 1: ref_lap_x = data[-1][3]
+            if idx == 2: alt_lap_x = data[-1][3]
 
         if not data:
             return
@@ -168,11 +172,29 @@ class Scatter(widgets.MouseHelperWidget):
         # X axis label
         x_label = f"{ch_x} [{x_units}]" if x_units else ch_x
         axis_space = 16 * ph.scale
-        ph.painter.drawText(
+        val_space = 40 * ph.scale
+        nref = (ref_lap_x is not None) + (alt_lap_x is not None)
+        if nref == 2:
+            val_space += 8 * ph.scale
+        rect = ph.painter.drawText(
             int(gh.graph_area.left()), int(gh.graph_area.bottom() + axis_space),
-            int(gh.graph_area.width()), int(axis_space),
+            int(gh.graph_area.width() - val_space * 0.5  * nref),
+            int(axis_space),
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
             x_label)
+        if ref_lap_x is not None:
+            ph.painter.drawText(rect.right() + 10 * ph.scale,
+                                int(gh.graph_area.bottom() + axis_space),
+                                int(gh.graph_area.width()), int(axis_space),
+                                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                                '%s%.*f' % ('\u278a ' if nref == 2 else '',
+                                            cd_x.dec_pts, ref_lap_x))
+        if alt_lap_x is not None:
+            ph.painter.drawText(rect.right() + 10 * ph.scale + val_space,
+                                int(gh.graph_area.bottom() + axis_space),
+                                int(gh.graph_area.width()), int(axis_space),
+                                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                                '\u278b %.*f' % (cd_x.dec_pts, alt_lap_x))
 
         # Y axis label (draw vertically would be ideal, but keep simple)
         gh.paintYLabel(f"{ch_y} [{y_units}]" if y_units else ch_y)
