@@ -51,7 +51,6 @@ class Scatter(widgets.MouseHelperWidget):
     def paintEvent(self, e):
         ph = widgets.makePaintHelper(self, e)
         ph.painter.fillRect(ph.rect, QtGui.QColor(12, 12, 12))
-        ph.painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
 
         gh = graphhelper.GraphHelper(self, ph)
         gh.setArea(QRectF(QPointF(0, 0), ph.size).adjusted(0, 25 * ph.scale, 0, 0), 1, 2)
@@ -119,6 +118,7 @@ class Scatter(widgets.MouseHelperWidget):
 
         ph.painter.save()
         ph.painter.setClipRect(gh.graph_area)
+        ph.painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         dot_size = max(1.5, 2 * ph.scale)
         for color, vals_x, vals_y in data:
             pen = QtGui.QPen(color)

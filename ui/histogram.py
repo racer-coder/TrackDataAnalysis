@@ -80,7 +80,6 @@ class Histogram(widgets.MouseHelperWidget):
     def paintEvent(self, e):
         ph = widgets.makePaintHelper(self, e)
         ph.painter.fillRect(ph.rect, QtGui.QColor(12, 12, 12))
-        ph.painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
 
         gh = graphhelper.GraphHelper(self, ph)
         gh.setArea(QRectF(QPointF(0, 0), ph.size).adjusted(0, 25 * ph.scale, 0, 0), 1, 1)
