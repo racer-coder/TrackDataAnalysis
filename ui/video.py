@@ -290,7 +290,7 @@ class AlignmentSlider(widgets.MouseHelperWidget):
         zero_offset = session_time + self.data_view.ref_lap.log.video_alignment - self.zoom_window / 2
         est_spacing = roundUpHumanNumber(self.zoom_window / (ph.size.width() / ph.scale / 60))
         self.x_axis = AxisGrid(zero_offset, zero_offset + self.zoom_window, est_spacing,
-                               ph.size.width() / self.zoom_window, 0)
+                               ph.size.width() / self.zoom_window, 0, 0)
 
         font = self.select_font()
         ph.painter.setFont(font)

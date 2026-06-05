@@ -576,7 +576,8 @@ class TimeDist(widgets.MouseHelperWidget):
                  self.x_axis.logical_max_val + self.dataView.getTDValue(lap.offset),
                  self.x_axis.logical_tick_spacing,
                  self.x_axis.pixel_val_spacing,
-                 self.x_axis.pixel_offset))
+                 self.x_axis.pixel_offset,
+                 self.x_axis.logical_zero))
             for lap in shift_laps]
 
         y_div = gh.full_graph_area.bottom()
