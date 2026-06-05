@@ -31,7 +31,7 @@ from PySide6.QtOpenGLWidgets import QOpenGLWidget
 os.environ['PATH'] = os.path.dirname(__file__) + os.pathsep + os.environ['PATH']
 from . import mpv
 from . import widgets
-from .timedist import roundUpHumanNumber, AxisGrid
+from .graphhelper import roundUpHumanNumber, AxisGrid
 from data import gpmf
 
 
