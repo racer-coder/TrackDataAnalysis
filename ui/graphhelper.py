@@ -109,6 +109,16 @@ class GraphHelper:
         for gy in self.y_axis.tickCoords():
             self.ph.painter.drawLine(self.graph_area.left(), gy, self.graph_area.right(), gy)
 
+    def paintYLabel(self, lbl):
+        self.ph.painter.save()
+        self.ph.painter.rotate(-90)
+        self.ph.painter.drawText(
+            -int(self.graph_area.bottom()), 0, int(self.graph_area.height()),
+            int(20 * self.ph.scale),
+            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
+            lbl)
+        self.ph.painter.restore()
+
     def paintYAxis(self):
         if self.graph_area.left() < self.ph.rect.left():
             return # nothing to do for this update

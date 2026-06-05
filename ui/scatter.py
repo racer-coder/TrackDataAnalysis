@@ -146,7 +146,7 @@ class Scatter(widgets.MouseHelperWidget):
         y_units = cd_y.units if cd_y.units else ''
 
         # X axis label
-        x_label = f"{ch_x} ({x_units})" if x_units else ch_x
+        x_label = f"{ch_x} [{x_units}]" if x_units else ch_x
         axis_space = 16 * ph.scale
         ph.painter.drawText(
             int(gh.graph_area.left()), int(gh.graph_area.bottom() + axis_space),
@@ -155,11 +155,4 @@ class Scatter(widgets.MouseHelperWidget):
             x_label)
 
         # Y axis label (draw vertically would be ideal, but keep simple)
-        y_label = f"{ch_y} ({y_units})" if y_units else ch_y
-        ph.painter.save()
-        ph.painter.rotate(-90)
-        ph.painter.drawText(
-            -int(gh.graph_area.bottom()), 0, int(gh.graph_area.height()), int(20 * ph.scale),
-            Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
-            y_label)
-        ph.painter.restore()
+        gh.paintYLabel(f"{ch_y} [{y_units}]" if y_units else ch_y)
