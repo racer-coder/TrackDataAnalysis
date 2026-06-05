@@ -114,6 +114,9 @@ class Scatter(widgets.MouseHelperWidget):
         gh.setYAxis(min(np.min(vals_y) for _, _, vals_y in data),
                     max(np.max(vals_y) for _, _, vals_y in data))
 
+        gh.paintXGrid()
+        gh.paintYGrid()
+
         ph.painter.save()
         ph.painter.setClipRect(gh.graph_area)
         dot_size = max(1.5, 2 * ph.scale)
