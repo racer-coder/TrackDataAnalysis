@@ -46,7 +46,7 @@ class Scatter(widgets.MouseHelperWidget):
         self.update()
 
     def updateCursor(self, old_cursor):
-        pass
+        self.update() # can we be more efficient?
 
     def paintEvent(self, e):
         ph = widgets.makePaintHelper(self, e)
@@ -103,15 +103,17 @@ class Scatter(widgets.MouseHelperWidget):
             vals_y = np.interp(cd_x.timecodes[start_idx:end_idx:step], cd_y.timecodes, cd_y.values)
 
             data.append((color if idx != 1 else channels.colors[cd_y.color],
-                         vals_x, vals_y))
+                         vals_x, vals_y,
+                         cd_x.interp(self.data_view.cursor2outTime(lap)),
+                         cd_y.interp(self.data_view.cursor2outTime(lap))))
 
         if not data:
             return
 
-        gh.setXAxis(min(np.min(vals_x) for _, vals_x, _ in data),
-                    max(np.max(vals_x) for _, vals_x, _ in data))
-        gh.setYAxis(min(np.min(vals_y) for _, _, vals_y in data),
-                    max(np.max(vals_y) for _, _, vals_y in data))
+        gh.setXAxis(min(np.min(vals_x) for _, vals_x, _, _, _ in data),
+                    max(np.max(vals_x) for _, vals_x, _, _, _ in data))
+        gh.setYAxis(min(np.min(vals_y) for _, _, vals_y, _, _ in data),
+                    max(np.max(vals_y) for _, _, vals_y, _, _ in data))
 
         gh.paintXGrid()
         gh.paintYGrid()
@@ -120,7 +122,7 @@ class Scatter(widgets.MouseHelperWidget):
         ph.painter.setClipRect(gh.graph_area)
         ph.painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
         dot_size = max(1.5, 2 * ph.scale)
-        for color, vals_x, vals_y in data:
+        for color, vals_x, vals_y, _, _ in data:
             pen = QtGui.QPen(color)
             pen.setWidth(1)
             ph.painter.setPen(pen)
@@ -132,6 +134,24 @@ class Scatter(widgets.MouseHelperWidget):
 
             for x, y in zip(vals_x, vals_y):
                 ph.painter.drawEllipse(QPointF(x, y), dot_size, dot_size)
+        ph.painter.restore()
+
+        # paint cursors
+        ph.painter.save()
+        ph.painter.setClipRect(gh.graph_area)
+        for color, _, _, val_x, val_y in data:
+            val_x = gh.x_axis.calc(val_x)
+            val_y = gh.y_axis.calc(val_y)
+            cursor_width = 6 * ph.scale
+
+            pens = [QtGui.QPen(Qt.black), QtGui.QPen(color)]
+            pens[0].setWidth(5)
+            pens[1].setWidth(3)
+            for pen in pens:
+                pen.setCapStyle(Qt.RoundCap)
+                ph.painter.setPen(pen)
+                ph.painter.drawLine(val_x - cursor_width, val_y, val_x + cursor_width, val_y)
+                ph.painter.drawLine(val_x, val_y - cursor_width, val_x, val_y + cursor_width)
         ph.painter.restore()
 
         # Graph frame and axis
