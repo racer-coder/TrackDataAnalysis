@@ -11,6 +11,7 @@ from PySide6 import QtGui
 from PySide6.QtCore import QPointF, QRectF, Qt
 
 from . import channels
+from . import graphhelper
 from . import state
 from . import widgets
 
@@ -52,12 +53,10 @@ class Scatter(widgets.MouseHelperWidget):
         ph.painter.fillRect(ph.rect, QtGui.QColor(12, 12, 12))
         ph.painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing, True)
 
-        chfont = QtGui.QFont('Tahoma')
-        chfont.setPixelSize(widgets.deviceScale(self, 13))
-        ph.painter.setFont(chfont)
+        gh = graphhelper.GraphHelper(self, ph)
+        gh.setArea(QRectF(QPointF(0, 0), ph.size).adjusted(0, 25 * ph.scale, 0, 0), 1, 2)
 
-        axfont = QtGui.QFont('Tahoma')
-        axfont.setPixelSize(widgets.deviceScale(self, 11.25))
+        ph.painter.setFont(gh.channel_font)
 
         dv = self.data_view
         if not dv.ref_lap:
@@ -79,32 +78,6 @@ class Scatter(widgets.MouseHelperWidget):
 
         ch_x = self.channel_list[0]
         ch_y = self.channel_list[1]
-
-        scale = ph.scale
-        margin_left = int(60 * scale)
-        margin_right = int(15 * scale)
-        margin_top = int(20 * scale)
-        margin_bottom = int(35 * scale)
-
-        chart_w = ph.size.width() - margin_left - margin_right
-        chart_h = ph.size.height() - margin_top - margin_bottom
-        if chart_w < 40 or chart_h < 20:
-            return
-
-        # Draw axes
-        axis_pen = QtGui.QPen(QtGui.QColor(192, 192, 192))
-        axis_pen.setWidth(max(1, int(scale)))
-        ph.painter.setPen(axis_pen)
-        ph.painter.drawLine(
-            int(margin_left), int(margin_top + chart_h),
-            int(margin_left + chart_w), int(margin_top + chart_h))
-        ph.painter.drawLine(
-            int(margin_left), int(margin_top),
-            int(margin_left), int(margin_top + chart_h))
-
-        label_font = ph.painter.font()
-        label_font.setPixelSize(max(8, int(10 * scale)))
-        ph.painter.setFont(label_font)
 
         data = []
         # Traverse laps in reverse order so main lap is on top, also
@@ -135,14 +108,14 @@ class Scatter(widgets.MouseHelperWidget):
         if not data:
             return
 
-        x_min = min(np.min(vals_x) for _, vals_x, _ in data)
-        x_max = max(np.max(vals_x) for _, vals_x, _ in data)
-        y_min = min(np.min(vals_y) for _, _, vals_y in data)
-        y_max = max(np.max(vals_y) for _, _, vals_y in data)
-        x_range = (x_max - x_min) or 1.
-        y_range = (y_max - y_min) or 1.
+        gh.setXAxis(min(np.min(vals_x) for _, vals_x, _ in data),
+                    max(np.max(vals_x) for _, vals_x, _ in data))
+        gh.setYAxis(min(np.min(vals_y) for _, _, vals_y in data),
+                    max(np.max(vals_y) for _, _, vals_y in data))
 
-        dot_size = max(1.5, 2 * scale)
+        ph.painter.save()
+        ph.painter.setClipRect(gh.graph_area)
+        dot_size = max(1.5, 2 * ph.scale)
         for color, vals_x, vals_y in data:
             pen = QtGui.QPen(color)
             pen.setWidth(1)
@@ -150,55 +123,41 @@ class Scatter(widgets.MouseHelperWidget):
             ph.painter.setBrush(QtGui.QBrush(
                 QtGui.QColor(color.red(), color.green(), color.blue(), 128)))
 
-            vals_x = margin_left + (vals_x - x_min) * (chart_w / x_range)
-            vals_y = margin_top + chart_h - (vals_y - y_min) * (chart_h / y_range)
+            step = max(1, len(vals_x) // 10000)
 
-            for i in range(0, len(vals_x), max(1, len(vals_x) // 10000)):
-                ph.painter.drawEllipse(QPointF(vals_x[i], vals_y[i]), dot_size, dot_size)
+            vals_x = gh.x_axis.calc(vals_x[::step]).data
+            vals_y = gh.y_axis.calc(vals_y[::step]).data
+
+            for x, y in zip(vals_x, vals_y):
+                ph.painter.drawEllipse(QPointF(x, y), dot_size, dot_size)
+        ph.painter.restore()
+
+        # Graph frame and axis
+        gh.paintGraphFrame()
+        gh.paintXAxis()
+        gh.paintYAxis()
 
         # Axis labels
-        ph.painter.setPen(QtGui.QColor(192, 192, 192))
+        ph.painter.setPen(gh.axis_pen)
+        ph.painter.setFont(gh.axis_font)
         x_units = cd_x.units if cd_x.units else ''
         y_units = cd_y.units if cd_y.units else ''
 
-        ph.painter.setFont(axfont)
-
         # X axis label
         x_label = f"{ch_x} ({x_units})" if x_units else ch_x
+        axis_space = 16 * ph.scale
         ph.painter.drawText(
-            int(margin_left), int(margin_top + chart_h + 5 * scale),
-            int(chart_w), int(margin_bottom),
+            int(gh.graph_area.left()), int(gh.graph_area.bottom() + axis_space),
+            int(gh.graph_area.width()), int(axis_space),
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
             x_label)
 
-        # X axis range
-        ph.painter.drawText(
-            int(margin_left), int(margin_top + chart_h + 2 * scale),
-            int(chart_w / 3), int(15 * scale),
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-            '%.*f' % (cd_x.dec_pts, x_min))
-        ph.painter.drawText(
-            int(margin_left + chart_w * 2 / 3), int(margin_top + chart_h + 2 * scale),
-            int(chart_w / 3), int(15 * scale),
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop,
-            '%.*f' % (cd_x.dec_pts, x_max))
-
-        # Y axis range
-        ph.painter.drawText(
-            0, int(margin_top + chart_h - 15 * scale),
-            int(margin_left - 5 * scale), int(15 * scale),
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom,
-            '%.*f' % (cd_y.dec_pts, y_min))
-        ph.painter.drawText(
-            0, int(margin_top), int(margin_left - 5 * scale), int(15 * scale),
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop,
-            '%.*f' % (cd_y.dec_pts, y_max))
-
         # Y axis label (draw vertically would be ideal, but keep simple)
         y_label = f"{ch_y} ({y_units})" if y_units else ch_y
+        ph.painter.save()
         ph.painter.rotate(-90)
         ph.painter.drawText(
-            #0, int(margin_top + 15 * scale), int(margin_left - 5 * scale), int(20 * scale),
-            -int(margin_top + chart_h), 0, int(chart_h), int(20 * scale),
+            -int(gh.graph_area.bottom()), 0, int(gh.graph_area.height()), int(20 * ph.scale),
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
             y_label)
+        ph.painter.restore()
