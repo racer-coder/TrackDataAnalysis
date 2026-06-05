@@ -2,7 +2,6 @@
 # Copyright 2024, Scott Smith.  MIT License (see LICENSE).
 
 import bisect
-from dataclasses import dataclass
 import math
 
 import numpy as np
@@ -11,13 +10,12 @@ from PySide6.QtGui import (
     QAction,
     QBrush,
     QColor,
-    QFont,
     QFontMetrics,
     QGuiApplication,
     QPainter,
     QPen,
 )
-from PySide6.QtCore import QPoint, QRect, QRectF, QSize, Qt
+from PySide6.QtCore import QPoint, QPointF, QRect, QRectF, QSize, Qt
 from PySide6.QtWidgets import (
     QApplication,
     QMenu,
@@ -27,44 +25,13 @@ from data import unitconv
 from data.distance import ChannelData
 from . import channels
 from .math import channel_editor
+from . import graphhelper
 from . import state
 from . import widgets
 
 
 
-def roundUpHumanNumber(num):
-    if num <= 0: return 1
-    l10 = math.log10(num)
-    w = math.ceil(l10)
-    d = 1
-    if 10. ** (l10 - w + 1) < 2:
-        d = 5
-    elif 10. ** (l10 - w + 1) < 5:
-        d = 2
-    return 10. ** w / d
-
-@dataclass()
-class AxisGrid:
-    logical_min_val: float
-    logical_max_val: float
-    logical_tick_spacing: float
-    pixel_val_spacing: float
-    pixel_offset: float
-
-    def calc(self, logical):
-        return (logical - self.logical_min_val) * self.pixel_val_spacing + self.pixel_offset
-
-    def invert(self, physical):
-        return (physical - self.pixel_offset) / self.pixel_val_spacing + self.logical_min_val
-
-    def invertRelative(self, physical):
-        return physical / self.pixel_val_spacing
-
 class TimeDist(widgets.MouseHelperWidget):
-    font_map = {
-        'axis': ('Tahoma', 11.25),
-        'channel': ('Tahoma', 13),
-    }
     CURSOR_WIDTH = 10 # scale?
 
     def __init__(self, dataView, lapView=None, state=None):
@@ -133,7 +100,6 @@ class TimeDist(widgets.MouseHelperWidget):
 
         self.setAcceptDrops(True) # for reordering channels
 
-        self.axis_pen = QPen(QColor(192, 192, 192))
         self.drop_indicator = None
 
     def save_state(self):
@@ -245,12 +211,6 @@ class TimeDist(widgets.MouseHelperWidget):
             self.dataView.makeTD(self.dataView.getTDValue(origZoom[1]) - rel, True))
         self.dataView.values_change.emit()
 
-    def selectFont(self, why):
-        stats = self.font_map[why]
-        font = QFont(stats[0])
-        font.setPixelSize(widgets.deviceScale(self, stats[1]))
-        return font
-
     def calc_time_slip(self, laps, var):
         if not laps: return
         target_window = self.dataView.lapTime2Mode(self.dataView.ref_lap,
@@ -276,8 +236,10 @@ class TimeDist(widgets.MouseHelperWidget):
                 dec_pts = 3,
                 interpolate = True))
 
-    def paintGraph(self, ph, y_offset, height, channel_list, graph_idx):
+    def paintGraph(self, gh, ph, y_offset, height, channel_list, graph_idx):
         if not self.x_axis: return
+        gh.graph_area = QRectF(gh.full_graph_area.left(), y_offset,
+                               gh.full_graph_area.width(), height)
         # get laps
         laps = self.dataView.get_laps()
         laps[0] = (self.dataView.ref_lap, None, 0) # special color to mean use channel color
@@ -297,26 +259,11 @@ class TimeDist(widgets.MouseHelperWidget):
         dmax += diff * .03
         dmin -= diff * .03
         # construct y axis base and spacing
-        y_axis = AxisGrid(dmax, dmin,
-                          roundUpHumanNumber((dmax-dmin) / (height / ph.scale / 14)),
-                          height / (dmin - dmax), y_offset)
-        # set pen for grid
-        pen = QPen(QColor(64, 64, 64))
-        pen.setStyle(Qt.DotLine)
-        ph.painter.setPen(pen)
-        # draw x grid
-        i = np.arange(math.ceil(self.x_axis.logical_min_val / self.x_axis.logical_tick_spacing),
-                      math.ceil(self.x_axis.logical_max_val / self.x_axis.logical_tick_spacing))
-        agx = self.x_axis.calc(i * self.x_axis.logical_tick_spacing)
-        for gx in memoryview(agx):
-            ph.painter.drawLine(gx, y_offset, gx, y_offset + height)
+        gh.setYAxis(dmin, dmax)
 
-        # draw y grid
-        i = np.arange(math.ceil(dmin / y_axis.logical_tick_spacing),
-                      math.ceil(dmax / y_axis.logical_tick_spacing))
-        agy = y_axis.calc(i * y_axis.logical_tick_spacing)
-        for gy in memoryview(agy):
-            ph.painter.drawLine(self.graph_x, gy, ph.size.width(), gy)
+        gh.paintXGrid()
+        gh.paintYGrid()
+
         # draw data
         draw_channels = channel_list
         if graph_idx == self.current_channel[0]:
@@ -340,7 +287,7 @@ class TimeDist(widgets.MouseHelperWidget):
                 search = self.x_axis.invert(max(ph.rect.right() + 0.5, self.graph_x)) + lap_base
                 end_idx = min(len(xa), bisect.bisect_right(xa, search) + 1)
                 xa = memoryview(np.round(self.x_axis.calc(np.subtract(xa[start_idx:end_idx], lap_base))).astype(int))
-                dv = np.round(y_axis.calc(np.asarray(d.values[start_idx:end_idx]))).astype(int)
+                dv = np.round(gh.y_axis.calc(np.asarray(d.values[start_idx:end_idx]))).astype(int)
                 dvd1 = dv.data
                 xa_uniqval, xa_uniqidx = np.unique(xa, return_index=True)
                 umin = np.minimum.reduceat(dv, xa_uniqidx)
@@ -353,7 +300,7 @@ class TimeDist(widgets.MouseHelperWidget):
                     np.minimum(umin[1:], dvval, out=umin[1:])
                     np.maximum(umax[1:], dvval, out=umax[1:])
                 ph.painter.save()
-                ph.painter.setClipRect(self.graph_x, y_offset, ph.size.width(), height)
+                ph.painter.setClipRect(gh.graph_area)
                 # paint lines that live across pixel columns
                 for idx in memoryview(xa_uniqidx[1:] - 1):
                     ph.painter.drawLine(xa[idx], dvd1[idx], xa[idx+1], dvd2[idx])
@@ -363,7 +310,7 @@ class TimeDist(widgets.MouseHelperWidget):
                         ph.painter.drawLine(x, y1, x, y2)
                 ph.painter.restore()
         # font for data stats
-        font = self.selectFont('channel')
+        font = gh.channel_font
         ph.painter.setFont(font)
         fontMetrics = QFontMetrics(font)
         # color background for text
@@ -424,7 +371,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                         ph.size.width() - self.graph_x, 4)))
             if len(d.values):
                 main_val = d.interp(self.dataView.cursor2outTime(lap))
-                self.cursor_values.append(y_axis.calc(main_val))
+                self.cursor_values.append(gh.y_axis.calc(main_val))
                 ph.painter.drawText(self.graph_x + 6 + self.channel_ind_width + self.channel_name_width, y,
                                     self.channel_value_width, fontMetrics.height(),
                                     Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
@@ -506,67 +453,7 @@ class TimeDist(widgets.MouseHelperWidget):
                                 ph.size.width() - self.graph_x, (y_offset - next_y + height)/2)))
 
         # draw Y axis
-        self.paintYAxis(ph, y_offset, height, y_axis)
-
-    def paintYAxis(self, ph, y_offset, height, y_axis):
-        if self.graph_x < ph.rect.left():
-            return # nothing to do
-
-        ph.painter.setFont(self.axis_font)
-        text_height = QFontMetrics(self.axis_font).height()
-        ph.painter.setPen(self.axis_pen)
-
-        ph.painter.drawLine(self.graph_x, y_offset, self.graph_x, y_offset + height)
-
-        exp = int(math.floor(math.log10(y_axis.logical_tick_spacing) + .01))
-        exp = max(0, -exp)
-        i = np.arange(int(y_axis.logical_max_val / y_axis.logical_tick_spacing),
-                      int(y_axis.logical_min_val / y_axis.logical_tick_spacing) + 1)
-        atc = i * y_axis.logical_tick_spacing
-        for tc, y in zip(atc, y_axis.calc(atc)):
-            if y + text_height / 2 <= y_offset + height:
-                ph.painter.drawText(0, y - 25, self.graph_x - 4, 50,
-                                    Qt.AlignVCenter | Qt.AlignRight | Qt.TextSingleLine,
-                                    '%.*f' % (exp, tc))
-        spacing = y_axis.logical_tick_spacing / 5
-        ai = np.arange(int(y_axis.logical_max_val / spacing) + 1,
-                       int(y_axis.logical_min_val / spacing) + 1)
-        for i, y in zip(ai.data, y_axis.calc(ai * spacing).data):
-            ph.painter.drawLine(self.graph_x, y,
-                                self.graph_x - (2 if i % 5 else 4), y)
-
-    def paintXAxis(self, ph, y_offset, x_axis):
-        if not self.dataView.ref_lap: return
-
-        ph.painter.setFont(self.axis_font)
-        ph.painter.setPen(self.axis_pen)
-
-        ph.painter.drawLine(self.graph_x, y_offset, ph.size.width(), y_offset)
-
-        exp = int(math.floor(math.log10(x_axis.logical_tick_spacing) + .01)) - 3
-        if self.dataView.mode_time:
-            formatter = '%.0f:%02d' if exp >= 0 else ('%%.0f:%%0%d.%df' % (3 - exp, -exp))
-        else:
-            formatter = '%%.%df' % max(-exp, 0)
-        ai = np.arange(int(math.ceil(x_axis.logical_min_val / x_axis.logical_tick_spacing)),
-                       int(math.ceil(x_axis.logical_max_val / x_axis.logical_tick_spacing)) + 1)
-        atc = ai * x_axis.logical_tick_spacing
-        ax = x_axis.calc(atc)
-        for tc, x in zip(atc, ax):
-            ph.painter.drawText(x - 100, y_offset + 4, 200, 50,
-                                Qt.AlignHCenter | Qt.AlignTop | Qt.TextSingleLine,
-                                formatter %
-                                ((math.copysign(math.trunc(tc / 60000), tc),
-                                  abs(tc) % 60000 / 1000) if self.dataView.mode_time else tc))
-
-        spacing = x_axis.logical_tick_spacing / 5
-        ai = np.arange(int(math.ceil(x_axis.logical_min_val / spacing)),
-                       int(math.ceil(x_axis.logical_max_val / spacing)))
-        atc = ai * spacing
-        ax = x_axis.calc(atc)
-        for i, tc, x in zip(ai.data, atc.data, ax.data):
-            ph.painter.drawLine(x, y_offset,
-                                x, y_offset + (2 if i % 5 else 4))
+        gh.paintYAxis()
 
     def minmax_width(self, channel_font_metrics, d):
         if isinstance(d, list):
@@ -629,17 +516,23 @@ class TimeDist(widgets.MouseHelperWidget):
 
     def paintEvent(self, event):
         ph = widgets.makePaintHelper(self, event)
+        gh = graphhelper.GraphHelper(self, ph)
 
-        self.axis_font = self.selectFont('axis')
+        if self.dataView.mode_offset and self.lapView and self.dataView.active_component == self:
+            shift_laps = [lap for lap, _, _ in self.dataView.get_laps()]
+        else:
+            shift_laps = []
 
-        self.graph_x = 50 * ph.scale
-        self.graph_max = ph.size.width()
+        gh.setArea(QRectF(QPointF(0, 0), ph.size), 1, 1 + len(shift_laps))
+
+        self.graph_x = gh.graph_area.left()
+        self.graph_max = gh.graph_area.left() + gh.graph_area.width()
 
         self.time_slip_data = []
         if self.time_slip.isChecked():
             self.calc_time_slip(self.dataView.get_laps(), self.time_slip_data)
 
-        channel_font_metrics = QFontMetrics(self.selectFont('channel'))
+        channel_font_metrics = QFontMetrics(gh.channel_font)
         M_space = channel_font_metrics.horizontalAdvance('\u25bc ')
         self.channel_name_width = max(
             [channel_font_metrics.horizontalAdvance(self.channelName(ch)) + 2 * M_space
@@ -674,19 +567,19 @@ class TimeDist(widgets.MouseHelperWidget):
                     self.dataView.ref_lap.log.laps[-1].end.time)
                 zero_offset = -self.dataView.getLapValue(self.dataView.ref_lap)[0] - self.dataView.getTDValue(self.dataView.ref_lap.offset)
             if data_range > 0: # maybe we have no distance data?
-                est_spacing = roundUpHumanNumber(data_range / ((ph.size.width() - self.graph_x) / ph.scale / 60))
-                self.x_axis = AxisGrid(zero_offset, zero_offset + data_range, est_spacing,
-                                       (ph.size.width() - self.graph_x) / data_range, self.graph_x)
-        if not self.dataView.mode_offset or not self.lapView or self.dataView.active_component != self:
-            self.shift_axis = []
-        else:
-            self.shift_axis = [
-                (lap, AxisGrid(zero_offset + self.dataView.getTDValue(lap.offset),
-                               zero_offset + self.dataView.getTDValue(lap.offset) + data_range,
-                               est_spacing,
-                               (ph.size.width() - self.graph_x) / data_range, self.graph_x))
-                for lap, color, idx in self.dataView.get_laps()]
-        y_div = ph.size.height() - 16 * ph.scale * (1 + len(self.shift_axis))
+                gh.setXAxis(zero_offset, zero_offset + data_range)
+                self.x_axis = gh.x_axis # Save it for future use by mouse callback functions
+        self.shift_axis = [
+            (lap,
+             graphhelper.AxisGrid(
+                 self.x_axis.logical_min_val + self.dataView.getTDValue(lap.offset),
+                 self.x_axis.logical_max_val + self.dataView.getTDValue(lap.offset),
+                 self.x_axis.logical_tick_spacing,
+                 self.x_axis.pixel_val_spacing,
+                 self.x_axis.pixel_offset))
+            for lap in shift_laps]
+
+        y_div = gh.full_graph_area.bottom()
 
         # grey out area outside of the current lap
         if self.x_axis:
@@ -701,11 +594,11 @@ class TimeDist(widgets.MouseHelperWidget):
                                     QColor(48, 48, 48))
 
         # lap window
-        font = self.axis_font
+        font = gh.axis_font
         ph.painter.setFont(font)
         fontMetrics = QFontMetrics(font)
         graph_y = 4 + fontMetrics.height()
-        ph.painter.setPen(self.axis_pen)
+        ph.painter.setPen(gh.axis_pen)
         # draw outline
         ph.painter.drawRect(self.graph_x, 0, ph.size.width() - self.graph_x - 1, graph_y - 2)
         # draw laps
@@ -731,6 +624,8 @@ class TimeDist(widgets.MouseHelperWidget):
             self.paint_sectors(ph, graph_y, graph_y - 2)
             graph_y *= 2
 
+        gh.full_graph_area.setTop(graph_y)
+
         # paint each channel group graph
         self.cursor_values = []
         groups = self.channelGroups or [[]]
@@ -739,7 +634,7 @@ class TimeDist(widgets.MouseHelperWidget):
         separation = 6
         for i, grp in enumerate(groups):
             next_cutoff = graph_y + i * separation + (i + 1) * (y_div - graph_y - separation * (len(groups) - 1)) // len(groups)
-            self.paintGraph(ph, last_cutoff, next_cutoff - last_cutoff, grp, i)
+            self.paintGraph(gh, ph, last_cutoff, next_cutoff - last_cutoff, grp, i)
             last_cutoff = next_cutoff + separation
 
         # separation lines
@@ -787,15 +682,13 @@ class TimeDist(widgets.MouseHelperWidget):
 
 
         # frame graph area
-        ph.painter.setPen(self.axis_pen)
-        ph.painter.drawRect(self.graph_x, graph_y,
-                            ph.size.width() - self.graph_x - 1, y_div - graph_y)
+        gh.paintGraphFrame()
 
         # paint X axis
         if self.x_axis:
-            self.paintXAxis(ph, y_div, self.x_axis)
+            gh.paintXAxis(self.x_axis, 0, self.dataView.mode_time)
             for idx, axis in enumerate(self.shift_axis):
-                self.paintXAxis(ph, y_div + 16 * ph.scale * (1 + idx), axis[1])
+                gh.paintXAxis(axis[1], 1 + idx, self.dataView.mode_time)
             ph.painter.save()
             f = QColor(192, 192, 192)
             b = QColor(0, 0, 0)
