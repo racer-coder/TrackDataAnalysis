@@ -28,6 +28,10 @@ class Histogram(widgets.MouseHelperWidget):
         self.channel_list = list(state['channels']) if state and 'channels' in state else []
         self.setMinimumSize(200, 100)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.ActionsContextMenu)
+        self.cumulative = QtGui.QAction('Show cumulative percentage', self)
+        self.cumulative.setCheckable(True)
+        self.cumulative.toggled.connect(self.toggle_cumulative)
+        self.addAction(self.cumulative)
         data_view.values_change.connect(self.update)
 
     def save_state(self):
@@ -50,6 +54,9 @@ class Histogram(widgets.MouseHelperWidget):
 
     def updateCursor(self, old_cursor):
         pass
+
+    def toggle_cumulative(self, flag):
+        self.update()
 
     def _datasets(self):
         laps = self.data_view.get_laps()
@@ -138,13 +145,19 @@ class Histogram(widgets.MouseHelperWidget):
             counts = np.histogram(values, bins=bin_edges, weights=weights)[0]
             counts = counts * (100. / (np.sum(counts) or 1)) # Normalize the sum to 100%
 
+            total = 0
             for bi, count in enumerate(counts):
                 if count == 0:
                     continue
+                total += count
                 bx = gh.graph_area.left() + (bi * n_channels + ci) * bar_width_per_ch
                 ph.painter.fillRect(QRectF(QPointF(bx, gh.y_axis.calc(count)),
                                            QPointF(bx + bar_width_per_ch, gh.graph_area.bottom())),
                                     alpha_color)
+                if self.cumulative.isChecked():
+                    ph.painter.drawRect(
+                        QRectF(QPointF(bx, gh.y_axis.calc(total)),
+                               QPointF(bx + bar_width_per_ch, gh.graph_area.bottom())))
 
 
         gh.paintGraphFrame()
