@@ -75,9 +75,9 @@ class Scatter(widgets.MouseHelperWidget):
             ph.painter.drawText(ph.rect, Qt.AlignmentFlag.AlignCenter, msg)
             return
 
-        ch_x = self.channel_list[0]
-
         data = []
+        ref_data = None
+        alt_data = None
         # Traverse laps in reverse order so main lap is on top, also
         # cds will represent the reference lap.
         for lap, color, idx in self.data_view.get_laps()[::-1]:
@@ -95,24 +95,31 @@ class Scatter(widgets.MouseHelperWidget):
             # Align on timecodes: interpolate Y onto X timecodes
             step = max(1, (end_idx - start_idx) // 10000)
             vals_x = cds[0].values[start_idx:end_idx:step]
-            vals_y = np.interp(cds[0].timecodes[start_idx:end_idx:step],
-                               cds[1].timecodes, cds[1].values)
 
             data.append(([color if idx != 1 else channels.colors[cd.color]
                           for cd in cds[1:]],
-                         vals_x, [np.interp(cds[0].timecodes[start_idx:end_idx:step],
-                                            cd.timecodes, cd.values)
-                                  for cd in cds[1:]],
+                         vals_x,
+                         [np.interp(cds[0].timecodes[start_idx:end_idx:step],
+                                    cd.timecodes, cd.values)
+                          if cd.values is not None and len(cd.values) > 0 else None
+                          for cd in cds[1:]],
                          [cd.interp(self.data_view.cursor2outTime(lap))
+                          if cd.values is not None and len(cd.values) > 0 else None
                           for cd in cds]))
+            if idx == 1: ref_data = data[-1]
+            if idx == 2: alt_data = data[-1]
 
         if not data:
             return
 
         gh.setXAxis(min(np.min(vals_x) for _, vals_x, _, _ in data),
                     max(np.max(vals_x) for _, vals_x, _, _ in data))
-        gh.setYAxis(min(np.min(vals_y) for _, _, vals, _ in data for vals_y in vals),
-                    max(np.max(vals_y) for _, _, vals, _ in data for vals_y in vals))
+        gh.setYAxis(min([np.min(vals_y) for _, _, vals, _ in data
+                         for vals_y in vals if vals_y is not None],
+                        default=0),
+                    max([np.max(vals_y) for _, _, vals, _ in data
+                         for vals_y in vals if vals_y is not None],
+                        default=0))
 
         gh.paintXGrid()
         gh.paintYGrid()
@@ -124,6 +131,7 @@ class Scatter(widgets.MouseHelperWidget):
         for colors, vals_x, vals, _ in data:
             vals_x = gh.x_axis.calc(vals_x).data
             for color, vals_y in zip(colors[::-1], vals[::-1]):
+                if vals_y is None: continue
                 pen = QtGui.QPen(color)
                 pen.setWidth(1)
                 ph.painter.setPen(pen)
@@ -142,6 +150,7 @@ class Scatter(widgets.MouseHelperWidget):
         for colors, _, _, vals in data:
             val_x = gh.x_axis.calc(vals[0])
             for color, val_y in zip(colors[::-1], vals[1:][::-1]):
+                if val_y is None: continue
                 val_y = gh.y_axis.calc(val_y)
 
                 pens = [QtGui.QPen(Qt.black), QtGui.QPen(color)]
@@ -160,11 +169,12 @@ class Scatter(widgets.MouseHelperWidget):
         x_units = cds[0].units if cds[0].units else ''
 
         # X axis label
+        ch_x = self.channel_list[0]
         x_label = f"{ch_x} [{x_units}]" if x_units else ch_x
         axis_space = 16 * ph.scale
         val_space = 40 * ph.scale
-        nref = 2 if self.data_view.alt_lap else 1
-        if nref == 2:
+        nref = 2 if alt_data else 1
+        if alt_data:
             val_space += 8 * ph.scale
         rect = ph.painter.drawText(
             int(gh.graph_area.left()), int(gh.graph_area.bottom() + axis_space),
@@ -172,18 +182,19 @@ class Scatter(widgets.MouseHelperWidget):
             int(axis_space),
             Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
             x_label)
-        ph.painter.drawText(rect.right() + 10 * ph.scale,
-                            int(gh.graph_area.bottom() + axis_space),
-                            int(gh.graph_area.width()), int(axis_space),
-                            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-                            '%s%.*f' % ('\u278a ' if nref == 2 else '',
-                                        cds[0].dec_pts, data[-1][3][0]))
-        if self.data_view.alt_lap:
+        if ref_data:
+            ph.painter.drawText(rect.right() + 10 * ph.scale,
+                                int(gh.graph_area.bottom() + axis_space),
+                                int(gh.graph_area.width()), int(axis_space),
+                                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                                '%s%.*f' % ('\u278a ' if alt_data else '',
+                                            cds[0].dec_pts, ref_data[3][0]))
+        if alt_data:
             ph.painter.drawText(rect.right() + 10 * ph.scale + val_space,
                                 int(gh.graph_area.bottom() + axis_space),
                                 int(gh.graph_area.width()), int(axis_space),
                                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-                                '\u278b %.*f' % (cds[0].dec_pts, data[-2][3][0]))
+                                '\u278b %.*f' % (cds[0].dec_pts, alt_data[3][0]))
 
 
         # Y axis legend
@@ -230,18 +241,19 @@ class Scatter(widgets.MouseHelperWidget):
                                 self.channel_name_width, fontMetrics.height(),
                                 Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
                                 name)
-            ph.painter.drawText(start_x + self.channel_ind_width + self.channel_name_width, y,
-                                self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '%.*f' % (cd.dec_pts, data[-1][3][idx+1]))
+            if ref_data and ref_data[3][idx+1] is not None:
+                ph.painter.drawText(start_x + self.channel_ind_width + self.channel_name_width, y,
+                                    self.channel_value_width, fontMetrics.height(),
+                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    '%.*f' % (cd.dec_pts, ref_data[3][idx+1]))
 
-            if not self.data_view.alt_lap: continue
-            ph.painter.setPen(pen2)
-            ph.painter.drawText(start_x + self.channel_ind_width
-                                + self.channel_name_width + self.channel_value_width,
-                                y, self.channel_value_width, fontMetrics.height(),
-                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
-                                '%.*f' % (cd.dec_pts, data[-2][3][idx+1]))
+            if alt_data and alt_data[3][idx+1] is not None:
+                ph.painter.setPen(pen2)
+                ph.painter.drawText(start_x + self.channel_ind_width
+                                    + self.channel_name_width + self.channel_value_width,
+                                    y, self.channel_value_width, fontMetrics.height(),
+                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    '%.*f' % (cd.dec_pts, alt_data[3][idx+1]))
 
         # Graph frame and axis
         gh.paintGraphFrame()

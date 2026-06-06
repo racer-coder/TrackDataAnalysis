@@ -57,7 +57,7 @@ class AxisGrid:
         return memoryview(self.calc(self.tickVals(subtick=subtick)))
 
 def makeAxisGrid(ph, min_val, max_val, pixel_base, pixel_range, tick_factor, zero_val=0):
-    pixel_per_val = pixel_range / (max_val - min_val)
+    pixel_per_val = pixel_range / (max_val - min_val) if min_val != max_val else 1
     return AxisGrid(
         min_val, max_val,
         roundUpHumanNumber(ph.scale * tick_factor / abs(pixel_per_val)),
