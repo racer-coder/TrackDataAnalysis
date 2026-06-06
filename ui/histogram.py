@@ -70,7 +70,7 @@ class Histogram(widgets.MouseHelperWidget):
                            data.timecodes[start_idx:end_idx])
                 values = data.values[start_idx:end_idx]
                 selector = np.isfinite(values)
-                values = values[selector]
+                values = np.compress(selector, values)
                 if len(values) == 0:
                     continue
 
