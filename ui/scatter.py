@@ -8,7 +8,7 @@ import bisect
 import numpy as np
 
 from PySide6 import QtGui
-from PySide6.QtCore import QPointF, QRectF, Qt
+from PySide6.QtCore import QPointF, QRectF, QSizeF, Qt
 
 from . import channels
 from . import graphhelper
@@ -158,11 +158,6 @@ class Scatter(widgets.MouseHelperWidget):
                 ph.painter.drawLine(val_x, val_y - cursor_width, val_x, val_y + cursor_width)
         ph.painter.restore()
 
-        # Graph frame and axis
-        gh.paintGraphFrame()
-        gh.paintXAxis()
-        gh.paintYAxis()
-
         # Axis labels
         ph.painter.setPen(gh.axis_pen)
         ph.painter.setFont(gh.axis_font)
@@ -196,5 +191,64 @@ class Scatter(widgets.MouseHelperWidget):
                                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
                                 '\u278b %.*f' % (cd_x.dec_pts, alt_lap_x))
 
-        # Y axis label (draw vertically would be ideal, but keep simple)
-        gh.paintYLabel(f"{ch_y} [{y_units}]" if y_units else ch_y)
+
+        # Y axis legend
+        name_with_units = f"{ch_y} [{y_units}]" if y_units else ch_y
+        # font for data stats
+        font = gh.channel_font
+        ph.painter.setFont(font)
+        fontMetrics = QtGui.QFontMetrics(font)
+        M_space = fontMetrics.horizontalAdvance('\u25bc ')
+        self.channel_name_width = fontMetrics.horizontalAdvance(name_with_units) + 2 * M_space
+        self.channel_ind_width = M_space if self.channel_name_width else 0
+        self.channel_value_width = M_space + max(
+            fontMetrics.horizontalAdvance('%.*f' % (cd_y.dec_pts, gh.y_axis.logical_min_val)),
+            fontMetrics.horizontalAdvance('%.*f' % (cd_y.dec_pts, gh.y_axis.logical_max_val)))
+        self.channel_opt_width = 2 * (self.channel_value_width
+                                      if self.channel_name_width and self.data_view.alt_lap
+                                      else 0)
+        # color background for text
+        ph.painter.fillRect(QRectF(gh.graph_area.topLeft(),
+                                   QSizeF(self.channel_ind_width + self.channel_name_width +
+                                          self.channel_value_width + self.channel_opt_width,
+                                          12 + fontMetrics.height() * 1)), # 1 channel
+                            QtGui.QColor(32, 32, 32, 160))
+
+        pen2 = QtGui.QPen(state.lap_colors[1])
+        pen2.setStyle(Qt.SolidLine)
+        next_y = gh.graph_area.top()
+        start_x = gh.graph_area.left() + 6
+        for i in range(1): # add loop later when supporting multiple channels
+            # set pen for data
+            y = next_y
+            next_y += fontMetrics.height()
+
+            pen = QtGui.QPen(channels.colors[cd_y.color])
+            ph.painter.setPen(pen)
+
+            if True: # add support for selecting channels later
+                ph.painter.drawText(start_x, y,
+                                    self.channel_ind_width, fontMetrics.height(),
+                                    Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                    '\u25aa')
+            ph.painter.drawText(start_x + self.channel_ind_width, y,
+                                self.channel_name_width, fontMetrics.height(),
+                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                name_with_units)
+            ph.painter.drawText(start_x + self.channel_ind_width + self.channel_name_width, y,
+                                self.channel_value_width, fontMetrics.height(),
+                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                '%.*f' % (cd_y.dec_pts, data[-1][4]))
+
+            if not self.data_view.alt_lap: continue
+            ph.painter.setPen(pen2)
+            ph.painter.drawText(start_x + self.channel_ind_width
+                                + self.channel_name_width + self.channel_value_width,
+                                y, self.channel_value_width, fontMetrics.height(),
+                                Qt.AlignTop | Qt.AlignLeft | Qt.TextSingleLine,
+                                '%.*f' % (cd_y.dec_pts, data[-2][4]))
+
+        # Graph frame and axis
+        gh.paintGraphFrame()
+        gh.paintXAxis()
+        gh.paintYAxis()
