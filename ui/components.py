@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from . import widgets
 from . import histogram
+from . import liftcoast
 from . import sector_table
 from . import scatter
 from . import table_builder
@@ -28,6 +29,7 @@ from . import video
 class ComponentManager(QWidget):
     factory = {
         'histogram': histogram.Histogram,
+        'liftcoast': liftcoast.LiftCoast,
         'scatter': scatter.Scatter,
         'sector_table': sector_table.SectorTable,
         'table_builder': table_builder.TableBuilder,
@@ -50,6 +52,8 @@ class ComponentManager(QWidget):
         addMenu.addAction('Sector Table').triggered.connect(
             self.graphMaker(sector_table.SectorTable))
         addMenu.addAction('Video').triggered.connect(self.graphMaker(video.Video))
+        addMenu.addAction('Lift and Coast').triggered.connect(
+            self.graphMaker(liftcoast.LiftCoast))
         addMenu.addAction('Table Builder').triggered.connect(
             self.graphMaker(table_builder.TableBuilder))
 
