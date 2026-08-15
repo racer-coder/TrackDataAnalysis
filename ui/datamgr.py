@@ -457,7 +457,7 @@ class DataDockWidget(TempDockWidget):
         file_names = QFileDialog.getOpenFileNames(self, 'Open data file for analysis',
                                                  self.config.get('main', 'last_open_dir',
                                                                  fallback=os.getcwd()),
-                                                 'Data files (*.adulog *.ibt *.ld *.log *.mlg *.run *.vbo *.xrk)')[0]
+                                                 'Data files (*.adulog *.emuprolog *.ibt *.ld *.log *.mlg *.run *.vbo *.xrk)')[0]
         for file_name in file_names:
             if self.open_file(file_name):
                 self.config['main']['last_open_dir'] = os.path.dirname(file_name)
@@ -473,6 +473,8 @@ class DataDockWidget(TempDockWidget):
             return data.iracing.IRacing
         elif file_name.lower().endswith('.adulog'):
             return data.ecumaster.ECUMASTER_ADU
+        elif file_name.lower().endswith('.emuprolog'):
+            return data.ecumaster.ECUMASTER_EMUPRO
         elif file_name.lower().endswith('.run'):
             return data.racetech.RUN
         elif file_name.lower().endswith('.vbo'):
