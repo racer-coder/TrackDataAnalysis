@@ -250,12 +250,12 @@ class MainWindow(QMainWindow):
                          os.path.basename(self.data_view.ref_lap.log.log.get_filename())))
         metadata.append(('Dirname', os.path.dirname(self.data_view.ref_lap.log.log.get_filename())))
         table = QTableWidget(len(metadata), 2)
-        table.setSelectionMode(table.NoSelection)
+        table.setSelectionMode(table.SelectionMode.NoSelection)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.horizontalHeader().hide()
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.verticalHeader().hide()
-        table.setEditTriggers(table.NoEditTriggers)
+        table.setEditTriggers(table.EditTrigger.NoEditTriggers)
         row = 0
         for name, val in metadata:
             table.setItem(row, 0, QTableWidgetItem(name))
