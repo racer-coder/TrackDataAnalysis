@@ -86,10 +86,11 @@ class LayoutEditor(QDialog):
         self.tree = LayoutTree()
         self.tree.setColumnCount(1)
         self.tree.setItemsExpandable(False)
-        self.tree.setDragDropMode(self.tree.InternalMove)
+        self.tree.setDragDropMode(self.tree.DragDropMode.InternalMove)
         self.tree.setDefaultDropAction(Qt.IgnoreAction)
-        self.tree.setEditTriggers(self.tree.DoubleClicked | self.tree.SelectedClicked |
-                                  self.tree.EditKeyPressed)
+        self.tree.setEditTriggers(self.tree.EditTrigger.DoubleClicked |
+                                  self.tree.EditTrigger.SelectedClicked |
+                                  self.tree.EditTrigger.EditKeyPressed)
         self.tree.header().hide()
         current = None
         for wb in parent.workspace:
