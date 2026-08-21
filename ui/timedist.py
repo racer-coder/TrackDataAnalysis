@@ -192,14 +192,17 @@ class TimeDist(widgets.MouseHelperWidget):
                           self.x_axis.invert(self.zoom_sel_start(absPos)))
         self.zoom_highlight = None
 
-        lap_range = self.dataView.getLapValue(self.dataView.ref_lap)
-        self.dataView.zoom_window = (
-            self.dataView.makeTD(zoom_highlight[0], False),
-            self.dataView.makeTD(zoom_highlight[1] - lap_range[1] + lap_range[0], True))
-        old_cursor = self.dataView.cursor_time
-        self.dataView.cursor_time = self.dataView.zoom_window[0]
-        self.dataView.cursor_change.emit(old_cursor)
-        self.dataView.values_change.emit()
+        if zoom_highlight[1] <= zoom_highlight[0]:
+            self.update()
+        else:
+            lap_range = self.dataView.getLapValue(self.dataView.ref_lap)
+            self.dataView.zoom_window = (
+                self.dataView.makeTD(zoom_highlight[0], False),
+                self.dataView.makeTD(zoom_highlight[1] - lap_range[1] + lap_range[0], True))
+            old_cursor = self.dataView.cursor_time
+            self.dataView.cursor_time = self.dataView.zoom_window[0]
+            self.dataView.cursor_change.emit(old_cursor)
+            self.dataView.values_change.emit()
 
     def xaxisCapture(self, absPos):
         return self.dataView.zoom_window
